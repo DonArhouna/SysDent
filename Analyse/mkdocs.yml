@@ -1,0 +1,70 @@
+site_name: SysDent Pro
+site_description: Documentation de la modélisation backend du projet SysDent Pro
+site_author: DeepMind Antigravity
+use_directory_urls: false
+
+theme:
+  name: material
+  language: fr
+  palette:
+    - scheme: default
+      primary: deep purple
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Mode sombre
+    - scheme: slate
+      primary: deep purple
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Mode clair
+  font:
+    text: Roboto
+    code: Roboto Mono
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - toc.follow
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - tables
+  - attr_list
+  - md_in_html
+
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - https://unpkg.com/mermaid/dist/mermaid.min.js
+  - javascripts/mermaid.js
+
+nav:
+  - Accueil: index.md
+  - Analyse Fonctionnelle:
+      - Cas d'utilisation: cas_utilisation.md
+  - Architecture des Données:
+      - Modèle Conceptuel (MCD): modelisation_mcd.md
+      - Modèle Logique (MLD): modelisation_mld.md
+      - Diagrammes de Classes: modelisation_classes.md
+      - Dictionnaire de données: dictionnaire.md
+  - Processus & Flux:
+      - Diagrammes de Séquence: sequence.md
+      - Flux Patient: flux_patient.md
+  - Règles Métier: regles.md
+  - Technologies: technologies.md

@@ -1,0 +1,582 @@
+🏥
+CAHIER DES CHARGES
+Système de Gestion de
+Multi-Cabinet Médico-Dentaire
+Version 1.0  |  Document Confidentiel
+Référence
+Valeur
+Titre du projet
+SysDent Pro – Gestion Multi-Cabinet
+Type de document
+Cahier des Charges Fonctionnel et Technique
+Statut
+Draft v1.0
+Domaine
+Santé / Médecine Dentaire
+Périmètre
+Multi-cabinet, Multi-praticien
+TABLE DES MATIÈRES
+1. Présentation du Projet
+2. Objectifs du Système
+3. Périmètre Fonctionnel
+4. Acteurs et Rôles
+5. Modules Fonctionnels
+5.1 Gestion des Patients
+5.2 Dossier Médical & Dentaire
+5.3 Odontogramme & Gestion des Dents
+5.4 Gestion des Rendez-vous
+5.5 Gestion des Praticiens & Cabinets
+5.6 Gestion des Traitements & Prescriptions
+5.7 Facturation & Caisse
+5.8 Stock & Gestion du Matériel
+5.9 Rapports & Statistiques
+5.10 Communication & Notifications
+6. Exigences Techniques
+7. Sécurité & Conformité
+8. Contraintes & Hypothèses
+9. Glossaire
+1. PRÉSENTATION DU PROJET
+1.1 Contexte
+Le secteur médico-dentaire au Sénégal et en Afrique francophone connaît une croissance significative avec l'essor de structures multi-cabinets regroupant plusieurs praticiens spécialisés sous un même toit ou répartis sur plusieurs sites géographiques.
+La gestion manuelle ou l'utilisation d'outils non adaptés engendre des pertes d'information, des erreurs de diagnostic, des problèmes de coordination entre praticiens et une qualité de service dégradée pour les patients.
+1.2 Description du Projet
+SysDent Pro est un système d'information de gestion intégré destiné aux structures multi-cabinets médico-dentaires. Il couvre l'ensemble du parcours patient, de l'accueil à la facturation, en passant par le diagnostic, le traitement, et le suivi post-opératoire.
+1.3 Parties Prenantes
+Partie Prenante
+Rôle
+Intérêt Principal
+Directeur Médical
+Commanditaire principal
+Vision globale, pilotage
+Praticiens Dentistes
+Utilisateurs cœur
+Qualité des soins, productivité
+Personnel d'accueil
+Utilisateurs quotidiens
+Fluidité de gestion
+Patients
+Bénéficiaires
+Qualité de prise en charge
+DSI / Informaticiens
+Maîtrise technique
+Maintenabilité du système
+Comptabilité
+Contrôle financier
+Exactitude des données
+2. OBJECTIFS DU SYSTÈME
+2.1 Objectifs Généraux
+Centraliser et sécuriser toutes les données patients et médicales
+Coordonner l'activité de plusieurs praticiens sur un ou plusieurs sites
+Réduire les délais d'attente et améliorer la satisfaction patient
+Assurer la traçabilité complète des actes et traitements
+Faciliter la facturation et le suivi financier
+Produire des statistiques et rapports d'activité
+2.2 Objectifs Spécifiques
+Mettre en place un dossier patient numérique complet (médical + dentaire)
+Intégrer un odontogramme interactif pour la gestion des 32 dents
+Gérer les rendez-vous en temps réel avec gestion des conflits
+Automatiser les rappels de rendez-vous par SMS/email
+Gérer le stock de matériels et consommables dentaires
+Respecter les normes de confidentialité des données de santé
+3. PÉRIMÈTRE FONCTIONNEL
+3.1 Inclus dans le périmètre
+Gestion multi-site (plusieurs cabinets géographiquement distincts)
+Gestion multi-praticien (dentistes généralistes et spécialistes)
+Dossier patient complet : médical, dentaire, imagerie
+Odontogramme numérique avec historique par dent
+Prise de rendez-vous en ligne et agenda partagé
+Prescriptions et ordonnances numériques
+Facturation, devis et gestion des paiements (espèces, virement, assurance)
+Gestion du stock et des commandes fournisseurs
+Tableau de bord et rapports statistiques
+Notifications automatiques (SMS, email)
+3.2 Hors périmètre (Phase 1)
+Téléconsultation vidéo (prévu Phase 2)
+Application mobile patient (prévu Phase 2)
+Intégration avec la sécurité sociale nationale (prévu Phase 3)
+4. ACTEURS ET RÔLES
+Le système définit les rôles suivants avec des permissions différenciées :
+4.1 Tableau des Rôles et Permissions
+Rôle
+Description
+Accès Principaux
+Restrictions
+Super Administrateur
+Gérant informatique du système
+Tous les modules, configuration système, gestion des utilisateurs
+Aucune
+Directeur Médical
+Responsable de la structure
+Rapports, statistiques, tous dossiers, configuration clinique
+Pas de suppression de données
+Dentiste / Praticien
+Professionnel de santé
+Dossiers patients, odontogramme, prescriptions, son agenda
+Pas d'accès à la comptabilité globale
+Assistant(e) Dentaire
+Aide du praticien
+Dossiers patients (lecture), préparation des actes, stérilisation
+Pas de prescription
+Secrétaire / Accueil
+Gestion administrative
+Rendez-vous, dossiers administratifs, facturation, caisse
+Pas d'accès aux données cliniques
+Comptable
+Gestion financière
+Facturation, caisse, rapports financiers, devis
+Pas d'accès aux données médicales
+Gestionnaire Stock
+Gestion des ressources
+Inventaire, commandes, fournisseurs, alertes stock
+Pas d'accès aux dossiers patients
+Patient (portail)
+Usager des soins
+Son propre dossier (lecture), prise de RDV en ligne
+Accès restreint à ses seules données
+4.2 Matrice de Permissions Détaillée
+Module
+Super Admin
+Directeur
+Dentiste
+Assistant
+Secrétaire
+Comptable
+Dossier Patient
+✅ CRUD
+✅ CRUD
+✅ CRUD
+👁 Lecture
+✅ CRUD Admin
+❌
+Odontogramme
+✅ CRUD
+👁 Lecture
+✅ CRUD
+👁 Lecture
+❌
+❌
+Prescriptions
+✅ CRUD
+👁 Lecture
+✅ CRUD
+❌
+❌
+❌
+Rendez-vous
+✅ CRUD
+✅ CRUD
+✅ Son agenda
+✅ Partiel
+✅ CRUD
+❌
+Facturation
+✅ CRUD
+👁 Lecture
+👁 Lecture
+❌
+✅ CRUD
+✅ CRUD
+Stock
+✅ CRUD
+👁 Lecture
+👁 Lecture
+✅ Partiel
+❌
+❌
+Rapports
+✅ Tous
+✅ Tous
+✅ Siens
+❌
+✅ Partiel
+✅ Financiers
+Utilisateurs
+✅ CRUD
+👁 Lecture
+❌
+❌
+❌
+❌
+5. MODULES FONCTIONNELS
+5.1 Module – Gestion des Patients
+Fiche Patient Complète
+Chaque patient dispose d'un dossier numérique unique avec les informations suivantes :
+Catégorie
+Champs
+Identification
+Numéro de dossier (auto), Prénom, Nom, Date de naissance, Sexe, Photo
+Contact
+Adresse complète, Téléphone principal, Téléphone secondaire, Email
+Profession
+Profession, Employeur (optionnel)
+État Général
+Grossesse (O/N + terme), Allaitement, Diabète (type + traitement), HTA (traitement), Allergies (liste détaillée), Antécédents médicaux
+Informations Dentaires
+Dernière visite, Praticien habituel, Groupe sanguin
+Assurance
+Organisme assureur, N° police, Taux de prise en charge
+Documents
+Pièce d'identité scannée, Radios, Ordonnances
+Fonctionnalités de gestion des patients
+Recherche multicritère (nom, prénom, numéro, téléphone, date de naissance)
+Création, modification, archivage de dossiers
+Fusion de doublons
+Historique complet des consultations
+Alertes automatiques sur les contre-indications (ex : patient allergique à la pénicilline)
+Export du dossier en PDF
+5.2 Module – Dossier Médical & Consultation
+Motif et Diagnostic
+Champ
+Type
+Description
+Motif de consultation
+Texte libre + liste
+Ex : Douleur, Contrôle, Urgence, Esthétique
+Anamnèse
+Texte libre
+Histoire de la maladie, symptômes
+Examen clinique
+Structuré + texte
+Examen exo-buccal, endo-buccal, parodontal
+Diagnostic
+Texte + codes CIM-10
+Diagnostic principal et différentiels
+Plan de traitement
+Structuré
+Liste des actes prévus avec ordre et priorité
+Traitement réalisé
+Structuré
+Actes effectués, matériaux utilisés, durée
+Prescriptions
+Structuré
+Médicaments, posologie, durée
+Recommandations
+Texte libre
+Instructions post-opératoires au patient
+Prochain rendez-vous
+Date/heure
+Planification du suivi
+5.3 Module – Odontogramme & Gestion Complète des Dents
+⭐ MODULE STRATÉGIQUE : Cœur métier de l'application dentaire
+5.3.1 Schéma de Numérotation des Dents
+Le système supporte deux nomenclatures internationales :
+Système
+Description
+Usage
+FDI / ISO 3950
+Notation à deux chiffres (quadrant + position)
+Ex : 11, 21, 31, 41 pour les incisives centrales
+Standard international, recommandé
+Universal (ADA)
+Numérotation de 1 à 32 pour adultes
+Usage américain
+Palmer
+Notation par quadrant avec symboles
+Usage européen classique
+5.3.2 Structure de l'Odontogramme
+Vue graphique interactive des 32 dents adultes (ou 20 dents primaires pour les enfants) :
+Quadrant
+Numérotation FDI
+Dents
+Supérieur Droit (Q1)
+11 à 18
+Incisive centrale → 3ème molaire
+Supérieur Gauche (Q2)
+21 à 28
+Incisive centrale → 3ème molaire
+Inférieur Gauche (Q3)
+31 à 38
+Incisive centrale → 3ème molaire
+Inférieur Droit (Q4)
+41 à 48
+Incisive centrale → 3ème molaire
+Dents primaires (enfants)
+51-55, 61-65, 71-75, 81-85
+20 dents temporaires
+5.3.3 États et Conditions par Dent
+Pour chaque dent (ou face de dent), le système enregistre :
+Catégorie
+États / Conditions Possibles
+État général
+Saine, Absente (extraite), Absente congénitale, Incluse/retenue, Supernuméraire
+Caries
+Carie débutante, Carie avancée, Carie profonde, Carie sous plombage
+Soins réalisés
+Obturation (amalgame/composite/CVI), Inlay, Onlay, Couronne
+Endodontie
+Traitement canalaire (TCR), Reprise de TCR, Apexification
+Prothèse fixe
+Couronne métal, Couronne céramique, Bridge (pilier/intermédiaire)
+Prothèse amovible
+Prothèse partielle, Prothèse totale, Stellite
+Implantologie
+Implant posé, Couronne sur implant, En attente d'ostéo-intégration
+Parodontologie
+Poche parodontale (profondeur mm), Mobilité (grades 1-3), Furcation
+Chirurgie
+Extraction planifiée, Extraction réalisée, Résection apicale
+Orthodontie
+Bague, Bracket, Contention
+Esthétique
+Facette, Blanchiment réalisé
+État des faces
+Mésial, Distal, Vestibulaire, Lingual/Palatin, Occlusal/Incisal
+5.3.4 Fonctionnalités de l'Odontogramme Numérique
+Interface graphique interactive : cliquer sur une dent pour afficher/modifier son état
+Code couleur selon l'état (vert = sain, rouge = carie, bleu = traité, gris = absent...)
+Visualisation par face (5 faces par dent postérieure, 4 faces par dent antérieure)
+Historique horodaté de chaque modification par dent
+Comparaison entre deux dates (avant/après traitement)
+Saisie du plan de traitement directement sur le schéma
+Impression/export de l'odontogramme en PDF
+Saisie du charting parodontal (sondage, saignement, récession)
+Gestion dents déciduale → permanente (dents mixtes)
+Annotations libres par dent avec date et auteur
+5.3.5 Charting Parodontal
+Paramètre
+Valeurs
+Fréquence de saisie
+Profondeur de sondage
+En mm, 6 points par dent
+À chaque bilan paro
+Niveau d'attache clinique (NAC)
+En mm
+À chaque bilan paro
+Récession gingivale
+En mm
+À chaque bilan paro
+Saignement au sondage (BOP)
+Oui / Non par site
+À chaque bilan paro
+Suppuration
+Oui / Non
+À chaque bilan paro
+Mobilité dentaire
+Grade 0, 1, 2, 3
+À chaque examen
+Atteinte furcation
+Classe I, II, III (Hamp)
+À chaque examen
+Plaque dentaire (IPV)
+% de sites positifs
+À chaque séance
+5.4 Module – Gestion des Rendez-vous
+Agenda multi-praticien avec vue journalière, hebdomadaire et mensuelle
+Codage couleur par type d'acte ou par praticien
+Gestion des créneaux disponibles par cabinet et par fauteuil
+Blocage de plages horaires (congés, formation, urgences)
+Durée estimée selon le type d'acte planifié
+Rappels automatiques SMS/email 24h avant le rendez-vous
+Gestion des absences et annulations avec historique
+Liste d'attente automatique en cas d'annulation
+Statistiques : taux d'absentéisme, taux de remplissage de l'agenda
+5.5 Module – Gestion des Cabinets & Praticiens
+Gestion Multi-Site
+Paramétrage de plusieurs sites (adresse, horaires, contacts)
+Affectation des praticiens à un ou plusieurs cabinets
+Gestion des fauteuils par salle de soins
+Planning d'occupation des fauteuils
+Fiche Praticien
+Champ
+Description
+Identité
+Nom, Prénom, Titre (Dr, Pr), Photo
+Spécialité
+Dentisterie générale, Orthodontie, Parodontologie, Chirurgie, Endodontie, Implantologie, Pédodontie, Prothèse
+Coordonnées
+Téléphone, Email professionnel
+N° d'inscription
+Ordre des chirurgiens-dentistes
+Disponibilités
+Jours et heures de travail par site
+Signature numérique
+Pour ordonnances et comptes rendus
+5.6 Module – Traitements & Prescriptions
+Nomenclature des Actes
+Base de données des actes dentaires (soins, prothèses, chirurgie, imagerie)
+Tarifs paramétrables par acte et par praticien
+Association automatique acte → matériel utilisé → coût
+Ordonnances Numériques
+Rédaction assistée avec base de données médicamenteuse
+Alertes automatiques interactions médicamenteuses
+Alertes contre-indications (grossesse, allaitement, allergie, diabète, HTA)
+Signature électronique du praticien
+Impression et archivage numérique
+Historique des prescriptions par patient
+5.7 Module – Facturation & Caisse
+Fonctionnalité
+Description
+Devis
+Génération automatique depuis le plan de traitement, signature patient
+Facturation
+Factures détaillées par acte avec TVA si applicable
+Modes de paiement
+Espèces, Carte bancaire, Virement, Mobile Money (Wave, Orange Money), Chèque
+Paiement partiel
+Acomptes, échelonnement, solde dû
+Assurance / Mutuelle
+Taux prise en charge, part assurance vs part patient
+Remboursements
+Gestion des avoirs et remboursements
+Reçus
+Génération automatique de reçus numérotés
+Rapports caisse
+Journalier, mensuel, annuel par praticien et par site
+Impayés
+Suivi des créances et relances automatiques
+5.8 Module – Stock & Gestion du Matériel
+Catalogue des produits dentaires (anesthésiques, résines, composites, instruments, consommables)
+Gestion des quantités par cabinet
+Alertes de stock minimum configurable
+Commandes fournisseurs avec bon de commande
+Réception et mise à jour automatique du stock
+Traçabilité par lot et date de péremption
+Gestion du matériel stérilisable (cycles de stérilisation)
+Rapport de consommation mensuelle
+5.9 Module – Rapports & Statistiques
+Type de Rapport
+Contenu
+Activité Médicale
+Nombre de consultations, actes réalisés, par praticien et période
+Financier
+Chiffre d'affaires, recettes, encaissements, impayés, par site/praticien
+Patients
+Nouveaux patients, fidélisation, répartition par âge/sexe/pathologie
+Agenda
+Taux de remplissage, absentéisme, durée moyenne de consultation
+Épidémiologique
+Pathologies les plus fréquentes, caries par tranche d'âge
+Stock
+Consommation, valeur du stock, alertes péremption
+Performance praticien
+Actes réalisés, temps moyen, satisfaction
+5.10 Module – Communication & Notifications
+SMS automatiques : rappel RDV, résultats disponibles, devis à valider
+Email automatiques : confirmation RDV, bilan annuel, promotions
+Portail patient (accès sécurisé) : consultation dossier, prise de RDV en ligne
+Messagerie interne entre praticiens et personnel
+Journal d'activité : traçabilité de toutes les actions utilisateurs
+6. EXIGENCES TECHNIQUES
+6.1 Architecture Système
+Composant
+Technologie Recommandée
+Justification
+Frontend Web
+React.js / Vue.js
+Interface riche, réactive, multi-écrans
+Backend API
+Node.js / Django REST
+Performance, scalabilité
+Base de données
+PostgreSQL
+Robustesse, relations complexes, ACID
+Cache
+Redis
+Sessions, performances, temps réel
+Serveur Web
+Nginx
+Proxy inverse, HTTPS, performance
+Hébergement
+Cloud VPS (OVH, AWS) ou serveur local
+Selon contraintes client
+Backup
+Sauvegarde quotidienne automatique chiffrée
+Continuité de service
+6.2 Exigences de Performance
+Temps de réponse < 2 secondes pour toute action standard
+Disponibilité : 99,5% (hors maintenance planifiée)
+Support de 50 utilisateurs simultanés minimum
+Capacité de stockage évolutive (documents, radiographies)
+6.3 Compatibilité
+Navigateurs : Chrome, Firefox, Edge, Safari (versions N-1)
+Appareils : PC, tablette (responsive design)
+Impression : compatible imprimantes standard et thermiques
+Import/Export : CSV, PDF, HL7 FHIR (interopérabilité médicale)
+7. SÉCURITÉ & CONFORMITÉ
+7.1 Sécurité des Données
+Authentification : identifiant + mot de passe fort + double authentification (2FA) optionnelle
+Gestion des sessions : expiration automatique après inactivité
+Chiffrement des données sensibles en base (AES-256)
+Communication sécurisée HTTPS/TLS 1.3
+Journalisation de tous les accès et modifications
+Cloisonnement des données par rôle (RBAC)
+7.2 Conformité Légale
+Exigence
+Mesure Implémentée
+Secret médical
+Accès aux données cliniques réservé aux soignants habilités
+Conservation des données
+Durée légale de conservation selon réglementation locale
+Droit d'accès patient
+Portail patient avec accès à son propre dossier
+Traçabilité
+Journal immuable de toutes les actions sur les dossiers
+Sauvegarde
+Backup quotidien automatique hors site chiffré
+RGPD / Loi locale
+Consentement explicite, anonymisation possible pour stats
+7.3 Plan de Continuité
+Sauvegarde automatique toutes les 24h avec rétention 90 jours
+Mode hors-ligne partiel en cas de coupure internet
+Plan de reprise d'activité (PRA) documenté
+Accès de secours administrateur défini
+8. CONTRAINTES & PLANNING
+8.1 Contraintes Techniques
+Connexion internet disponible mais potentiellement instable (prévoir mode dégradé)
+Matériel hétérogène (PC anciens à récents, tablettes)
+Support multilingue : français principalement, wolof possible
+8.2 Contraintes Organisationnelles
+Formation obligatoire de tous les utilisateurs avant déploiement
+Migration possible des données existantes (Excel, logiciels antérieurs)
+Support technique disponible en heures ouvrables
+8.3 Planning Indicatif
+Phase
+Activités
+Durée estimée
+Phase 0 – Cadrage
+Validation CDC, maquettes, architecture
+3 semaines
+Phase 1 – Développement Core
+Patients, dossiers, odontogramme, RDV
+3 mois
+Phase 2 – Développement Avancé
+Facturation, stock, rapports, notifications
+2 mois
+Phase 3 – Tests & Recette
+Tests unitaires, intégration, recette client
+1 mois
+Phase 4 – Déploiement
+Migration données, formation, go-live
+3 semaines
+Phase 5 – Maintenance
+Support, correctifs, évolutions
+Continu
+9. GLOSSAIRE
+Terme
+Définition
+Odontogramme
+Schéma graphique représentant l'ensemble des dents avec leur état
+FDI
+Fédération Dentaire Internationale – système de numérotation des dents à deux chiffres
+TCR
+Traitement Canalaire Radiculaire – dévitalisation et obturation des canaux
+Charting parodontal
+Évaluation clinique de l'état du parodonte (gencives et os)
+RBAC
+Role-Based Access Control – contrôle d'accès basé sur les rôles
+HL7 FHIR
+Standard d'interopérabilité pour l'échange de données médicales
+BOP
+Bleeding On Probing – saignement au sondage, indicateur d'inflammation gingivale
+NAC
+Niveau d'Attache Clinique – mesure de la destruction parodontale
+IPV
+Indice de Plaque Vestibulaire – quantification de la plaque bactérienne
+Multi-cabinet
+Structure regroupant plusieurs cabinets sur un ou plusieurs sites
+2FA
+Authentification à deux facteurs – sécurité renforcée de connexion
+RGPD
+Règlement Général sur la Protection des Données (européen)
+FIN DU CAHIER DES CHARGES – SysDent Pro v1.0
+Document confidentiel – Tous droits réservés

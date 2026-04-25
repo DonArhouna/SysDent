@@ -1,0 +1,68 @@
+/* Custom styles to match premium look */
+
+:root {
+    --md-primary-fg-color: #673ab7; /* Deep Purple */
+    --md-primary-fg-color--light: #9575cd;
+    --md-primary-fg-color--dark: #512da8;
+}
+
+.md-content__inner {
+    max-width: 1000px;
+}
+
+/* Make mermaid diagrams look better */
+.mermaid {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: center;
+}
+
+[data-md-color-scheme="slate"] .mermaid {
+    background: #1e2124;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+}
+
+/* Improve admonitions (alerts) */
+.md-typeset .admonition, .md-typeset details {
+    border-radius: 0.4rem;
+    border-left-width: 0.4rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+/* Code blocks rounding */
+.md-typeset pre {
+    border-radius: 0.4rem;
+}
+
+/* Index page welcome layout */
+.welcome-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.welcome-card {
+    padding: 1.5rem;
+    background: var(--md-card-bg);
+    border: 1px solid var(--md-default-fg-color--lightest);
+    border-radius: 0.8rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    text-decoration: none !important;
+    color: inherit !important;
+}
+
+.welcome-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    border-color: var(--md-primary-fg-color);
+}
+
+.welcome-card h3 {
+    margin-top: 0 !important;
+    color: var(--md-primary-fg-color);
+}
