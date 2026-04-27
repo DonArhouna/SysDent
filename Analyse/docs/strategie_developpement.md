@@ -839,16 +839,16 @@ flowchart TD
 
 ### 9.1 Comparatif Backend
 
-| Critère | **Node.js + Express** | **Django REST (Python)** | **Spring Boot (Java)** |
+| Critère | **Node.js + Express** | **Django REST (Python)** | **FastAPI (Python)** |
 |---------|----------------------|-------------------------|----------------------|
-| Performance | ⭐⭐⭐⭐ Excellente (async I/O) | ⭐⭐⭐ Bonne | ⭐⭐⭐⭐ Excellente |
-| Rapidité de dev | ⭐⭐⭐⭐⭐ Très rapide | ⭐⭐⭐⭐⭐ Très rapide (admin auto) | ⭐⭐⭐ Plus lent |
-| Sécurité native | ⭐⭐⭐ Moyenne | ⭐⭐⭐⭐⭐ Excellente (CSRF, XSS, SQL inj.) | ⭐⭐⭐⭐⭐ Spring Security |
-| ORM | Prisma (type-safe) | Django ORM (intégré) | Hibernate/JPA |
-| Écosystème médical | ⭐⭐⭐ Bon | ⭐⭐⭐⭐ Riche (NumPy, Pandas) | ⭐⭐⭐⭐ HL7/FHIR natif |
-| Scalabilité | ⭐⭐⭐⭐ Horizontale | ⭐⭐⭐ Correcte | ⭐⭐⭐⭐⭐ Enterprise-grade |
-| Recrutement Sénégal | ⭐⭐⭐⭐ Facile | ⭐⭐⭐⭐ Facile | ⭐⭐⭐ Moyen |
-| **Recommandation** | ✅ **Recommandé** si JS full-stack | ✅ **Recommandé** si robustesse prioritaire | 🔶 Pour grande structure |
+| Performance | ⭐⭐⭐⭐ Excellente (async I/O) | ⭐⭐⭐ Bonne | ⭐⭐⭐⭐⭐ Exceptionnelle (Asynchrone) |
+| Rapidité de dev | ⭐⭐⭐⭐⭐ Très rapide | ⭐⭐⭐⭐⭐ Très rapide (admin auto) | ⭐⭐⭐⭐⭐ Très rapide (Pydantic/Typage) |
+| Sécurité native | ⭐⭐⭐ Moyenne | ⭐⭐⭐⭐⭐ Excellente (CSRF, XSS) | ⭐⭐⭐⭐ Très bonne (OAuth2/JWT) |
+| ORM | Prisma (type-safe) | Django ORM (intégré) | SQLAlchemy / SQLModel |
+| Écosystème médical | ⭐⭐⭐ Bon | ⭐⭐⭐⭐ Riche (NumPy, Pandas) | ⭐⭐⭐⭐ Riche (Data Science) |
+| Scalabilité | ⭐⭐⭐⭐ Horizontale | ⭐⭐⭐ Correcte | ⭐⭐⭐⭐⭐ Nativement asynchrone |
+| Recrutement Sénégal | ⭐⭐⭐⭐ Facile | ⭐⭐⭐⭐ Facile | ⭐⭐⭐⭐ En forte progression |
+| **Recommandation** | 🔶 Option alternative | 🔶 Si admin auto-générée vitale | ✅ **Choix validé : FastAPI** |
 
 ### 9.2 Comparatif Frontend
 
@@ -875,7 +875,7 @@ flowchart TD
 
 | Composant | Choix recommandé |
 |-----------|-----------------|
-| **Backend** | **Django REST Framework** (Python) — sécurité native, admin auto-générée, idéal données médicales |
+| **Backend** | **FastAPI** (Python) — performances exceptionnelles, typage statique, doc Swagger automatique |
 | **Frontend** | **React.js** avec Next.js — composants riches, SVG pour odontogramme |
 | **Base de données** | **PostgreSQL** — conformité ACID, JSONB, standard santé |
 | **Cache** | Redis — sessions, file d'attente notifications |
