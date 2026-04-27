@@ -1,5 +1,13 @@
 # Modèle Logique de Données (MLD)
 
+> Notation: **table**(*PK*, attributs, #FK)
+
+!!! info "Champs communs d'audit"
+    Par souci de clarté, les champs suivants sont implicites pour **toutes les tables** du système :
+    - **id** (UUID, Primary Key)
+    - **created_at** (DateTime, auto-généré à la création)
+    - **updated_at** (DateTime, mis à jour à chaque modification)
+
 ## Structure Multi-Tenant (Sage X3 Style)
 
 - **societes**(*id*, nom, ninea, logo_url, adresse_siege, ville, pays, telephone, email, site_web, actif, date_creation)

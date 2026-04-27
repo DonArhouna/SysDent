@@ -500,6 +500,9 @@ classDiagram
 
 > Notation: **table**(*PK*, attributs, #FK)
 
+!!! info "Audit & Traçabilité"
+    Toutes les tables incluent systématiquement les champs **id** (UUID), **created_at** et **updated_at** pour le suivi des données.
+
 ### 4.1 Authentification & RBAC
 
 - **roles**(*id*, nom, description)

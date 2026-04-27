@@ -27,6 +27,7 @@ Le système SysDent Pro repose sur **23 règles de gestion** critiques garantiss
 | RG21 | Disponibilités praticien respectées par l'agenda | RDV |
 | RG22 | Réception commande = Stock à jour auto | Stock |
 | RG23 | Session expire après inactivité | Sécurité |
+| RG24 | Toutes les tables disposent de champs `created_at` et `updated_at` | Audit |
 
 ## Matrice de Permissions
 
