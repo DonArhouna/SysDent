@@ -27,7 +27,7 @@ document.addEventListener("DOMContentLoaded", function () {
       theme: "base",
       themeVariables: {
         primaryColor: "#673ab7",
-        primaryTextColor: "#fff",
+        primaryTextColor: "#ffffff",
         primaryBorderColor: "#512da8",
         lineColor: "#673ab7",
         secondaryColor: "#9c27b0",
@@ -35,6 +35,11 @@ document.addEventListener("DOMContentLoaded", function () {
         mainBkg: "#673ab7",
         nodeBorder: "#512da8",
         clusterBkg: "#f3e5f5",
+        // Spécifique ER Diagram
+        attributeFill: "#f8f9fa",
+        attributeColor: "#333333",
+        entityBkg: "#673ab7",
+        entityBorder: "#512da8",
       },
       flowchart: {
         useMaxWidth: true,

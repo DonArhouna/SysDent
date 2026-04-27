@@ -26,6 +26,25 @@
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
 }
 
+.mermaid svg {
+    color: var(--md-default-fg-color);
+}
+
+/* Fix for ER Diagram text visibility */
+.mermaid .entityBox {
+    fill: #673ab7 !important;
+}
+.mermaid .entityLabel {
+    fill: #ffffff !important;
+}
+.mermaid .attributeBoxOdd, .mermaid .attributeBoxEven {
+    fill: #f8f9fa !important;
+    stroke: #512da8 !important;
+}
+.mermaid .attributeLabel {
+    fill: #333333 !important;
+}
+
 /* Improve admonitions (alerts) */
 .md-typeset .admonition, .md-typeset details {
     border-radius: 0.4rem;
