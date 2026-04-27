@@ -1,7 +1,7 @@
 /* Custom styles to match premium look */
 
 :root {
-    --md-primary-fg-color: #673ab7; /* Deep Purple */
+    --md-primary-fg-color: #673ab7;
     --md-primary-fg-color--light: #9575cd;
     --md-primary-fg-color--dark: #512da8;
 }
@@ -10,78 +10,69 @@
     max-width: 1000px;
 }
 
-/* Make mermaid diagrams look better */
+/* Mermaid General Container */
 .mermaid {
-    background: white;
+    background: #ffffff;
     padding: 20px;
     border-radius: 8px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     margin-bottom: 2rem;
     display: flex;
     justify-content: center;
 }
 
-[data-md-color-scheme="slate"] .mermaid {
-    background: #1e2124;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-}
+/* FORCE VISIBILITY FOR ER DIAGRAMS */
 
-.mermaid svg {
-    color: var(--md-default-fg-color);
-}
-
-/* Fix for ER Diagram text visibility */
+/* 1. Entity Boxes (Headers) */
 .mermaid .entityBox {
     fill: #673ab7 !important;
+    stroke: #512da8 !important;
 }
 .mermaid .entityLabel {
     fill: #ffffff !important;
+    font-weight: bold !important;
+    font-size: 14px !important;
 }
-.mermaid .attributeBoxOdd, .mermaid .attributeBoxEven {
-    fill: #f8f9fa !important;
-    stroke: #512da8 !important;
+
+/* 2. Attributes (Fields) - Force a clear background and dark text */
+.mermaid rect[class*="attributeBox"] {
+    fill: #fdfdfd !important;
+    stroke: #d1d1d1 !important;
 }
-.mermaid .attributeLabel {
+.mermaid text[class*="attributeLabel"] {
     fill: #333333 !important;
+    font-size: 12px !important;
 }
 
-/* Improve admonitions (alerts) */
-.md-typeset .admonition, .md-typeset details {
-    border-radius: 0.4rem;
-    border-left-width: 0.4rem;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+/* 3. Relationship Labels (Liaisons) - CRITICAL FIX */
+.mermaid .relationshipLabel rect {
+    fill: #ffffff !important;
+    fill-opacity: 1 !important;
+    stroke: #673ab7 !important;
+}
+.mermaid .relationshipLabel text, 
+.mermaid .edgeLabel, 
+.mermaid .label text {
+    fill: #333333 !important;
+    font-weight: bold !important;
 }
 
-/* Code blocks rounding */
-.md-typeset pre {
-    border-radius: 0.4rem;
+/* 4. Lines and markers */
+.mermaid .er.relationshipLine {
+    stroke: #673ab7 !important;
+}
+.mermaid .er.entityBox {
+    stroke-width: 2px !important;
 }
 
-/* Index page welcome layout */
-.welcome-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1rem;
-    margin-top: 2rem;
+/* Dark mode support */
+[data-md-color-scheme="slate"] .mermaid {
+    background: #1e2124;
 }
-
-.welcome-card {
-    padding: 1.5rem;
-    background: var(--md-card-bg);
-    border: 1px solid var(--md-default-fg-color--lightest);
-    border-radius: 0.8rem;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    text-decoration: none !important;
-    color: inherit !important;
+[data-md-color-scheme="slate"] .mermaid rect[class*="attributeBox"] {
+    fill: #2c2f33 !important;
 }
-
-.welcome-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    border-color: var(--md-primary-fg-color);
-}
-
-.welcome-card h3 {
-    margin-top: 0 !important;
-    color: var(--md-primary-fg-color);
+[data-md-color-scheme="slate"] .mermaid text[class*="attributeLabel"],
+[data-md-color-scheme="slate"] .mermaid .relationshipLabel text {
+    fill: #e1e1e1 !important;
 }
