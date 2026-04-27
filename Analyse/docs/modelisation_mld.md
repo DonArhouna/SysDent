@@ -8,7 +8,7 @@
     - **created_at** (DateTime, auto-généré à la création)
     - **updated_at** (DateTime, mis à jour à chaque modification)
 
-## Structure Multi-Tenant (Sage X3 Style)
+## Structure Multi-Tenant
 
 - **societes**(*id*, nom, ninea, logo_url, adresse_siege, ville, pays, telephone, email, site_web, actif, date_creation)
 

@@ -203,6 +203,16 @@ erDiagram
 
 ```mermaid
 erDiagram
+    SOCIETE ||--o{ CABINET : "possède"
+    SOCIETE ||--o{ UTILISATEUR : "emploie"
+    
+    SOCIETE {
+        string nom
+        string ninea
+        string logo_url
+        string adresse_siege
+    }
+
     UTILISATEUR }o--|| ROLE : "a un"
     ROLE ||--o{ PERMISSION_ROLE : "accorde"
     PERMISSION_ROLE }o--|| PERMISSION : "sur"

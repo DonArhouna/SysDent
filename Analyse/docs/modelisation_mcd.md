@@ -1,6 +1,6 @@
 # Modèle Conceptuel de Données (MCD)
 
-## Architecture Multi-Tenant (Structure Sage X3)
+## Architecture Multi-Tenant
 
 Le système est conçu pour être SaaS. Chaque "Société" (Tenant) est isolée des autres.
 
