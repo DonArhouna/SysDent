@@ -68,3 +68,4 @@ nav:
       - Flux Patient: flux_patient.md
   - Règles Métier: regles.md
   - Technologies: technologies.md
+  - Stratégie de Développement: strategie_developpement.md
