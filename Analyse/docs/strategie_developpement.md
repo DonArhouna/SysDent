@@ -46,6 +46,7 @@ graph LR
     SE --> UC3["Modifier infos administratives"]
     SE --> UC4["Planifier RDV"]
     DE["🦷 Dentiste"] --> UC2
+    DE --> UC4
     DE --> UC5["Consulter dossier médical"]
     DE --> UC6["Mettre à jour état général"]
     DE --> UC7["Ajouter antécédent médical"]

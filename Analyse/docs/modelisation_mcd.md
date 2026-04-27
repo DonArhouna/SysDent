@@ -1,5 +1,26 @@
 # Modèle Conceptuel de Données (MCD)
 
+## Architecture Multi-Tenant (Structure Sage X3)
+
+Le système est conçu pour être SaaS. Chaque "Société" (Tenant) est isolée des autres.
+
+```mermaid
+erDiagram
+    SOCIETE ||--o{ CABINET : "possède (Sites)"
+    SOCIETE ||--o{ UTILISATEUR : "emploie"
+    SOCIETE ||--o{ PATIENT : "gère"
+    SOCIETE ||--o{ FOURNISSEUR : "travaille avec"
+    
+    SOCIETE {
+        string nom
+        string ninea
+        string logo_url
+        string adresse_siege
+        string telephone
+        string email
+    }
+```
+
 ## Noyau Patient & Médical
 
 !!! important "Provenance des données"
@@ -98,6 +119,7 @@ erDiagram
     PRATICIEN ||--o{ TARIF_PRATICIEN : "définit"
 
     CABINET ||--o{ CABINET_PRATICIEN : "contient"
+    SOCIETE ||--o{ CABINET : "possède"
     CABINET ||--o{ SALLE : "dispose de"
     SALLE ||--o{ FAUTEUIL : "équipée de"
 

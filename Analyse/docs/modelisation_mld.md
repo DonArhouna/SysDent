@@ -1,10 +1,12 @@
 # Modèle Logique de Données (MLD)
 
-> Notation: **table**(*PK*, attributs, #FK)
+## Structure Multi-Tenant (Sage X3 Style)
+
+- **societes**(*id*, nom, ninea, logo_url, adresse_siege, ville, pays, telephone, email, site_web, actif, date_creation)
 
 ## Utilisateurs, Groupes & Rôles (RBAC)
 
-- **utilisateurs**(*id*, email, mot_de_passe, #role_id, prenom, nom, telephone, photo_url, actif, deux_facteurs, secret_2fa, dernier_login)
+- **utilisateurs**(*id*, #societe_id, email, mot_de_passe, #role_id, prenom, nom, telephone, photo_url, actif, deux_facteurs, secret_2fa, dernier_login)
 - **roles**(*id*, nom, description, niveau_hierarchie)
 - **permissions**(*id*, module, action, description)
 - **permission_roles**(*#role_id*, *#permission_id*, scope)
@@ -16,7 +18,7 @@
 
 ## Cabinets & Praticiens
 
-- **cabinets**(*id*, nom, adresse, ville, telephone, email, horaires_ouverture[JSON], actif)
+- **cabinets**(*id*, #societe_id, nom, adresse, ville, telephone, email, horaires_ouverture[JSON], actif)
 - **salles**(*id*, #cabinet_id, nom, etage)
 - **fauteuils**(*id*, #salle_id, numero, equipements[JSON], actif)
 - **praticiens**(*id*, #utilisateur_id, titre, specialite, numero_ordre, signature_url, bio)
@@ -25,7 +27,7 @@
 
 ## Patients & Dossiers
 
-- **patients**(*id*, numero_dossier[AUTO], prenom, nom, date_naissance, sexe, photo_url, adresse, ville, telephone_1, telephone_2, email, profession, employeur, groupe_sanguin, #enregistre_par, #utilisateur_id, source, notes, actif, archive)
+- **patients**(*id*, #societe_id, numero_dossier[AUTO], prenom, nom, date_naissance, sexe, photo_url, adresse, ville, telephone_1, telephone_2, email, profession, employeur, groupe_sanguin, #enregistre_par, #utilisateur_id, source, notes, actif, archive)
 - **assurances_patients**(*id*, #patient_id, organisme, numero_police, taux_prise_en_charge, date_debut, date_fin, actif)
 - **documents_patients**(*id*, #patient_id, type, nom_fichier, fichier_url, taille_octets, mime_type, description, #uploaded_by)
 
@@ -57,8 +59,8 @@
 
 ## Stock & Dépenses
 
-- **produits**(*id*, reference, nom, #categorie_id, description, unite, prix_achat, seuil_minimum, sterilisable, #fournisseur_principal_id, actif)
+- **produits**(*id*, #societe_id, reference, nom, #categorie_id, description, unite, prix_achat, seuil_minimum, sterilisable, #fournisseur_principal_id, actif)
 - **stock_cabinet**(*id*, #produit_id, #cabinet_id, quantite, lot, date_peremption)
 - **mouvements_stock**(*id*, #produit_id, #cabinet_id, type, quantite, lot, #effectue_par)
 - **depenses**(*id*, numero, #cabinet_id, #categorie_id, #fournisseur_id, designation, montant_total, date_depense, mode_paiement, #enregistre_par)
-- **fournisseurs**(*id*, raison_sociale, contact_nom, telephone, email, actif)
+- **fournisseurs**(*id*, #societe_id, raison_sociale, contact_nom, telephone, email, actif)

@@ -56,6 +56,7 @@ extra_javascript:
 
 nav:
   - Accueil: index.md
+  - Architecture Multi-Tenant: architecture_multi_tenant.md
   - Analyse Fonctionnelle:
       - Cas d'utilisation: cas_utilisation.md
   - Architecture des Données:

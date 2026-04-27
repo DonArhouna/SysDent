@@ -19,6 +19,10 @@ SysDent Pro est un système de gestion multi-cabinet médico-dentaire à la poin
         <h3>⚙️ Technologies</h3>
         <p>Justification du choix de FastAPI, PostgreSQL et React.js pour le projet.</p>
     </a>
+    <a href="architecture_multi_tenant.html" class="welcome-card">
+        <h3>🏢 Multi-Tenant</h3>
+        <p>Isolation physique des données (Dossiers) inspirée de la logique Sage X3.</p>
+    </a>
 </div>
 
 ---

@@ -28,6 +28,7 @@ graph LR
     SE --> UC3["Modifier infos administratives"]
     SE --> UC4["Planifier RDV"]
     DE["🦷 Dentiste / Médecin"] --> UC2
+    DE --> UC4
     DE --> UC5["Créer dossier médical<br/>(à partir d'un patient existant)"]
     DE --> UC6["Consulter dossier médical"]
     DE --> UC7["Mettre à jour état général"]
@@ -107,7 +108,8 @@ graph LR
 
 ```mermaid
 graph LR
-    SA["🔑 Super Admin"] --> UC1["Créer utilisateur"]
+    SA["🔑 Super Admin"] --> UC_TENANT["Gérer les Sociétés (Tenants)<br/>(NINEA, Logo, Coordonnées)"]
+    SA --> UC1["Créer utilisateur"]
     SA --> UC2["Modifier utilisateur"]
     SA --> UC3["Désactiver utilisateur"]
     SA --> UC4["Créer rôle"]
