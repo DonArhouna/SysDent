@@ -8,14 +8,14 @@
 ## Table des matières
 
 1. [Diagramme de Cas d'Utilisation](#1-diagrammes-de-cas-dutilisation)
-2. [Modèle Conceptuel de Données (MCD)](#2-modèle-conceptuel-de-données-mcd)
+2. [Modèle Conceptuel de Données (MCD)](#2-modele-conceptuel-de-donnees-mcd)
 3. [Diagramme de Classes UML](#3-diagramme-de-classes-uml)
-4. [Modèle Logique de Données (MLD)](#4-modèle-logique-de-données-mld)
-5. [Dictionnaire de Données](#5-dictionnaire-de-données)
-6. [Diagrammes de Séquence](#6-diagrammes-de-séquence)
-7. [Diagramme d'Activité – Workflow Patient](#7-diagramme-dactivité)
-8. [Règles de Gestion](#8-règles-de-gestion)
-9. [Annexe – Suggestions Technologiques](#9-annexe--suggestions-technologiques)
+4. [Modèle Logique de Données (MLD)](#4-modele-logique-de-donnees-mld)
+5. [Dictionnaire de Données](#5-dictionnaire-de-donnees)
+6. [Diagrammes de Séquence](#6-diagrammes-de-sequence)
+7. [Diagramme d'Activité – Workflow Patient](#7-diagramme-dactivite)
+8. [Règles de Gestion](#8-regles-de-gestion)
+9. [Annexe – Suggestions Technologiques](#9-annexe-suggestions-technologiques)
 
 ---
 
