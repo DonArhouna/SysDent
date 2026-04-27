@@ -23,6 +23,10 @@ SysDent Pro est un système de gestion multi-cabinet médico-dentaire à la poin
         <h3>🏢 Multi-Tenant</h3>
         <p>Isolation physique des données (Dossiers) inspirée de la logique Sage X3.</p>
     </a>
+    <a href="console_administration.html" class="welcome-card">
+        <h3>💻 Console Admin</h3>
+        <p>Outil EXE de provisionnement et de gestion automatisée des dossiers.</p>
+    </a>
 </div>
 
 ---
