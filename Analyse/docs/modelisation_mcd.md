@@ -121,6 +121,13 @@ erDiagram
     CABINET ||--o{ CABINET_PRATICIEN : "contient"
     SOCIETE ||--o{ CABINET : "possède"
     CABINET ||--o{ SALLE : "dispose de"
+    CABINET {
+        string nom
+        string adresse
+        string telephone
+        string email
+        string logo_url
+    }
     SALLE ||--o{ FAUTEUIL : "équipée de"
 
     RENDEZ_VOUS }o--|| PRATICIEN : "avec"

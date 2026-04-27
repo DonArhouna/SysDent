@@ -513,7 +513,7 @@ classDiagram
 
 ### 4.2 Cabinets & Praticiens
 
-- **cabinets**(*id*, nom, adresse, ville, telephone, email, horaires_ouverture[JSON], actif)
+- **cabinets**(*id*, nom, adresse, ville, telephone, email, logo_url, horaires_ouverture[JSON], actif)
 - **salles**(*id*, #cabinet_id, nom, etage)
 - **fauteuils**(*id*, #salle_id, numero, equipements[JSON], actif)
 - **praticiens**(*id*, #utilisateur_id, titre, specialite, numero_ordre, signature_url, bio)
