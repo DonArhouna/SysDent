@@ -35,8 +35,8 @@
 
 ## Patients & Dossiers
 
-- **patients**(*id*, #societe_id, numero_dossier[AUTO], prenom, nom, date_naissance, sexe, photo_url, adresse, ville, telephone_1, telephone_2, email, profession, employeur, groupe_sanguin, #enregistre_par, #utilisateur_id, source, notes, actif, archive)
-- **assurances_patients**(*id*, #patient_id, organisme, numero_police, taux_prise_en_charge, date_debut, date_fin, actif)
+- **patients**(*id*, #societe_id, numero_dossier[AUTO], prenom, nom, date_naissance, sexe, type_piece_identite[ENUM], numero_piece_identite, photo_url, adresse, ville, telephone_1, telephone_2, email, profession, employeur, groupe_sanguin, #enregistre_par, #utilisateur_id, source, notes, actif, archive)
+- **prises_en_charge**(*id*, #patient_id, type[ENUM], organisme, numero_police, taux_couverture, plafond, date_debut, date_fin, actif)
 - **documents_patients**(*id*, #patient_id, type, nom_fichier, fichier_url, taille_octets, mime_type, description, #uploaded_by)
 
 - **dossiers_medicaux**(*id*, #patient_id[UNIQUE], #cree_par_praticien_id, #praticien_habituel_id, date_creation, notes)
@@ -50,6 +50,12 @@
 - **tarifs_praticien**(*id*, #acte_id, #praticien_id, tarif)
 - **actes_realises**(*id*, #consultation_id, #acte_id, dent_numero, face, description, tarif_applique, quantite, notes)
 - **materiaux_utilises**(*id*, #acte_realise_id, #produit_id, quantite, lot)
+
+## Ordonnances & Prescriptions
+
+- **medicaments**(*id*, nom_commercial, dci, forme, dosage, contre_indications[JSON], interactions[JSON], actif)
+- **ordonnances**(*id*, #consultation_id, #praticien_id, #patient_id, date_ordonnance, notes_generales, signature_praticien)
+- **lignes_ordonnance**(*id*, #ordonnance_id, #medicament_id, medicament_texte, posologie, duree, quantite, instructions_specifiques)
 
 ## Odontogramme
 

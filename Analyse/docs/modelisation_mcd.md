@@ -34,14 +34,14 @@ erDiagram
     DOSSIER_MEDICAL ||--|| ODONTOGRAMME : "contient"
     DOSSIER_MEDICAL ||--o{ CONSULTATION : "contient"
 
-    PATIENT ||--o{ ASSURANCE_PATIENT : "couvert par"
+    PATIENT ||--o{ PRISE_EN_CHARGE : "couvert par (IPM/Assurance)"
     PATIENT ||--o{ DOCUMENT_PATIENT : "a des"
     PATIENT ||--o{ RENDEZ_VOUS : "prend"
 
     CONSULTATION }o--|| PRATICIEN : "réalisée par"
     CONSULTATION }o--|| CABINET : "dans"
     CONSULTATION ||--o{ ACTE_REALISE : "comprend"
-    CONSULTATION ||--o{ PRESCRIPTION : "génère"
+    CONSULTATION ||--o{ ORDONNANCE : "génère"
 
     ODONTOGRAMME ||--o{ DENT : "contient"
     DENT ||--o{ ETAT_DENT_HISTORIQUE : "trace"
@@ -51,8 +51,8 @@ erDiagram
     ACTE_REALISE }o--|| ACTE_NOMENCLATURE : "référence"
     ACTE_REALISE ||--o{ MATERIAU_UTILISE : "consomme"
 
-    PRESCRIPTION ||--o{ LIGNE_PRESCRIPTION : "contient"
-    LIGNE_PRESCRIPTION }o--o| MEDICAMENT : "prescrit"
+    ORDONNANCE ||--o{ LIGNE_ORDONNANCE : "contient"
+    LIGNE_ORDONNANCE }o--o| MEDICAMENT : "prescrit"
 ```
 
 ## Facturation & Paiements

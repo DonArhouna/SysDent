@@ -532,10 +532,10 @@ classDiagram
 
 ### 4.3 Patients & Dossier Médical
 
-- **patients**(*id*, numero_dossier[AUTO], prenom, nom, date_naissance, sexe, photo_url, adresse, ville, telephone_1, telephone_2, email, profession, employeur, groupe_sanguin, #praticien_habituel_id, #utilisateur_id, source, notes, actif, archive)
+- **patients**(*id*, numero_dossier[AUTO], prenom, nom, date_naissance, sexe, type_piece_identite[ENUM], numero_piece_identite, photo_url, adresse, ville, telephone_1, telephone_2, email, profession, employeur, groupe_sanguin, #praticien_habituel_id, #utilisateur_id, source, notes, actif, archive)
 - **etats_generaux**(*id*, #patient_id, grossesse, grossesse_terme, allaitement, diabete, diabete_type, diabete_traitement, hta, hta_traitement, allergies[JSON], tabac, alcool, autres_conditions[JSON], examens_complementaires[JSON], #mis_a_jour_par)
 - **antecedents_medicaux**(*id*, #patient_id, type[ENUM], description, date_survenue, en_cours, traitement, notes)
-- **assurances_patients**(*id*, #patient_id, organisme, numero_police, taux_prise_en_charge, date_debut, date_fin, actif)
+- **prises_en_charge**(*id*, #patient_id, type_prise_en_charge[ENUM], organisme, numero_police, taux_couverture, plafond, date_debut, date_fin, actif)
 - **documents_patients**(*id*, #patient_id, type, nom_fichier, fichier_url, taille_octets, mime_type, description, #uploaded_by)
 
 ### 4.4 Consultations
@@ -546,11 +546,11 @@ classDiagram
 - **actes_realises**(*id*, #consultation_id, #acte_id, dent_numero, face, description, tarif_applique, quantite, notes)
 - **materiaux_utilises**(*id*, #acte_realise_id, #produit_id, quantite, lot)
 
-### 4.5 Prescriptions
+### 4.5 Ordonnances
 
 - **medicaments**(*id*, nom_commercial, dci, forme, dosage, contre_indications[JSON], interactions[JSON], actif)
-- **prescriptions**(*id*, #consultation_id, #praticien_id, #patient_id, date_prescription, notes_generales, signe)
-- **lignes_prescription**(*id*, #prescription_id, #medicament_id, medicament_texte, posologie, duree, instructions, quantite)
+- **ordonnances**(*id*, #consultation_id, #praticien_id, #patient_id, date_ordonnance, notes_generales, signature_praticien)
+- **lignes_ordonnance**(*id*, #ordonnance_id, #medicament_id, medicament_texte, posologie, duree, quantite, instructions_specifiques)
 
 ### 4.6 Odontogramme
 

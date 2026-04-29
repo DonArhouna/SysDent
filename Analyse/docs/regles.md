@@ -10,8 +10,8 @@ Le système SysDent Pro repose sur **23 règles de gestion** critiques garantiss
 | RG04 | La secrétaire n'a aucun accès aux dossiers médicaux | RBAC |
 | RG05 | La secrétaire peut créer des factures mais ne peut PAS les modifier | Facturation |
 | RG06 | L'état général doit être mis à jour à chaque consultation | Dossier Médical |
-| RG07 | Les allergies déclenchent des alertes automatiques | Prescriptions |
-| RG08 | Les contre-indications bloquent certains médicaments | Prescriptions |
+| RG07 | Les allergies déclenchent des alertes automatiques | Ordonnances |
+| RG08 | Les contre-indications bloquent certains médicaments | Ordonnances |
 | RG09 | Un acte réalisé décrémente automatiquement le stock | Stock |
 | RG10 | Alerte de stock bas sous le seuil minimum | Stock |
 | RG11 | Reste à payer auto-calculé : total - assurance - payé | Facturation |
