@@ -129,7 +129,7 @@ graph LR
 erDiagram
     PATIENT ||--|| ETAT_GENERAL : "a un"
     PATIENT ||--o{ ANTECEDENT_MEDICAL : "possède"
-    PATIENT ||--o{ ASSURANCE_PATIENT : "couvert par"
+    PATIENT ||--o{ PRISE_EN_CHARGE : "couvert par (IPM/Assurance)"
     PATIENT ||--o{ DOCUMENT_PATIENT : "a des"
     PATIENT ||--|| ODONTOGRAMME : "possède"
     PATIENT ||--o{ CONSULTATION : "effectue"
@@ -138,7 +138,7 @@ erDiagram
     CONSULTATION }o--|| PRATICIEN : "réalisée par"
     CONSULTATION }o--|| CABINET : "dans"
     CONSULTATION ||--o{ ACTE_REALISE : "comprend"
-    CONSULTATION ||--o{ PRESCRIPTION : "génère"
+    CONSULTATION ||--o{ ORDONNANCE : "génère"
 
     ODONTOGRAMME ||--o{ DENT : "contient"
     DENT ||--o{ ETAT_DENT_HISTORIQUE : "trace"
@@ -148,8 +148,39 @@ erDiagram
     ACTE_REALISE }o--|| ACTE_NOMENCLATURE : "référence"
     ACTE_REALISE ||--o{ MATERIAU_UTILISE : "consomme"
 
-    PRESCRIPTION ||--o{ LIGNE_PRESCRIPTION : "contient"
-    LIGNE_PRESCRIPTION }o--o| MEDICAMENT : "prescrit"
+    ORDONNANCE ||--o{ LIGNE_ORDONNANCE : "contient"
+    LIGNE_ORDONNANCE }o--o| MEDICAMENT : "prescrit"
+
+    PATIENT {
+        string numero_dossier
+        string prenom
+        string nom
+        string type_piece_identite
+        string numero_piece_identite
+        string telephone_1
+        string groupe_sanguin
+    }
+
+    PRISE_EN_CHARGE {
+        string type
+        string organisme
+        string numero_police
+        float taux_couverture
+        float plafond
+    }
+
+    ORDONNANCE {
+        date date_ordonnance
+        string notes_generales
+        string signature_praticien
+    }
+
+    LIGNE_ORDONNANCE {
+        string posologie
+        int duree_jours
+        int quantite
+        string instructions_specifiques
+    }
 ```
 
 ### 2.2 MCD – Facturation & Paiements

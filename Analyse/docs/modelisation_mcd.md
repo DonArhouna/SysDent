@@ -53,6 +53,37 @@ erDiagram
 
     ORDONNANCE ||--o{ LIGNE_ORDONNANCE : "contient"
     LIGNE_ORDONNANCE }o--o| MEDICAMENT : "prescrit"
+
+    PATIENT {
+        string numero_dossier
+        string prenom
+        string nom
+        string type_piece_identite
+        string numero_piece_identite
+        string telephone_1
+        string groupe_sanguin
+    }
+
+    PRISE_EN_CHARGE {
+        string type
+        string organisme
+        string numero_police
+        float taux_couverture
+        float plafond
+    }
+
+    ORDONNANCE {
+        date date_ordonnance
+        string notes_generales
+        string signature_praticien
+    }
+
+    LIGNE_ORDONNANCE {
+        string posologie
+        int duree_jours
+        int quantite
+        string instructions_specifiques
+    }
 ```
 
 ## Facturation & Paiements
