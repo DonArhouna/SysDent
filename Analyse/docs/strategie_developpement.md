@@ -130,6 +130,7 @@ erDiagram
     PATIENT ||--|| ETAT_GENERAL : "a un"
     PATIENT ||--o{ ANTECEDENT_MEDICAL : "possède"
     PATIENT ||--o{ PRISE_EN_CHARGE : "couvert par (IPM/Assurance)"
+    TYPE_PRISE_EN_CHARGE ||--o{ PRISE_EN_CHARGE : "catégorise"
     PATIENT ||--o{ DOCUMENT_PATIENT : "a des"
     PATIENT ||--|| ODONTOGRAMME : "possède"
     PATIENT ||--o{ CONSULTATION : "effectue"
@@ -162,11 +163,15 @@ erDiagram
     }
 
     PRISE_EN_CHARGE {
-        string type
         string organisme
         string numero_police
         float taux_couverture
         float plafond
+    }
+
+    TYPE_PRISE_EN_CHARGE {
+        string libelle
+        string description
     }
 
     ORDONNANCE {
@@ -564,9 +569,10 @@ classDiagram
 ### 4.3 Patients & Dossier Médical
 
 - **patients**(*id*, numero_dossier[AUTO], prenom, nom, date_naissance, sexe, type_piece_identite[ENUM], numero_piece_identite, photo_url, adresse, ville, telephone_1, telephone_2, email, profession, employeur, groupe_sanguin, #praticien_habituel_id, #utilisateur_id, source, notes, actif, archive)
+- **types_prise_en_charge**(*id*, libelle, description, actif)
 - **etats_generaux**(*id*, #patient_id, grossesse, grossesse_terme, allaitement, diabete, diabete_type, diabete_traitement, hta, hta_traitement, allergies[JSON], tabac, alcool, autres_conditions[JSON], examens_complementaires[JSON], #mis_a_jour_par)
 - **antecedents_medicaux**(*id*, #patient_id, type[ENUM], description, date_survenue, en_cours, traitement, notes)
-- **prises_en_charge**(*id*, #patient_id, type_prise_en_charge[ENUM], organisme, numero_police, taux_couverture, plafond, date_debut, date_fin, actif)
+- **prises_en_charge**(*id*, #patient_id, #type_prise_en_charge_id, organisme, numero_police, taux_couverture, plafond, date_debut, date_fin, actif)
 - **documents_patients**(*id*, #patient_id, type, nom_fichier, fichier_url, taille_octets, mime_type, description, #uploaded_by)
 
 ### 4.4 Consultations

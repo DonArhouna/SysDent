@@ -36,7 +36,8 @@
 ## Patients & Dossiers
 
 - **patients**(*id*, #societe_id, numero_dossier[AUTO], prenom, nom, date_naissance, sexe, type_piece_identite[ENUM], numero_piece_identite, photo_url, adresse, ville, telephone_1, telephone_2, email, profession, employeur, groupe_sanguin, #enregistre_par, #utilisateur_id, source, notes, actif, archive)
-- **prises_en_charge**(*id*, #patient_id, type[ENUM], organisme, numero_police, taux_couverture, plafond, date_debut, date_fin, actif)
+- **types_prise_en_charge**(*id*, #societe_id, libelle, description, actif)
+- **prises_en_charge**(*id*, #patient_id, #type_prise_en_charge_id, organisme, numero_police, taux_couverture, plafond, date_debut, date_fin, actif)
 - **documents_patients**(*id*, #patient_id, type, nom_fichier, fichier_url, taille_octets, mime_type, description, #uploaded_by)
 
 - **dossiers_medicaux**(*id*, #patient_id[UNIQUE], #cree_par_praticien_id, #praticien_habituel_id, date_creation, notes)

@@ -37,6 +37,7 @@ erDiagram
     PATIENT ||--o{ PRISE_EN_CHARGE : "couvert par (IPM/Assurance)"
     PATIENT ||--o{ DOCUMENT_PATIENT : "a des"
     PATIENT ||--o{ RENDEZ_VOUS : "prend"
+    TYPE_PRISE_EN_CHARGE ||--o{ PRISE_EN_CHARGE : "catégorise"
 
     CONSULTATION }o--|| PRATICIEN : "réalisée par"
     CONSULTATION }o--|| CABINET : "dans"
@@ -65,11 +66,15 @@ erDiagram
     }
 
     PRISE_EN_CHARGE {
-        string type
         string organisme
         string numero_police
         float taux_couverture
         float plafond
+    }
+
+    TYPE_PRISE_EN_CHARGE {
+        string libelle
+        string description
     }
 
     ORDONNANCE {
