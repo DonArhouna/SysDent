@@ -57,6 +57,7 @@ extra_javascript:
 nav:
   - Accueil: index.md
   - Architecture Multi-Tenant: architecture_multi_tenant.md
+  - Proposition d'Architecture: architecture_proposition.md
   - Console d'Administration: console_administration.md
   - Analyse Fonctionnelle:
       - Cas d'utilisation: cas_utilisation.md
