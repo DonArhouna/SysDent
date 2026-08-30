@@ -1,0 +1,3 @@
+# Configuration Pyrefly pour résoudre les imports src.*
+import-root = "."
+search-path = [".", "Backend"]

@@ -1,0 +1,3 @@
+# Configuration Pyrefly à la racine du workspace
+import-root = "Backend"
+search-path = ["Backend", "Backend/src"]
