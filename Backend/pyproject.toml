@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sysdent-backend"
+version = "1.0.0"
+description = "SysDent Pro - Backend API FastAPI Multi-Tenant pour la gestion de cabinets dentaires"
+authors = [{ name = "SysDent Team" }]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.28.0",
+    "pydantic>=2.6.0",
+    "pydantic-settings>=2.2.0",
+    "sqlalchemy>=2.0.28",
+    "asyncpg>=0.29.0",
+    "alembic>=1.13.1",
+    "passlib[argon2,bcrypt]>=1.7.4",
+    "pyjwt[crypto]>=2.8.0",
+    "structlog>=24.1.0",
+    "redis>=5.0.3",
+    "python-multipart>=0.0.9",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = "test_*.py"
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+
+[tool.isort]
+profile = "black"
+line_length = 100

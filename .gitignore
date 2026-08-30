@@ -1,17 +1,19 @@
-# OS files
-.DS_Store
-Thumbs.db
+# ==============================================================================
+# SYSDENT PRO - GLOBAL GITIGNORE
+# ==============================================================================
 
-# Environments
+# ------------------------------------------------------------------------------
+# 1. Environment & Secrets (Crucial pour la sécurité)
+# ------------------------------------------------------------------------------
 .env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
+.env.*
+*.env
+!.env.example
+!.env.template
 
-# Python
+# ------------------------------------------------------------------------------
+# 2. Python & Backend
+# ------------------------------------------------------------------------------
 __pycache__/
 *.py[cod]
 *$py.class
@@ -32,22 +34,105 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
-# Node / Frontend
+# Environnements virtuels
+.venv
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Tests & Couverture de code
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+
+# Type checking & Linters
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+.ruff_cache/
+
+# ------------------------------------------------------------------------------
+# 3. Node / Frontend (React / Next.js / Vite)
+# ------------------------------------------------------------------------------
 node_modules/
-/Frontend/node_modules
-/Frontend/dist
-/Frontend/build
-.npm
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.pnpm-debug.log*
 
-# Documentation
+# Builds Frontend
+/Frontend/dist/
+/Frontend/build/
+/Frontend/out/
+/Frontend/.next/
+dist/
+build/
+out/
+.next/
+.turbo/
+.cache/
+
+# ------------------------------------------------------------------------------
+# 4. Logs & Fichiers Temporaires
+# ------------------------------------------------------------------------------
+logs/
+*.log
+*.log.*
+*.pid
+*.seed
+*.pid.lock
+*.tmp
+*.temp
+
+# ------------------------------------------------------------------------------
+# 5. Bases de Données Locales & Dumps
+# ------------------------------------------------------------------------------
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.sql.gz
+
+# ------------------------------------------------------------------------------
+# 6. Documentation & Sites générés
+# ------------------------------------------------------------------------------
 /Analyse/site/
+site/
 
-# IDEs
+# ------------------------------------------------------------------------------
+# 7. IDEs, Éditeurs & Outils IA
+# ------------------------------------------------------------------------------
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
+.project
+.pydevproject
+.settings/
+.qodo/
+
+# ------------------------------------------------------------------------------
+# 8. Système d'Exploitation (OS)
+# ------------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
