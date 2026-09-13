@@ -8,22 +8,21 @@ if CURRENT_DIR not in sys.path:
     sys.path.insert(0, CURRENT_DIR)
 
 from sqlalchemy import select
-from src.common.base_model import Base
 from src.core.database import MasterAsyncSessionFactory, master_engine
+from src.core.migrations import upgrade_master_to_head
 from src.core.security import get_password_hash
-# Importer explicitement les modèles Master pour les enregistrer dans SQLAlchemy Base.metadata
-from src.modules.master.models import AuditLogGlobal, Societe, SuperAdmin, TenantDB
+from src.modules.master.models import SuperAdmin
 
 
 async def init_database() -> None:
-    """Crée toutes les tables de la base de données Master et insère le Super Admin par défaut."""
+    """Applique les migrations Alembic de la base Master et insère le Super Admin par défaut."""
     print("🚀 Initialisation de la base Master PostgreSQL...")
 
-    # 1. Création des tables Master
-    async with master_engine.begin() as conn:
-        print("📦 Création des tables : societes, tenants_db, super_admins, audit_logs_global...")
-        await conn.run_sync(Base.metadata.create_all)
-        print("✅ Tables Master créées avec succès !")
+    # 1. Schéma Master versionné via Alembic (voir Backend/alembic/). Alembic étant synchrone,
+    # on l'exécute dans un thread pour ne pas bloquer l'event loop asyncio de ce script.
+    print("📦 Application des migrations Alembic (societes, tenants_db, super_admins, audit_logs_global)...")
+    await asyncio.to_thread(upgrade_master_to_head)
+    print("✅ Schéma Master à jour !")
 
     # 2. Création d'un Super Admin par défaut si inexistant
     async with MasterAsyncSessionFactory() as session:

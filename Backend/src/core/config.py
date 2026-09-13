@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    # Clé Fernet (32 octets url-safe base64) utilisée pour chiffrer les secrets stockés en base (ex: TenantDB.db_password).
+    # CHANGER en production : Fernet.generate_key().decode()
+    TENANT_DB_ENCRYPTION_KEY: str = "T8WR4tc3-0J8dU0YTg44LB-lsD_hfK4JtMCGf6eRkc0="
 
     # Base de données Master (Centrale)
     MASTER_DB_HOST: str = "localhost"

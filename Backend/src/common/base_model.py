@@ -15,7 +15,17 @@ POSTGRES_NAMING_CONVENTION = {
 
 
 class Base(DeclarativeBase):
-    """Classe de base déclarative pour tous les modèles ORM SQLAlchemy 2.0."""
+    """Classe de base déclarative pour les modèles de la base MASTER (societes, tenants_db, super_admins, audit_logs_global)."""
+    metadata = MetaData(naming_convention=POSTGRES_NAMING_CONVENTION)
+
+
+class TenantBase(DeclarativeBase):
+    """
+    Classe de base déclarative pour les modèles du schéma TENANT (patients, consultations, facturation...).
+    Séparée de `Base` car les deux jeux de modèles finissent chargés dans le même process (master/services.py
+    importe des modèles tenant) : un seul registre de métadonnées partagé ferait créer les tables tenant dans
+    la base Master (et vice-versa) au premier `metadata.create_all`.
+    """
     metadata = MetaData(naming_convention=POSTGRES_NAMING_CONVENTION)
 
 

@@ -110,16 +110,36 @@ uvicorn src.main:app --reload --port 8001
 
 ## 🔄 4. Migrations de Base de Données (Alembic)
 
-```powershell
-# Générer une nouvelle révision de migration automatique
-alembic revision --autogenerate -m "description_du_changement"
+Il existe **deux environnements Alembic distincts**, car il y a deux schémas différents (`src/common/base_model.py` : `Base` pour le Master, `TenantBase` pour les cabinets) :
+- `Backend/alembic/` (+ `alembic.ini`) → base **Master** (`societes`, `tenants_db`, `super_admins`, `audit_logs_global`). Une seule base, l'URL vient de `.env`.
+- `Backend/alembic_tenant/` (+ `alembic_tenant.ini`) → schéma **Tenant** (`patients`, `consultations`, `facturation`, etc.). Appliqué à N bases (une par cabinet) : l'URL de la base cible doit être passée explicitement à chaque commande.
 
-# Appliquer toutes les migrations en attente
-alembic upgrade head
+Toutes les commandes s'exécutent depuis `Backend/`.
+
+### Schéma Master
+```powershell
+# Après avoir modifié src/modules/master/models.py :
+python -m alembic revision --autogenerate -m "description_du_changement"
+
+# Appliquer les migrations en attente sur la base Master (.env)
+python -m alembic upgrade head
 
 # Revenir en arrière d'une révision
-alembic downgrade -1
+python -m alembic downgrade -1
 ```
+
+### Schéma Tenant
+```powershell
+# Après avoir modifié src/modules/tenants/models.py, générer la révision contre UNE base
+# tenant existante (le diff sert de référence pour toutes les autres) :
+python -m alembic -c alembic_tenant.ini -x tenant_db_url="postgresql+psycopg2://postgres:postgres_password@localhost:5432/<nom_base_tenant>" revision --autogenerate -m "description_du_changement"
+
+# Appliquer cette migration à une base tenant précise :
+python -m alembic -c alembic_tenant.ini -x tenant_db_url="postgresql+psycopg2://postgres:postgres_password@localhost:5432/<nom_base_tenant>" upgrade head   
+```
+Pour une **nouvelle société**, cette dernière commande est exécutée automatiquement par `MasterTenantService.create_societe_and_provision_tenant` (voir `src/core/migrations.py`) : pas besoin de la lancer à la main.
+
+⚠️ **Règle d'équipe :** plus aucun `Base.metadata.create_all` / `TenantBase.metadata.create_all` dans le code applicatif. Toute évolution de schéma passe par une révision Alembic, relue avant d'être appliquée (l'autogenerate ne détecte pas tout : renommages de colonnes, changements de type, etc.).
 
 ---
 

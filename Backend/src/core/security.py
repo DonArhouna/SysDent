@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 import jwt
+from cryptography.fernet import Fernet, InvalidToken
 from passlib.context import CryptContext
 from .config import settings
 from .exceptions import AuthenticationException
@@ -90,3 +91,19 @@ def decode_token(token: str) -> Dict[str, Any]:
         raise AuthenticationException("La session a expiré. Veuillez vous reconnecter.", code="TOKEN_EXPIRED")
     except jwt.InvalidTokenError:
         raise AuthenticationException("Jeton d'authentification invalide ou altéré.", code="TOKEN_INVALID")
+
+
+_fernet = Fernet(settings.TENANT_DB_ENCRYPTION_KEY.encode())
+
+
+def encrypt_secret(plain_value: str) -> str:
+    """Chiffre une valeur sensible (ex: mot de passe de connexion tenant) avant stockage en base."""
+    return _fernet.encrypt(plain_value.encode()).decode()
+
+
+def decrypt_secret(encrypted_value: str) -> str:
+    """Déchiffre une valeur précédemment chiffrée avec `encrypt_secret`."""
+    try:
+        return _fernet.decrypt(encrypted_value.encode()).decode()
+    except InvalidToken as e:
+        raise ValueError("Impossible de déchiffrer la valeur : clé TENANT_DB_ENCRYPTION_KEY invalide ou valeur corrompue.") from e

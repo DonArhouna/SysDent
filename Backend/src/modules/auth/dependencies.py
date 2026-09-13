@@ -6,9 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from src.core.database import MasterAsyncSessionFactory, get_master_db, tenant_db_manager
 from src.core.exceptions import AuthenticationException, PermissionDeniedException, TenantNotFoundException
-from src.core.security import decode_token
+from src.core.security import decode_token, decrypt_secret
 from src.modules.master.models import Societe, TenantDB
-from src.modules.tenants.models import Utilisateur
+from src.modules.tenants.models import PermissionRole, Role, Utilisateur
 
 security_scheme = HTTPBearer(auto_error=False)
 
@@ -70,7 +70,7 @@ async def get_tenant_db(
             host=tenant_db_config.db_host,
             port=tenant_db_config.db_port,
             user=tenant_db_config.db_user,
-            password=tenant_db_config.db_password,
+            password=decrypt_secret(tenant_db_config.db_password),
         )
         session_factory = tenant_db_manager.get_session_factory(str(tenant_db_config.societe_id))
 
@@ -97,7 +97,7 @@ async def get_current_user(
     stmt = (
         select(Utilisateur)
         .options(
-            selectinload(Utilisateur.role).selectinload(src.modules.tenants.models.Role.permission_roles).selectinload(src.modules.tenants.models.PermissionRole.permission)
+            selectinload(Utilisateur.role).selectinload(Role.permission_roles).selectinload(PermissionRole.permission)
         )
         .where(Utilisateur.id == user_id, Utilisateur.actif == True)
     )

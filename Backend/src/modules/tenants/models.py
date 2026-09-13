@@ -18,7 +18,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from src.common.base_model import Base, TimestampMixin, UUIDMixin
+from src.common.base_model import TenantBase, TimestampMixin, UUIDMixin
 
 
 # ==============================================================================
@@ -74,7 +74,7 @@ class TypeMouvementStockEnum(str, enum.Enum):
 # UTILISATEURS, GROUPES & RBAC
 # ==============================================================================
 
-class Role(Base, UUIDMixin, TimestampMixin):
+class Role(TenantBase, UUIDMixin, TimestampMixin):
     __tablename__ = "roles"
 
     nom: Mapped[str] = mapped_column(String(50), unique=True, nullable=False) # e.g. ADMIN_CABINET, PRATICIEN, SECRETAIRE, ASSISTANT, COMPTABLE
@@ -85,7 +85,7 @@ class Role(Base, UUIDMixin, TimestampMixin):
     permission_roles: Mapped[list["PermissionRole"]] = relationship("PermissionRole", back_populates="role", cascade="all, delete-orphan")
 
 
-class Permission(Base, UUIDMixin):
+class Permission(TenantBase, UUIDMixin):
     __tablename__ = "permissions"
 
     module: Mapped[str] = mapped_column(String(50), nullable=False) # PATIENTS, CONSULTATIONS, FACTURATION, STOCKS, ADMIN
@@ -95,7 +95,7 @@ class Permission(Base, UUIDMixin):
     __table_args__ = (UniqueConstraint("module", "action", name="uq_permission_module_action"),)
 
 
-class PermissionRole(Base, UUIDMixin):
+class PermissionRole(TenantBase, UUIDMixin):
     __tablename__ = "permission_roles"
 
     role_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE"), nullable=False)
@@ -106,7 +106,7 @@ class PermissionRole(Base, UUIDMixin):
     permission: Mapped[Permission] = relationship("Permission")
 
 
-class Utilisateur(Base, UUIDMixin, TimestampMixin):
+class Utilisateur(TenantBase, UUIDMixin, TimestampMixin):
     __tablename__ = "utilisateurs"
 
     email: Mapped[str] = mapped_column(String(150), unique=True, nullable=False, index=True)
@@ -126,7 +126,7 @@ class Utilisateur(Base, UUIDMixin, TimestampMixin):
     sessions: Mapped[list["SessionUser"]] = relationship("SessionUser", back_populates="utilisateur", cascade="all, delete-orphan")
 
 
-class SessionUser(Base, UUIDMixin, TimestampMixin):
+class SessionUser(TenantBase, UUIDMixin, TimestampMixin):
     __tablename__ = "sessions_utilisateurs"
 
     utilisateur_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("utilisateurs.id", ondelete="CASCADE"), nullable=False)
@@ -143,7 +143,7 @@ class SessionUser(Base, UUIDMixin, TimestampMixin):
 # STRUCTURE DU CABINET & ÉQUIPEMENTS
 # ==============================================================================
 
-class Cabinet(Base, UUIDMixin, TimestampMixin):
+class Cabinet(TenantBase, UUIDMixin, TimestampMixin):
     __tablename__ = "cabinets"
 
     nom: Mapped[str] = mapped_column(String(150), nullable=False)
@@ -158,7 +158,7 @@ class Cabinet(Base, UUIDMixin, TimestampMixin):
     salles: Mapped[list["Salle"]] = relationship("Salle", back_populates="cabinet", cascade="all, delete-orphan")
 
 
-class Salle(Base, UUIDMixin, TimestampMixin):
+class Salle(TenantBase, UUIDMixin, TimestampMixin):
     __tablename__ = "salles"
 
     cabinet_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("cabinets.id", ondelete="CASCADE"), nullable=False)
@@ -169,7 +169,7 @@ class Salle(Base, UUIDMixin, TimestampMixin):
     fauteuils: Mapped[list["Fauteuil"]] = relationship("Fauteuil", back_populates="salle", cascade="all, delete-orphan")
 
 
-class Fauteuil(Base, UUIDMixin, TimestampMixin):
+class Fauteuil(TenantBase, UUIDMixin, TimestampMixin):
     __tablename__ = "fauteuils"
 
     salle_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("salles.id", ondelete="CASCADE"), nullable=False)
@@ -180,7 +180,7 @@ class Fauteuil(Base, UUIDMixin, TimestampMixin):
     salle: Mapped[Salle] = relationship("Salle", back_populates="fauteuils")
 
 
-class Praticien(Base, UUIDMixin, TimestampMixin):
+class Praticien(TenantBase, UUIDMixin, TimestampMixin):
     __tablename__ = "praticiens"
 
     utilisateur_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("utilisateurs.id", ondelete="CASCADE"), unique=True, nullable=False)
@@ -197,7 +197,7 @@ class Praticien(Base, UUIDMixin, TimestampMixin):
 # PATIENTS & DOSSIER MÉDICAL
 # ==============================================================================
 
-class Patient(Base, UUIDMixin, TimestampMixin):
+class Patient(TenantBase, UUIDMixin, TimestampMixin):
     __tablename__ = "patients"
 
     numero_dossier: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
@@ -224,7 +224,7 @@ class Patient(Base, UUIDMixin, TimestampMixin):
     dossier_medical: Mapped["DossierMedical | None"] = relationship("DossierMedical", back_populates="patient", uselist=False, cascade="all, delete-orphan")
 
 
-class DossierMedical(Base, UUIDMixin, TimestampMixin):
+class DossierMedical(TenantBase, UUIDMixin, TimestampMixin):
     __tablename__ = "dossiers_medicaux"
 
     patient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("patients.id", ondelete="CASCADE"), unique=True, nullable=False)
@@ -237,7 +237,7 @@ class DossierMedical(Base, UUIDMixin, TimestampMixin):
     consultations: Mapped[list["Consultation"]] = relationship("Consultation", back_populates="dossier_medical")
 
 
-class EtatGeneral(Base, UUIDMixin, TimestampMixin):
+class EtatGeneral(TenantBase, UUIDMixin, TimestampMixin):
     __tablename__ = "etats_generaux"
 
     dossier_medical_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("dossiers_medicaux.id", ondelete="CASCADE"), unique=True, nullable=False)
@@ -253,7 +253,7 @@ class EtatGeneral(Base, UUIDMixin, TimestampMixin):
     dossier_medical: Mapped[DossierMedical] = relationship("DossierMedical", back_populates="etat_general")
 
 
-class AntecedentMedical(Base, UUIDMixin, TimestampMixin):
+class AntecedentMedical(TenantBase, UUIDMixin, TimestampMixin):
     __tablename__ = "antecedents_medicaux"
 
     dossier_medical_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("dossiers_medicaux.id", ondelete="CASCADE"), nullable=False)
@@ -269,7 +269,7 @@ class AntecedentMedical(Base, UUIDMixin, TimestampMixin):
 # ODONTOGRAMME & SOINS DENTAIRES
 # ==============================================================================
 
-class Odontogramme(Base, UUIDMixin, TimestampMixin):
+class Odontogramme(TenantBase, UUIDMixin, TimestampMixin):
     __tablename__ = "odontogrammes"
 
     dossier_medical_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("dossiers_medicaux.id", ondelete="CASCADE"), unique=True, nullable=False)
@@ -280,7 +280,7 @@ class Odontogramme(Base, UUIDMixin, TimestampMixin):
     dents: Mapped[list["Dent"]] = relationship("Dent", back_populates="odontogramme", cascade="all, delete-orphan")
 
 
-class Dent(Base, UUIDMixin, TimestampMixin):
+class Dent(TenantBase, UUIDMixin, TimestampMixin):
     __tablename__ = "dents"
 
     odontogramme_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("odontogrammes.id", ondelete="CASCADE"), nullable=False)
@@ -297,7 +297,7 @@ class Dent(Base, UUIDMixin, TimestampMixin):
 # CONSULTATIONS & ACTES
 # ==============================================================================
 
-class Consultation(Base, UUIDMixin, TimestampMixin):
+class Consultation(TenantBase, UUIDMixin, TimestampMixin):
     __tablename__ = "consultations"
 
     dossier_medical_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("dossiers_medicaux.id"), nullable=False)
@@ -316,7 +316,7 @@ class Consultation(Base, UUIDMixin, TimestampMixin):
     actes_realises: Mapped[list["ActeRealise"]] = relationship("ActeRealise", back_populates="consultation", cascade="all, delete-orphan")
 
 
-class ActeNomenclature(Base, UUIDMixin, TimestampMixin):
+class ActeNomenclature(TenantBase, UUIDMixin, TimestampMixin):
     __tablename__ = "actes_nomenclature"
 
     code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True) # e.g. DT01, ENDO02, EXT01
@@ -327,7 +327,7 @@ class ActeNomenclature(Base, UUIDMixin, TimestampMixin):
     actif: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
 
-class ActeRealise(Base, UUIDMixin, TimestampMixin):
+class ActeRealise(TenantBase, UUIDMixin, TimestampMixin):
     __tablename__ = "actes_realises"
 
     consultation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("consultations.id", ondelete="CASCADE"), nullable=False)
@@ -346,7 +346,7 @@ class ActeRealise(Base, UUIDMixin, TimestampMixin):
 # FACTURATION & PAIEMENTS
 # ==============================================================================
 
-class Facture(Base, UUIDMixin, TimestampMixin):
+class Facture(TenantBase, UUIDMixin, TimestampMixin):
     __tablename__ = "factures"
 
     numero: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True) # e.g. FAC-2026-0001
@@ -365,7 +365,7 @@ class Facture(Base, UUIDMixin, TimestampMixin):
     paiements: Mapped[list["Paiement"]] = relationship("Paiement", back_populates="facture", cascade="all, delete-orphan")
 
 
-class LigneFacture(Base, UUIDMixin):
+class LigneFacture(TenantBase, UUIDMixin):
     __tablename__ = "lignes_facture"
 
     facture_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("factures.id", ondelete="CASCADE"), nullable=False)
@@ -378,7 +378,7 @@ class LigneFacture(Base, UUIDMixin):
     facture: Mapped[Facture] = relationship("Facture", back_populates="lignes")
 
 
-class Paiement(Base, UUIDMixin, TimestampMixin):
+class Paiement(TenantBase, UUIDMixin, TimestampMixin):
     __tablename__ = "paiements"
 
     facture_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("factures.id", ondelete="CASCADE"), nullable=False)
@@ -396,7 +396,7 @@ class Paiement(Base, UUIDMixin, TimestampMixin):
 # AUDIT TRAIL LOCAL (TENANT)
 # ==============================================================================
 
-class AuditLogTenant(Base, UUIDMixin):
+class AuditLogTenant(TenantBase, UUIDMixin):
     __tablename__ = "audit_logs"
 
     timestamp: Mapped[datetime] = mapped_column(

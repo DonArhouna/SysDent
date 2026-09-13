@@ -14,6 +14,7 @@ from src.core.security import (
 )
 from src.modules.auth.dependencies import get_current_user, get_token_payload
 from src.modules.auth.schemas import LoginRequest, RefreshTokenRequest, TokenResponse, UserProfileResponse
+from src.modules.auth.services import AuthService
 from src.modules.tenants.models import SessionUser, Utilisateur
 
 router = APIRouter(prefix="/auth", tags=["Authentification"])
@@ -27,20 +28,25 @@ async def login(
     master_db: AsyncSession = Depends(get_master_db),
 ):
     """
-    Connexion utilisateur : génère un Access Token court et un Refresh Token de session.
+    Connexion utilisateur : résout le cabinet rattaché à l'email, vérifie le mot de passe
+    dans sa base tenant, puis génère un Access Token court et un Refresh Token de session.
     Dépose optionnellement le cookie HttpOnly pour une sécurité maximale contre les failles XSS.
     """
-    # En architecture multi-tenant dynamique, on résout le tenant rattaché
-    # (Pour ce template de démarrage, exemple standard avec vérification sécurisée)
+    user, tenant_id, permissions = await AuthService.authenticate(
+        email=login_data.email,
+        password=login_data.password,
+        master_db=master_db,
+    )
+
     access_token = create_access_token(
-        user_id="00000000-0000-0000-0000-000000000001",
-        tenant_id="00000000-0000-0000-0000-000000000001",
-        role="ADMIN_CABINET",
-        permissions=["ALL"],
+        user_id=str(user.id),
+        tenant_id=tenant_id,
+        role=user.role.nom,
+        permissions=permissions,
     )
     refresh_token = create_refresh_token(
-        user_id="00000000-0000-0000-0000-000000000001",
-        tenant_id="00000000-0000-0000-0000-000000000001",
+        user_id=str(user.id),
+        tenant_id=tenant_id,
     )
 
     # Déposer le cookie HttpOnly sécurisé
@@ -59,7 +65,7 @@ async def login(
             access_token=access_token,
             refresh_token=refresh_token,
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            tenant_id="00000000-0000-0000-0000-000000000001",
+            tenant_id=tenant_id,
         ),
     )
 
