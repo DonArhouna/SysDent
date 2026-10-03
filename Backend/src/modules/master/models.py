@@ -55,6 +55,36 @@ class TenantDB(Base, UUIDMixin, TimestampMixin):
     societe: Mapped[Societe] = relationship("Societe", back_populates="tenant_db")
 
 
+class UtilisateurIndex(Base, UUIDMixin, TimestampMixin):
+    """
+    Index de routage email -> société, en base Master.
+
+    Le login tenant consistait à parcourir TOUTES les bases de cabinets actives
+    pour trouver l'utilisateur portant l'email : coût O(n.tenants) et une
+    tentative de connexion sur chaque base, y compris celles d'autres clients.
+    Cet index rend le login en une seule requête Master, sans jamais toucher aux
+    bases d'un cabinet qui n'est pas concerné.
+
+    L'email est la clé : deux cabinets ne peuvent pas partager le même compte,
+    ce qui est la règle pour un déploiement multi-tenant.
+    """
+
+    __tablename__ = "utilisateur_index"
+
+    email: Mapped[str] = mapped_column(String(150), primary_key=True)
+    societe_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("societes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    utilisateur_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    actif: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    derniere_connexion: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    societe: Mapped[Societe] = relationship("Societe")
+
+
 class SuperAdmin(Base, UUIDMixin, TimestampMixin):
     """
     Comptes d'administration globale du système (Accès Console Master).
@@ -65,7 +95,42 @@ class SuperAdmin(Base, UUIDMixin, TimestampMixin):
     mot_de_passe: Mapped[str] = mapped_column(String(255), nullable=False)
     nom_complet: Mapped[str] = mapped_column(String(150), nullable=False)
     actif: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Verrouillage progressif après N échecs de connexion (anti force brute).
+    tentatives_echouees: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    verrouille_jusqua: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     dernier_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class SuperAdminSession(Base, UUIDMixin, TimestampMixin):
+    """
+    Sessions persistées du Super Admin (révocables).
+
+    Sans cette table, un access token de console Master restait valide jusqu'à
+    15 minutes et un refresh token 7 jours, sans possibilité de révoquer un
+    compte compromis.
+    """
+
+    __tablename__ = "super_admin_sessions"
+
+    super_admin_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("super_admins.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    refresh_token: Mapped[str] = mapped_column(String(500), unique=True, nullable=False, index=True)
+    jti: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
+    est_revoque: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    expire_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    derniere_activite: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    super_admin: Mapped[SuperAdmin] = relationship("SuperAdmin")
 
 
 class AuditLogGlobal(Base, UUIDMixin):

@@ -86,3 +86,38 @@ class TenantConnectionException(AppException):
             status_code=503,
             details={"tenant_id": tenant_id, "error": original_error},
         )
+
+
+class TooManyRequestsException(AppException):
+    """Levée lorsqu'un client dépasse une limite de débit (force brute sur le login)."""
+
+    def __init__(self, message: str, retry_after_seconds: int):
+        super().__init__(
+            message=message,
+            code="TOO_MANY_REQUESTS",
+            status_code=429,
+            details={"retry_after_seconds": retry_after_seconds},
+        )
+
+
+class InvalidTokenException(AppException):
+    """Levée lorsqu'un jeton de rafraîchissement est inconnu, révoqué ou expiré."""
+
+    def __init__(self, message: str = "Session expirée ou révoquée. Veuillez vous reconnecter."):
+        super().__init__(
+            message=message,
+            code="INVALID_REFRESH_TOKEN",
+            status_code=401,
+        )
+
+
+class InvalidStateException(AuthenticationException):
+    """
+    Levée lorsque l'état de la plateforme interdit l'opération.
+
+    Exemple : tenter de supprimer le dernier Super Admin, ou de supprimer une
+    société qui porte des cabinets en production.
+    """
+
+    def __init__(self, message: str, code: str = "INVALID_STATE"):
+        super().__init__(message=message, code=code)

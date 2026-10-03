@@ -55,7 +55,7 @@ class TenantDatabaseManager:
         pwd = password or settings.TENANT_DB_PASSWORD
         return f"postgresql+asyncpg://{u}:{pwd}@{h}:{p}/{db_name}"
 
-    def get_or_create_engine(
+    async def get_or_create_engine(
         self,
         tenant_id: str,
         db_name: str,
@@ -88,23 +88,28 @@ class TenantDatabaseManager:
                 autoflush=False,
             )
 
-            # Éviction LRU si dépassement de capacité
+            # Éviction LRU si dépassement de capacité.
+            # `dispose()` est indispensable : sans lui, chaque éviction abandonnait
+            # un pool de connexions PostgreSQL ouvert. Le moteur était retiré du
+            # cache mais ses sockets restaient actives jusqu'à la fermeture du
+            # process — une fuite qui finit par épuiser le max_connections du
+            # serveur au bout de quelques centaines de cabinets.
             if len(self._engines) > self._max_cached_engines:
                 oldest_tenant, oldest_engine = self._engines.popitem(last=False)
                 self._session_factories.pop(oldest_tenant, None)
-                # Dispose async en background ou synchrone
                 logger.info("evicting_old_tenant_engine", tenant_id=oldest_tenant)
+                await oldest_engine.dispose()
 
             return engine
         except Exception as e:
             logger.exception("tenant_engine_creation_failed", tenant_id=tenant_id, error=str(e))
             raise TenantConnectionException(tenant_id=tenant_id, original_error=str(e))
 
-    def get_session_factory(self, tenant_id: str) -> async_sessionmaker[AsyncSession]:
+    async def get_session_factory(self, tenant_id: str) -> async_sessionmaker[AsyncSession]:
         if tenant_id not in self._session_factories:
             # Si non préchargé, on tente avec le nom de base conventionnel
             default_db_name = f"sysdent_tenant_{tenant_id}"
-            self.get_or_create_engine(tenant_id=tenant_id, db_name=default_db_name)
+            await self.get_or_create_engine(tenant_id=tenant_id, db_name=default_db_name)
         return self._session_factories[tenant_id]
 
     async def close_all(self) -> None:

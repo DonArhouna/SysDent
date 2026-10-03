@@ -5,7 +5,11 @@ pydantic>=2.6.0,<3.0.0
 pydantic-settings>=2.2.0,<3.0.0
 
 # Database & ORM
-sqlalchemy>=2.0.28,<3.0.0
+# ATTENTION : SQLAlchemy 2.1.x casse l'extension Cython utilisée pour le cache de
+# requêtes sous coverage (`TypeError: 'InternalTraversal' object is not callable`) :
+# les tests passent sans --cov mais plantent avec. Rester sur 2.0.x tant que ce n'est
+# pas corrigé en amont. Ne pas relaxed la borne supérieure sans revalider `pytest --cov`.
+sqlalchemy>=2.0.28,<2.1.0
 asyncpg>=0.29.0,<1.0.0
 psycopg2-binary>=2.9.9,<3.0.0
 alembic>=1.13.1,<2.0.0

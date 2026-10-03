@@ -125,6 +125,22 @@ site/
 .settings/
 .qodo/
 
+# Fichiers de verrouillage Office (Word/Excel : ~$nom.docx)
+~$*.docx
+~$*.xlsx
+~$*.pptx
+
+# Fichiers temporaires de développement local (scripts de check hors tests)
+/Backend/_verify_*.py
+/Backend/_repro_*.py
+/Backend/_check_*.py
+/Backend/_env.*.ps1
+/Backend/_*.log
+/Backend/_*.txt
+
+# Script de setup de la base de test isolée : utile à l'équipe, versionné.
+!/Backend/_setup_test_db.ps1
+
 # ------------------------------------------------------------------------------
 # 8. Système d'Exploitation (OS)
 # ------------------------------------------------------------------------------

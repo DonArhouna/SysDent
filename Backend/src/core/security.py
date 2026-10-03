@@ -59,15 +59,24 @@ def create_access_token(
 def create_refresh_token(
     user_id: str,
     tenant_id: Optional[str],
+    jti: str,
     expires_delta: Optional[timedelta] = None,
 ) -> str:
-    """Génère un JWT Refresh Token de longue durée avec signature unique."""
+    """
+    Génère un JWT Refresh Token de longue durée.
+
+    Le `jti` est une clé de session unique, persistée en base. Il sert à deux
+    choses : identifier la session à révoquer, et empêcher la réutilisation d'un
+    refresh token déjà consommé (rotation). Sans `jti` dans le payload, un token
+    volé resterait rejouable pendant toute sa durée de vie.
+    """
     now = datetime.now(timezone.utc)
     expire = now + (expires_delta or timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS))
 
     payload: Dict[str, Any] = {
         "sub": str(user_id),
         "tenant_id": str(tenant_id) if tenant_id else None,
+        "jti": jti,
         "type": "refresh",
         "iat": int(now.timestamp()),
         "exp": int(expire.timestamp()),

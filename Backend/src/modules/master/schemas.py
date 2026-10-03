@@ -60,9 +60,22 @@ class SocieteResponse(BaseSchema):
     tenant_db: Optional[TenantDBResponse] = None
 
 
+class SocieteStatutUpdate(BaseSchema):
+    actif: bool = Field(..., description="true pour réactiver, false pour suspendre l'accès du cabinet")
+
+
 class SuperAdminLogin(BaseSchema):
     email: EmailStr
     password: str
+
+
+class MasterTokenResponse(BaseSchema):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int = Field(..., description="Durée de validité de l'access token en secondes")
+    email: Optional[str] = None
+    nom_complet: Optional[str] = None
 
 
 class SuperAdminResponse(BaseSchema):
@@ -71,3 +84,11 @@ class SuperAdminResponse(BaseSchema):
     nom_complet: str
     actif: bool
     dernier_login: Optional[datetime] = None
+
+
+class SuperAdminSessionResponse(BaseSchema):
+    id: uuid.UUID
+    super_admin_id: uuid.UUID
+    ip_address: Optional[str] = None
+    expire_at: datetime
+    derniere_activite: datetime

@@ -20,7 +20,10 @@ async def list_audit_logs(
     limit: int = Query(20, ge=1, le=100),
     current_user: Utilisateur = Depends(get_current_user),
     db: AsyncSession = Depends(get_tenant_db),
-    _: bool = Depends(require_permissions("AUDIT_READ")),
+    # Format "MODULE:ACTION" : c'est le format que produit `AuthService.authenticate`
+    # (module + action de la table `permissions`). Le former "AUDIT_READ" ne pouvait
+    # jamais correspondre et bloquait l'accès pour tout rôle non-administrateur.
+    _: bool = Depends(require_permissions("AUDIT:READ")),
 ):
     """Consulte le journal d'audit légal du cabinet (Réservé aux profils autorisés)."""
     params = PaginationParams(page=page, limit=limit)

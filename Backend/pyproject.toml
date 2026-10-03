@@ -14,7 +14,9 @@ dependencies = [
     "uvicorn[standard]>=0.28.0",
     "pydantic>=2.6.0",
     "pydantic-settings>=2.2.0",
-    "sqlalchemy>=2.0.28",
+    # <2.1.0 : SQLAlchemy 2.1.x casse le cache de requêtes Cython sous coverage
+    # (voir requirements.txt pour le détail).
+    "sqlalchemy>=2.0.28,<2.1.0",
     "asyncpg>=0.29.0",
     "alembic>=1.13.1",
     "passlib[argon2,bcrypt]>=1.7.4",
@@ -28,6 +30,16 @@ dependencies = [
 asyncio_mode = "auto"
 testpaths = ["tests"]
 python_files = "test_*.py"
+# Boucle d'événements par test (défaut de pytest-asyncio). Chaque test possède
+# ainsi ses propres connexions, détruites avec sa boucle.
+# Les tests NE doivent jamais réutiliser un moteur global (`master_engine`) :
+# son pool serait attaché à une boucle déjà fermée au test suivant
+# (« Event loop is closed »). Les fixtures `master_db` / `tenant_db` créent un
+# moteur dédié par test, et la console Master est testée via une surcharge de
+# `get_master_db`.
+markers = [
+    "integration: test nécessitant une base PostgreSQL réelle (les fixtures en créent une jetable)",
+]
 
 [tool.black]
 line-length = 100

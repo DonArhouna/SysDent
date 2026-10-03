@@ -1,13 +1,14 @@
+import uuid
 from typing import AsyncGenerator, Callable, List, Optional
-from fastapi import Depends, Header, HTTPException, Request, status
+from fastapi import Depends, Header, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from src.core.database import MasterAsyncSessionFactory, get_master_db, tenant_db_manager
+from src.core.database import get_master_db, tenant_db_manager
 from src.core.exceptions import AuthenticationException, PermissionDeniedException, TenantNotFoundException
 from src.core.security import decode_token, decrypt_secret
-from src.modules.master.models import Societe, TenantDB
+from src.modules.master.models import TenantDB
 from src.modules.tenants.models import PermissionRole, Role, Utilisateur
 
 security_scheme = HTTPBearer(auto_error=False)
@@ -50,29 +51,37 @@ async def get_tenant_db(
 ) -> AsyncGenerator[AsyncSession, None]:
     """
     Dépendance FastAPI fournissant une session DB asynchrone pointant vers le bon Tenant.
-    Recherche d'abord la configuration de la DB dans Master (ou cache) et fournit la session.
-    """
-    stmt = (
-        select(TenantDB)
-        .where(TenantDB.societe_id == tenant_id, TenantDB.statut == "ACTIVE")
-    )
-    result = await master_db.execute(stmt)
-    tenant_db_config = result.scalar_one_or_none()
 
-    if not tenant_db_config:
-        # Fallback pour le dev ou convention standard
-        db_name = f"sysdent_tenant_{tenant_id}"
-        session_factory = tenant_db_manager.get_session_factory(tenant_id)
-    else:
-        tenant_db_manager.get_or_create_engine(
-            tenant_id=str(tenant_db_config.societe_id),
-            db_name=tenant_db_config.db_name,
-            host=tenant_db_config.db_host,
-            port=tenant_db_config.db_port,
-            user=tenant_db_config.db_user,
-            password=decrypt_secret(tenant_db_config.db_password),
-        )
-        session_factory = tenant_db_manager.get_session_factory(str(tenant_db_config.societe_id))
+    Résout la base du cabinet via la table Master `tenants_db` et refuse
+    l'accès si le cabinet n'est pas ACTIVE (une société suspendue perd l'accès
+    sans que ses données soient supprimées).
+    """
+    try:
+        uuid_tenant = uuid.UUID(str(tenant_id))
+    except ValueError:
+        # Un tenant_id valide est toujours l'UUID de la société (ce que place
+        # l'index `utilisateur_index`). Un identifiant arbitraire ne doit pas
+        # pouvoir ouvrir une session sur une base au nom deviné.
+        raise AuthenticationException("Identifiant de cabinet invalide.", code="TENANT_ID_INVALIDE")
+
+    stmt = select(TenantDB).where(
+        TenantDB.societe_id == uuid_tenant,
+        TenantDB.statut == "ACTIVE",
+    )
+    tenant_db_config = (await master_db.execute(stmt)).scalar_one_or_none()
+
+    if tenant_db_config is None:
+        raise TenantNotFoundException(tenant_id)
+
+    await tenant_db_manager.get_or_create_engine(
+        tenant_id=str(tenant_db_config.societe_id),
+        db_name=tenant_db_config.db_name,
+        host=tenant_db_config.db_host,
+        port=tenant_db_config.db_port,
+        user=tenant_db_config.db_user,
+        password=decrypt_secret(tenant_db_config.db_password),
+    )
+    session_factory = await tenant_db_manager.get_session_factory(str(tenant_db_config.societe_id))
 
     async with session_factory() as session:
         try:
@@ -110,7 +119,14 @@ async def get_current_user(
 
 
 def require_permissions(*required_permissions: str) -> Callable:
-    """Garde de sécurité RBAC vérifiant si l'utilisateur possède toutes les permissions requises."""
+    """
+    Garde de sécurité RBAC vérifiant si l'utilisateur possède toutes les permissions requises.
+
+    Format attendu : "MODULE:ACTION" (ex: "PATIENTS:READ"), identique à celui que
+    produit `AuthService.authenticate` en combinant `permissions.module` et
+    `permissions.action`. Les rôles ADMIN_CABINET et SUPER_ADMIN contournent la
+    vérification (accès complet par conception).
+    """
     async def permission_checker(payload: dict = Depends(get_token_payload)) -> bool:
         user_permissions = payload.get("permissions", [])
         role = payload.get("role")
