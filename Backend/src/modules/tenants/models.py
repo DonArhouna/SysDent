@@ -66,6 +66,33 @@ class ModePaiementEnum(str, enum.Enum):
     ASSURANCE = "ASSURANCE"
 
 
+class StatutDevisEnum(str, enum.Enum):
+    """Cycle de vie d'un devis (CDC : brouillon, envoyé, accepté, refusé, expiré)."""
+
+    BROUILLON = "BROUILLON"
+    ENVOYE = "ENVOYE"
+    ACCEPTE = "ACCEPTE"
+    REFUSE = "REFUSE"
+    EXPIRE = "EXPIRE"
+
+
+class FrequenceEchelonnementEnum(str, enum.Enum):
+    """Pas entre deux échéances d'un plan de paiement (RG08)."""
+
+    HEBDO = "HEBDO"
+    BIMENSUEL = "BIMENSUEL"
+    MENSUEL = "MENSUEL"
+
+
+class StatutEcheanceEnum(str, enum.Enum):
+    """Vie d'une échéance. `EN_RETARD` est posé par le job de relance (RG09)."""
+
+    A_PAYER = "A_PAYER"
+    PAYEE = "PAYEE"
+    EN_RETARD = "EN_RETARD"
+    ANNULEE = "ANNULEE"
+
+
 class TypeMouvementStockEnum(str, enum.Enum):
     ENTREE = "ENTREE"
     SORTIE_CONSULTATION = "SORTIE_CONSULTATION"
@@ -875,19 +902,27 @@ class Facture(TenantBase, UUIDMixin, TimestampMixin):
     __tablename__ = "factures"
 
     numero: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True) # e.g. FAC-2026-0001
-    patient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("patients.id"), nullable=False)
+    # Indexés : la liste des factures se filtre par patient et par statut (caisse du jour).
+    patient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("patients.id"), nullable=False, index=True)
     cabinet_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("cabinets.id"), nullable=False)
     consultation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("consultations.id"), nullable=True)
     montant_total: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     montant_tva: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
     montant_paye: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
     montant_restant: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
-    statut: Mapped[StatutFactureEnum] = mapped_column(Enum(StatutFactureEnum), default=StatutFactureEnum.EMISE, nullable=False)
+    statut: Mapped[StatutFactureEnum] = mapped_column(Enum(StatutFactureEnum), default=StatutFactureEnum.EMISE, nullable=False, index=True)
     date_emission: Mapped[date] = mapped_column(Date, default=date.today, nullable=False)
     date_echeance: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Traçabilité (MLD §4.8) : le praticien du soin à l'origine de la facture
+    # (null sur une vente libre) et l'agent qui a émis le document.
+    praticien_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("praticiens.id"), nullable=True)
+    emis_par_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("utilisateurs.id"), nullable=True)
 
     lignes: Mapped[list["LigneFacture"]] = relationship("LigneFacture", back_populates="facture", cascade="all, delete-orphan")
     paiements: Mapped[list["Paiement"]] = relationship("Paiement", back_populates="facture", cascade="all, delete-orphan")
+    plan_echelonnement: Mapped["PlanEchelonnement | None"] = relationship(
+        "PlanEchelonnement", back_populates="facture", uselist=False
+    )
 
 
 class LigneFacture(TenantBase, UUIDMixin):
@@ -913,8 +948,104 @@ class Paiement(TenantBase, UUIDMixin, TimestampMixin):
     reference: Mapped[str | None] = mapped_column(String(100), nullable=True) # Ref transaction Wave/OM/Chèque
     recu_numero: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     date_paiement: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    # Agent de caisse qui a encaissé (MLD §4.8 : #enregistre_par).
+    enregistre_par_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("utilisateurs.id"), nullable=True)
 
     facture: Mapped[Facture] = relationship("Facture", back_populates="paiements")
+    echeance: Mapped["Echeance | None"] = relationship("Echeance", back_populates="paiement")
+
+
+# -----------------------------------------------------------------------------
+# Devis & échéanciers
+
+# Le devis PRÉCÈDE la facture : il engage le cabinet sur un prix avant le soin.
+# Un devis accepté se convertit en facture (RG14) sans ressaisie des lignes.
+
+class Devis(TenantBase, UUIDMixin, TimestampMixin):
+    __tablename__ = "devis"
+
+    numero: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True) # e.g. DEV-2026-00001
+    patient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("patients.id"), nullable=False, index=True)
+    praticien_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("praticiens.id"), nullable=True)
+    cabinet_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("cabinets.id"), nullable=True)
+    montant_total: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    statut: Mapped[StatutDevisEnum] = mapped_column(Enum(StatutDevisEnum), default=StatutDevisEnum.BROUILLON, nullable=False, index=True)
+    date_validite: Mapped[date | None] = mapped_column(Date, nullable=True)
+    signature_patient: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    date_signature: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # RG14 : trace de la conversion. UNIQUE — un devis ne produit qu'une facture,
+    # sinon le même plan de traitement serait facturé deux fois.
+    facture_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("factures.id"), nullable=True, unique=True
+    )
+    emis_par_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("utilisateurs.id"), nullable=True)
+
+    lignes: Mapped[list["LigneDevis"]] = relationship("LigneDevis", back_populates="devis", cascade="all, delete-orphan")
+    facture: Mapped["Facture | None"] = relationship("Facture")
+
+
+class LigneDevis(TenantBase, UUIDMixin):
+    __tablename__ = "lignes_devis"
+
+    devis_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("devis.id", ondelete="CASCADE"), nullable=False)
+    acte_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("actes_nomenclature.id"), nullable=True)
+    designation: Mapped[str] = mapped_column(String(255), nullable=False)
+    dent_numero: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    quantite: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    prix_unitaire: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    montant: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+
+    devis: Mapped[Devis] = relationship("Devis", back_populates="lignes")
+    acte: Mapped["ActeNomenclature | None"] = relationship("ActeNomenclature")
+
+
+class PlanEchelonnement(TenantBase, UUIDMixin, TimestampMixin):
+    """
+    Plan de paiement d'une facture (RG08). Un seul plan par facture : les
+    échéances sont la décomposition du reste à payer, pas un éventail de
+    négociations parallèles.
+    """
+
+    __tablename__ = "plans_echelonnement"
+
+    facture_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("factures.id"), nullable=False, unique=True, index=True
+    )
+    patient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("patients.id"), nullable=False)
+    montant_total: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    nombre_echeances: Mapped[int] = mapped_column(Integer, nullable=False)
+    date_debut: Mapped[date] = mapped_column(Date, nullable=False)
+    frequence: Mapped[FrequenceEchelonnementEnum] = mapped_column(
+        Enum(FrequenceEchelonnementEnum), default=FrequenceEchelonnementEnum.MENSUEL, nullable=False
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actif: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    facture: Mapped[Facture] = relationship("Facture", back_populates="plan_echelonnement")
+    echeances: Mapped[list["Echeance"]] = relationship(
+        "Echeance", back_populates="plan", cascade="all, delete-orphan", order_by="Echeance.numero"
+    )
+
+
+class Echeance(TenantBase, UUIDMixin):
+    __tablename__ = "echeances"
+
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("plans_echelonnement.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    numero: Mapped[int] = mapped_column(Integer, nullable=False) # 1..N
+    montant_prevu: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    montant_paye: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
+    date_prevue: Mapped[date] = mapped_column(Date, nullable=False)
+    date_paiement: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    paiement_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("paiements.id"), nullable=True)
+    statut: Mapped[StatutEcheanceEnum] = mapped_column(
+        Enum(StatutEcheanceEnum), default=StatutEcheanceEnum.A_PAYER, nullable=False, index=True
+    )
+
+    plan: Mapped[PlanEchelonnement] = relationship("PlanEchelonnement", back_populates="echeances")
+    paiement: Mapped["Paiement | None"] = relationship("Paiement", back_populates="echeance")
 
 
 # ==============================================================================

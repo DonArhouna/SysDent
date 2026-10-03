@@ -3,6 +3,7 @@ from src.modules.audit import audit_router
 from src.modules.auth import auth_router
 from src.modules.cabinets import cabinets_router
 from src.modules.consultations import consultations_router, nomenclature_router
+from src.modules.facturation import devis_router, facturation_router
 from src.modules.master import master_router
 from src.modules.odontogramme import odontogramme_router
 from src.modules.ordonnances import medicaments_router, ordonnances_router
@@ -32,5 +33,11 @@ api_v1_router.include_router(ordonnances_router)
 # Pôle 2 : décor physique puis agenda.
 api_v1_router.include_router(cabinets_router)
 api_v1_router.include_router(rendezvous_router)
+
+# Pôle 2 : facturation. `/factures/journal-caisse` est déclaré dans le même
+# routeur AVANT `/factures/{facture_id}` : l'ordre interne suffit, aucun
+# problème d'absorption ici.
+api_v1_router.include_router(facturation_router)
+api_v1_router.include_router(devis_router)
 
 api_v1_router.include_router(rbac_router)

@@ -91,6 +91,7 @@ out/
 logs/
 *.log
 *.log.*
+*.err
 *.pid
 *.seed
 *.pid.lock
@@ -136,6 +137,10 @@ site/
 /Backend/_env.*.ps1
 /Backend/_*.log
 /Backend/_*.txt
+/Backend/_*.err
+/Backend/check_db.py
+/Backend/run_dev.py
+/Backend/run_backend.sh
 
 # Script de setup de la base de test isolée : utile à l'équipe, versionné.
 !/Backend/_setup_test_db.ps1

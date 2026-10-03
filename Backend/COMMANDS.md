@@ -477,6 +477,51 @@ Une vérification applicative **ne peut pas** empêcher deux secrétaires de val
 
 ---
 
+## 💰 5septies. Facturation, Caisse & Devis (D2C) — le pôle financier
+
+### Ce que le backend se charge de calculer à la place du client
+
+| Règle | Implémentation |
+|-------|----------------|
+| **RG07** — `montant_restant` | Recalculé à chaque paiement : `montant_total - Σ paiements`. Le statut en dérive (`EMISE → PARTIELLEMENT_PAYEE → PAYEE`), il n'est jamais fourni par l'appelant. |
+| **RG08** — échéanciers | Le plan découpe le **reste à payer** du jour de sa création. Le reliquat de division centime va sur la 1ʳᵉ échéance (les suivantes restent identiques — plus simple à annoncer au patient). |
+| **RG14** — devis → facture | Conversion en une passe, lignes comprises, `devis.facture_id` UNIQUE. Re-convertir = `422 DEVIS_DEJA_CONVERTI`. |
+| **Totaux** | `montant_total` = Σ(quantité × prix unitaire) calculé côté serveur, jamals reçu du client. Une facture de consultation est générée depuis les actes réalisés. |
+
+### Points d'API
+
+| Route | Effet |
+|-------|-------|
+| `POST /factures/consultation/{id}` | Émet la facture d'une consultation **terminée** (lignes = actes réalisés). `422 CONSULTATION_NON_TERMINEE` / `CONSULTATION_DEJA_FACTUREE` |
+| `POST /factures` | Émission libre (produit, forfait) : lignes fournies, total calculé |
+| `GET /factures` | Liste paginée — filtres `statut`, `patient_id`, `q` (numéro), `date_debut/fin` |
+| `GET /factures/{id}` | Détail : lignes, paiements, plan |
+| `POST /factures/{id}/paiements` | **Encaissement**. `422 PAIEMENT_TROP_ELEVE` si > reste à payer. Reçu `RECU-AAAAMMJJ-NNNN` auto |
+| `POST /factures/{id}/annuler` | Annulation motivée. `422 FACTURE_AVEC_PAIEMENTS` si déjà encaissée (remboursement à venir) |
+| `POST/GET /factures/{id}/echelonnement` | Plan (RG08) + échéances générées serveur. Un seul plan actif |
+| `GET /factures/journal-caisse` | Journal de caisse (règle `FACTURATION:READ`). Déclaré **avant** `/factures/{id}` |
+| `POST/GET /devis[/{id}]` | Devis : `BROUILLON → ENVOYE → ACCEPTE/REFUSE` (cycle fermé) |
+| `POST /devis/{id}/statut` | `ACCEPTE` exige `signature_patient: true` + validité en cours |
+| `POST /devis/{id}/convertir` | RG14 : devis accepté → facture |
+
+### Règles que le frontend doit connaître
+
+1. **Jamais de champ `montant_total` saisi par l'UI.** Pour une consultation : `POST /factures/consultation/{id}` avec `{}` — le backend importe les actes. Le montant affiché à l'écran vient toujours de la réponse du serveur.
+2. **Encaissement d'échéance = montant EXACT** du reste dû sur l'échéance (`422 ECHEANCE_MONTANT_INCOHERENT` sinon, avec `details.attendu`). L'allocation partielle n'existe pas : le reçu et l'échéance doivent se correspondre au centime.
+3. **Un trop-perçu est refusé** (`PAIEMENT_TROP_ELEVE`) — pas de solde négatif à l'écran.
+4. **Le reçu porte son numéro immédiatement** (`recu_numero` dans la réponse) : imprimable d'un trait, aucune requête supplémentaire.
+5. **Les statuts de facture sont `BROUILLON|EMISE|PARTIELLEMENT_PAYEE|PAYEE|ANNULEE`** — les filtres de la caisse utilisent ces littéraux exacts (majuscules).
+6. **Permissions :** `FACTURATION:READ` pour lire, `:CREATE` pour émettre/encaisser/convertir, `:UPDATE` pour l'échelonnement, `:DELETE` pour annuler (réservé comptable/admin). `SECRETAIRE` a READ+CREATE ; `COMPTABLE` a tout sauf le court-circuit admin.
+7. **Montants en XOF** (FCFA), `Decimal` sérialisé en chaîne (`"15000.00"`) — pas de flottants côté UI.
+
+### Vérification de bout en bout
+
+```powershell
+.\.venv\Scripts\python.exe .\tests\test_facturation.py  # via pytest, cf. §5
+```
+
+---
+
 ## 🌐 6. Liens & Endpoints Utiles
 
 - **Documentation Swagger UI** : [http://localhost:8000/docs](http://localhost:8000/docs) (ou port 8001)

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="fr" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="SysDent Pro — Gestion multi-cabinet médico-dentaire" />
+    <title>SysDent Pro</title>
+    <script>
+      // Thème initial avant rendu : évite le flash blanc en mode sombre.
+      // La préférence est stockée par le ThemeProvider (localStorage).
+      ;(function () {
+        try {
+          var prefere = localStorage.getItem('sysdent-theme')
+          var sombre = prefere ? prefere === 'dark' : true // maquette : sombre par défaut
+          document.documentElement.classList.toggle('dark', sombre)
+        } catch (e) {}
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,79 @@
+/*
+ * Tokens de design SysDent Pro — mode clair et sombre.
+ *
+ * Une seule source de vérité : les composants n'utilisent que les classes
+ * générées depuis ces variables (`bg-card`, `text-muted-foreground`...).
+ * Changer le thème = changer les variables sous `html.dark`, aucun composant
+ * à retoucher. Base chromatique inspirée de la maquette (navy profond,
+ * accents vifs sur cartes de statistiques).
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ---- Mode clair ---- */
+    --background: 220 33% 97%; /* page : gris très bleuté */
+    --foreground: 222 33% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 33% 10%;
+    --sidebar: 222 39% 98%;
+    --sidebar-foreground: 222 33% 14%;
+    --sidebar-border: 220 20% 90%;
+    --muted: 220 25% 94%;
+    --muted-foreground: 220 12% 45%;
+    --border: 220 20% 90%;
+    --input: 220 20% 88%;
+    --primary: 220 85% 55%; /* bleu SysDent */
+    --primary-foreground: 0 0% 100%;
+    --success: 152 60% 40%;
+    --warning: 35 92% 50%;
+    --danger: 0 72% 51%;
+    --accent-blue: 220 85% 55%;
+    --accent-green: 152 60% 45%;
+    --accent-purple: 258 70% 58%;
+    --accent-orange: 32 92% 50%;
+  }
+
+  .dark {
+    /* ---- Mode sombre (maquette de référence) ---- */
+    --background: 226 39% 7%; /* page : navy profond */
+    --foreground: 216 40% 96%;
+    --card: 226 35% 10%; /* cartes : navy légèrement plus clair */
+    --card-foreground: 216 40% 96%;
+    --sidebar: 227 42% 6%;
+    --sidebar-foreground: 218 30% 88%;
+    --sidebar-border: 226 28% 16%;
+    --muted: 226 28% 15%;
+    --muted-foreground: 220 14% 60%;
+    --border: 226 28% 16%;
+    --input: 226 28% 18%;
+    --primary: 220 85% 58%;
+    --primary-foreground: 0 0% 100%;
+    --success: 152 55% 45%;
+    --warning: 35 92% 55%;
+    --danger: 0 72% 60%;
+    --accent-blue: 220 85% 58%;
+    --accent-green: 152 55% 50%;
+    --accent-purple: 258 70% 65%;
+    --accent-orange: 32 92% 55%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04';
+  }
+}
+
+@layer components {
+  /* Chip d'icône des cartes de statistiques : carré arrondi teinté. */
+  .icon-chip {
+    @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-lg;
+  }
+}
