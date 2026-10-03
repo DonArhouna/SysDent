@@ -42,6 +42,7 @@ from src.modules.tenants.models import (
     EtatGeneral,
     Patient,
     Praticien,
+    StatutConsultationEnum,
     Utilisateur,
 )
 
@@ -318,7 +319,12 @@ class ConsultationService:
             type_motif=data.type_motif,
             motif_detail=data.motif_detail,
             anamnese=data.anamnese,
-            statut="EN_COURS",
+            # ENUM, pas chaîne : SQLAlchemy ne convertit la valeur qu'à la
+            # LECTURE. Écrire la chaîne laissait l'attribut ORM dans cet état
+            # jusqu'au rechargement suivant, et le module Rendez-vous — qui
+            # sérialise cette consultation sans la recharger — lisait
+            # `.statut.value` et plantait.
+            statut=StatutConsultationEnum.EN_COURS,
             date_consultation=data.date_consultation or datetime.now(timezone.utc),
             duree_minutes=data.duree_minutes,
         )

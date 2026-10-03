@@ -15,6 +15,7 @@ se chevaucher**, et selon quelle autorité :
 
 from datetime import date, datetime, timedelta, timezone
 from typing import AsyncGenerator
+import uuid
 
 import pytest
 import pytest_asyncio
@@ -226,20 +227,41 @@ def test_message_de_transition_dite_ce_qu_on_peut_faire():
 
 
 @pytest.mark.parametrize(
-    "debut, attendu",
+    "debut, duree, attendu",
     [
-        ("2026-10-05T05:00:00+00:00", "avant l'ouverture"),
-        ("2026-10-05T23:30:00+00:00", "après la fermeture"),
+        ("2026-10-05T05:00:00+00:00", 30, "avant l'ouverture"),
+        ("2026-10-05T23:00:00+00:00", 30, "après la fermeture"),
+        ("2026-10-05T23:30:00+00:00", 30, "traverse minuit"),
+        ("2026-10-05T22:30:00+00:00", 30, None),
     ],
 )
-def test_creneaux_hors_bornes_refuses(debut, attendu):
-    """Une saisie de 5h du matin est presque toujours une faute de frappe."""
-    from src.common.rendezvous import borne_horaire
+def test_creneaux_hors_bornes_refuses(debut, duree, attendu):
+    """
+    Bornes de sécurité sur la saisie. Une prise à 5h du matin, une fin après la
+    fermeture, ou un créneau qui traverse minuit (signe d'une date saisie de
+    travers) sont presque toujours des fautes de frappe.
+    """
+    from src.common.rendezvous import HEURE_FERMETURE, HEURE_OUVERTURE, borne_horaire
 
     d = datetime.fromisoformat(debut)
-    message = borne_horaire(d, d + timedelta(minutes=30))
-    assert message is not None
-    assert attendu in message
+    message = borne_horaire(d, d + timedelta(minutes=duree))
+
+    if attendu is None:
+        assert message is None, message
+    else:
+        assert message is not None, "ce créneau aurait dû être refusé"
+        assert attendu in message
+
+
+def test_fermeture_a_23h_pas_a_minuit():
+    """
+    Non-régression de la règle : 23h00 est la dernière minute admissible, pas
+    23h59. Une borne mal comprise laisserait planifier des soins de nuit.
+    """
+    from src.common.rendezvous import HEURE_FERMETURE, borne_horaire
+
+    d = datetime(2026, 10, 5, HEURE_FERMETURE - 1, 30, tzinfo=timezone.utc)
+    assert borne_horaire(d, d + timedelta(minutes=30)) is None
 
 
 # ==============================================================================
@@ -589,6 +611,67 @@ async def test_annulation_conserve_le_motif(client_authenticated, decor, patient
         params={"statut": "ANNULE", "motif": "Patient empêché"},
     )
     assert r.json()["data"]["motif_annulation"] == "Patient empêché"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("statut_final", ["ANNULE", "ABSENT", "TERMINEE"])
+async def test_statut_terminal_libere_le_fauteuil(
+    client_authenticated, decor, patient_id, tenant_db, statut_final
+):
+    """
+    Non-régression : un rendez-vous arrivé à son terme rend le fauteuil.
+
+    La contrainte d'exclusion de `creneaux_fauteuil` ne regarde PAS le statut du
+    rendez-vous (il vit dans une autre table), et elle est inconditionnelle par
+    choix — un fauteuil en panne doit rester bloqué. C'est donc le service qui
+    libère. Sans cela, le fauteuil d'un rendez-vous annulé resterait occupé
+    à jamais, et le cabinet finirait sans une seule place libre.
+
+    Paramétré sur les trois statuts terminaux : les trois doivent libérer.
+    """
+    creation = await prendre(client_authenticated, decor, patient_id, _a(9))
+    assert creation.status_code == 201, creation.text
+    rendez_vous_id = creation.json()["data"]["id"]
+
+    # Le fauteuil est bien occupé tant que le rendez-vous vit.
+    occupation = (
+        await tenant_db.execute(
+            select(CreneauFauteuil).where(CreneauFauteuil.rendez_vous_id == rendez_vous_id)
+        )
+    ).scalar_one()
+    assert occupation.fauteuil_id == uuid.UUID(decor["fauteuil_1"])
+
+    params = {"statut": statut_final}
+    if statut_final == "ANNULE":
+        params["motif"] = "Patient empêché"
+
+    # « Terminé » ne s'atteint qu'après une consultation : le cycle est
+    # Planifié → Confirmé → Salle d'attente → Consultation → Terminé. Sauter
+    # l'étape intermédiaire est refusé, et c'est voulu.
+    if statut_final == "TERMINEE":
+        for etape in ("CONFIRME", "EN_SALLE_ATTENTE", "EN_CONSULTATION"):
+            r = await client_authenticated.post(
+                f"/api/v1/rendez-vous/{rendez_vous_id}/statut", params={"statut": etape}
+            )
+            assert r.status_code == 200, f"{etape} -> {r.text}"
+
+    r = await client_authenticated.post(
+        f"/api/v1/rendez-vous/{rendez_vous_id}/statut", params=params
+    )
+    assert r.status_code == 200, r.text
+
+    restantes = (
+        await tenant_db.execute(
+            select(CreneauFauteuil).where(CreneauFauteuil.rendez_vous_id == rendez_vous_id)
+        )
+    ).scalars().all()
+    assert restantes == [], "le fauteuil n'a pas été libéré"
+
+    # Et le fauteuil redevient réservable.
+    autre = await prendre(
+        client_authenticated, decor, patient_id, _a(9), fauteuil_id=decor["fauteuil_1"]
+    )
+    assert autre.status_code == 201, autre.text
 
 
 @pytest.mark.asyncio

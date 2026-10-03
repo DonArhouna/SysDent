@@ -62,6 +62,7 @@ from src.common.rendezvous import (
     PLANIFIE,
     STATUTS_ACTIFS,
     STATUTS_EXCLUS_DU_CONFLIT,
+    STATUTS_TERMINAUX,
     TERMINEE,
     TransitionInterdite,
     chevauchent,
@@ -86,10 +87,12 @@ from src.modules.tenants.models import (
     CreneauFauteuil,
     Disponibilite,
     Fauteuil,
+    MotifConsultationEnum,
     Patient,
     Praticien,
     MotifBlocageFauteuilEnum,
     RendezVous,
+    StatutRendezVousEnum,
     Salle,
     Utilisateur,
 )
@@ -116,6 +119,19 @@ class ConflitRendezVousException(BusinessRuleViolationException):
         self.conflits = conflits
 
 
+def _heure(valeur) -> str:
+    """
+    Formate `HH:MM` depuis un datetime ou une chaîne ISO.
+
+    Les conflits circulent sérialisés (chaînes ISO) parce que `details` part
+    tel quel dans un JSONResponse. On accepte les deux formes plutôt que de
+    contraindre l'appelant, qui n'a pas toujours l'objet en main.
+    """
+    if isinstance(valeur, str):
+        valeur = datetime.fromisoformat(valeur)
+    return valeur.strftime("%H:%M")
+
+
 def _formater_message_conflits(conflits: Sequence[Dict[str, Any]]) -> str:
     """Un message qui nomme l'obstacle, pas seulement son existence."""
     if not conflits:
@@ -127,8 +143,8 @@ def _formater_message_conflits(conflits: Sequence[Dict[str, Any]]) -> str:
         qui = conflit.get("patient_nom") or "un autre patient"
         motif = f" — {conflit['motif']}" if conflit.get("motif") else ""
         lignes.append(
-            f"{ressource.capitalize()} occupé {conflit['debut']:%H:%M}-{conflit['fin']:%H:%M} "
-            f"par {qui}{motif}"
+            f"{ressource.capitalize()} occupé "
+            f"{_heure(conflit['debut'])}-{_heure(conflit['fin'])} par {qui}{motif}"
         )
     return " ; ".join(lignes) + "."
 
@@ -538,8 +554,11 @@ class RendezVousService:
             debut=data.debut,
             fin=fin,
             motif=data.motif.strip(),
-            type_motif=data.type_motif,
-            statut=data.statut,
+            # Conversion explicite chaîte -> ENUM : SQLAlchemy ne convertit la
+            # valeur qu'à la LECTURE. écrire une chaîte laisse l'attribut ORM dans
+            # cet état jusqu'au prochain rechargement, et `.value` échoue ensuite.
+            type_motif=MotifConsultationEnum(data.type_motif),
+            statut=StatutRendezVousEnum(data.statut),
             notes=data.notes,
         )
         db.add(rendez_vous)
@@ -748,10 +767,25 @@ class RendezVousService:
                 code="MOTIF_ANNULATION_REQUIS",
             )
 
-        rendez_vous.statut = nouveau_statut
+        rendez_vous.statut = StatutRendezVousEnum(nouveau_statut)
         rendez_vous.date_statut = datetime.now(timezone.utc)
         if nouveau_statut == ANNULE:
             rendez_vous.motif_annulation = (motif or "").strip()
+
+        # Un rendez-vous arrivé à son terme LIBÈRE le fauteuil.
+        #
+        # La contrainte d'exclusion sur `creneaux_fauteuil` est volontairement
+        # inconditionnelle : un fauteuil en panne doit rester bloqué. Elle ne
+        # peut pas voir le statut du rendez-vous, qui vit dans une autre table.
+        # C'est donc ici qu'on libère, et c'est indispensable : sans cela, le
+        # fauteuil d'un rendez-vous annulé resterait occupé à jamais, et le
+        # cabinet finirait par n'avoir plus une seule place libre.
+        #
+        # L'historique n'est pas perdu : `consultations.fauteuil_id` porte
+        # toujours le lieu du soin.
+        if nouveau_statut in STATUTS_TERMINAUX:
+            for occupation in list(rendez_vous.creneaux_fauteuil):
+                await db.delete(occupation)
 
         await db.flush()
 

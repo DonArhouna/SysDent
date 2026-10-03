@@ -120,10 +120,9 @@ site/
 *.swp
 *.swo
 *~
-.project
-.pydevproject
 .settings/
 .qodo/
+.freebuff/
 
 # Fichiers de verrouillage Office (Word/Excel : ~$nom.docx)
 ~$*.docx

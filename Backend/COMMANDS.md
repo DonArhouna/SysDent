@@ -211,7 +211,13 @@ Si le port 5432 est inutilisable sur votre poste, le script suivant monte une in
 
 ⚠️ Un `rollback` (provoqué par toute requête en erreur) **expire** les objets du session. Relire ensuite un attribut d'un `Utilisateur` déjà chargé (`auteur.id`) depuis une coroutine lève `MissingGreenlet`. En production chaque requête charge un utilisateur neuf, le problème n'apparaît pas ; en test, la fixture `client_authenticated` renvoie volontairement une **copie détachée** pour reproduire ce comportement et supprimer cette classe d'échecs trompeurs.
 
-⚠️ FastAPI teste les routes **dans l'ordre de déclaration** : un sous-routeur comme `/ordonnances/medicaments` est absorbé par `/ordonnances/{prescription_id}` s'il est enregistré après. L'ordre dans `src/api/v1/router.py` est significatif — voir le commentaire qui l'accompagne.
+⚠️ FastAPI teste les routes **dans l'ordre de déclaration** : un sous-routeur comme `/ordonnances/medicaments` est absorbé par `/ordonnances/{prescription_id}` s'il est enregistré après. L'ordre dans `src/api/v1/router.py` est significatif — voir le commentaire qui l'accompagne. La même règle s'applique **dans** un routeur : `/rendez-vous/{id}` est déclaré après `/rendez-vous/agenda`, sinon l'agenda serait interprété comme un identifiant.
+
+⚠️ **Assigner une chaîne à une colonne `Enum` laisse l'attribut ORM en `str`** jusqu'au rechargement suivant : SQLAlchemy ne convertit la valeur qu'à la lecture. `.statut.value` échoue alors. Toujours convertir à l'écriture (`StatutConsultationEnum.EN_COURS`). C'est invisible dans les modules qui rechargent systématiquement, et explosif dans ceux qui sérialisent l'objet courant — le module Rendez-vous l'a révélé pour le module Consultations.
+
+⚠️ **`error.details` part tel quel dans un `JSONResponse`.** Y mettre un `datetime` lève « Object of type datetime is not JSON serializable ». Les conflits de rendez-vous transportent donc des chaînes ISO.
+
+⚠️ **Une colonne `Enum(...)` n'accepte pas `type='exclude'` dans `op.drop_constraint`** : Alembic ne connaît que check/foreignkey/primary/unique. Utiliser `ALTER TABLE … DROP CONSTRAINT` en SQL brut.
 
 ---
 
@@ -252,6 +258,8 @@ Ce sprint a fermé les brèches identifiées lors de l'audit. Points à connaît
 | Cabinets, salles & fauteuils | `/api/v1/cabinets` | D2A — sites, ressources physiques, vue planning |
 | Praticiens | `/api/v1/praticiens` | D2A — rattachement au site, numéros d'ordre |
 | Disponibilités | `/api/v1/praticiens/{id}/disponibilites` | D2A — plages de travail, créneaux proposables |
+| Rendez-vous & Agenda | `/api/v1/rendez-vous` | D2B — conflits praticien **et** fauteuil, cycle de vie |
+| Blocage de fauteuil | `/api/v1/rendez-vous/fauteuils/blocage` | D2B — panne, réparation, réservation interne |
 | RBAC & rôles | `/api/v1/rbac` | Sprint 0bis — catalogue, rôles, attribution de permissions |
 
 **Permissions RBAC utilisées** (format `MODULE:ACTION`) :
@@ -411,6 +419,60 @@ Un créneau proposable au patient doit être dans les deux. Le module Agenda fer
 
 ```powershell
 .\.venv\Scripts\python.exe .\_verify_d2a.py
+```
+
+---
+
+## 📅 5sexies. Rendez-vous & Agenda (D2B) — le cœur du pôle 2
+
+### La décision structurante : **la base est l'arbitre des conflits**
+
+Deux **contraintes d'exclusion PostgreSQL** interdisent physiquement le double-booking :
+
+```sql
+-- rendez_vous : un praticien ne peut pas avoir deux RDV qui se chevauchent
+EXCLUDE USING gist (praticien_id WITH =, tstzrange(debut, fin, '[)') WITH &&)
+  WHERE (statut NOT IN ('ANNULE', 'ABSENT', 'TERMINEE'))
+
+-- creneaux_fauteuil : un fauteuil ne peut pas être occupé deux fois
+EXCLUDE USING gist (fauteuil_id WITH =, tstzrange(debut, fin, '[)') WITH &&)
+```
+
+Une vérification applicative **ne peut pas** empêcher deux secrétaires de valider au même instant : entre son test et son `INSERT`, l'autre passe. Le service fait malgré tout un contrôle préalable — non pour protéger la base, mais pour **nommer l'obstacle** dans le message : une violation de contrainte ne dit pas « Mme Diop, détartrage, 09:00 ».
+
+⚠️ **`btree_gist` est requis** (opérateur `=` sur UUID pour un index GiST). La révision `f4433b308196` la crée sur chaque base tenant. En production, le rôle de création de base doit avoir le droit d'installer des extensions.
+
+### Occupation de fauteuil : une seule table, toutes causes confondues
+
+`creneaux_fauteuil` porte les rendez-vous **et** les indisponibilités (panne). C'est ce qui permet à la contrainte de fauteuil de couvrir les deux d'un seul trait. Répartir les deux cas entre deux tables obligerait à revérifier en croisant — et rouvrirait la fenêtre de course qu'on vient de fermer.
+
+### Points d'API
+
+| Route | Effet |
+|-------|-------|
+| `POST /rendez-vous` | Prise de RDV. **422 `CRENEAU_DEJA_OCCUPE`** avec le détail du conflit |
+| `GET /rendez-vous/creneaux-libres` | **Créneaux disponibles** : heures déclarées moins ce qui est pris |
+| `GET /rendez-vous/agenda?date=` | Journée : rendez-vous **et** indisponibilités de fauteuil |
+| `POST /rendez-vous/{id}/statut` | Faire avancer le cycle de vie |
+| `POST /rendez-vous/{id}/planifier` | Report atomique (libère l'ancien, réserve le nouveau) |
+| `POST /rendez-vous/{id}/consultation` | Ouvre la consultation, reprend le fauteuil |
+| `POST /rendez-vous/fauteuils/blocage` | Immobilise un fauteuil sans rendez-vous |
+| `GET /rendez-vous/referentiel` | Cycle de vie + graphe des transitions |
+
+### Règles que le frontend doit connaître
+
+1. **Le cycle est fermé.** `Planifié → Confirmé → Salle d'attente → Consultation → Terminé`, plus `Annulé` et `Absent` à tout moment avant la consultation. Un rendez-vous annulé ne se rouvre pas. `error.details.transitions` liste ce qui reste possible : **n'afficher que ces actions**.
+2. **`error.details.conflits` est le cœur de l'UX.** Chaque conflit dit la ressource (`PRATICIEN` / `FAUTEUIL`), le créneau, le patient et le motif. C'est ce qui permet de proposer 09:30 au lieu d'afficher « conflit ».
+3. **Hors disponibilités déclarées : accepté mais signalé.** `hors_disponibilites: true` dans la réponse et l'avertissement dans le message. Un cabinet qui n'a pas saisi ses horaires doit pouvoir prendre un rendez-vous, et une urgence ne peut pas attendre. Les **conflits**, eux, restent bloquants : ils sont physiques.
+4. **Un créneau adjacent est valide.** 09:00-09:30 puis 09:30-10:00 passe. Les bornes sont ouvertes en fin, sinon un cabinet ne pourrait pas remplir une matinée.
+5. **Tout statut terminal libère le fauteuil.** La contrainte de fauteuil ne voit pas le statut du rendez-vous (autre table) : c'est le service qui libère. `consultations.fauteuil_id` conserve l'historique du lieu du soin.
+6. **Un rendez-vous sans fauteuil est possible** (visite d'évaluation, urgence). `/creneaux-libres` ne propose un créneau que s'il reste au moins un fauteuil libre.
+7. **Le cycle se termine par le module Consultations** : le module Rendez-vous ne termine jamais seul un rendez-vous en consultation.
+
+### Vérification de bout en bout
+
+```powershell
+.\.venv\Scripts\python.exe .\_verify_d2b.py
 ```
 
 ---

@@ -693,8 +693,12 @@ class RendezVous(TenantBase, UUIDMixin, TimestampMixin):
             (praticien_id, "="),
             (func.tstzrange(debut, fin, "[)"), "&&"),
             using="gist",
-            # Un rendez-vous annulé ou manqué ne réserve plus le créneau.
-            where=text("statut NOT IN ('ANNULE', 'ABSENT')"),
+            # `where` : les trois statuts TERMINAUX sortent du périmètre. Un
+            # rendez-vous terminé, annulé ou manqué ne réserve plus son créneau.
+            # La valeur est dupliquée côté Python (`STATUTS_EXCLUS_DU_CONFLIT`)
+            # et doit rester alignée : c'est la seule règle qui doit l'être,
+            # d'où ce rappel.
+            where=text("statut NOT IN ('ANNULE', 'ABSENT', 'TERMINEE')"),
             name="ex_rendez_vous_praticien",
         ),
     )
