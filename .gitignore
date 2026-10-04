@@ -25,8 +25,19 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+# ⚠️ `lib/` et `lib64/` sont ANCRÉS à la racine (`/lib/`).
+# Sans l'ancre, git ignore TOUT dossier nommé `lib` à n'importe quelle
+# profondeur — y compris `Frontend/src/lib/`, qui contient le client HTTP
+# (`api.ts`), le formatage, la navigation et les utilitaires. Conséquence : le
+# dépôt ne contenait aucune couche de communication frontend, et un `git clone`
+# produisait une application qui ne compile pas (`Cannot find module
+# '@/lib/api'`). Les environnements virtuels restent couverts par `.venv/`,
+# `venv/`, `env/`.
+/lib/
+/lib64/
+
+# Garantie explicite : le dossier `lib` du frontend est du code source.
+!/Frontend/src/lib/
 parts/
 sdist/
 var/

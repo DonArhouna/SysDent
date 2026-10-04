@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils'
 import type { DentOdontogramme, EtatReferentiel } from '../types'
+import { COULEUR_ABSENTE, COULEUR_SAINE, couleurEtatDentaire } from '../etats-couleurs'
 
 interface OdontogrammeSvgProps {
   dents: DentOdontogramme[]
@@ -9,22 +10,6 @@ interface OdontogrammeSvgProps {
   typeOdontogramme: 'ADULTE' | 'ENFANT' | 'MIXTE'
 }
 
-/**
- * Palette de repli des états cliniques.
- *
- * Ces teintes relèvent d'une convention du schéma dentaire, pas d'un choix
- * décoratif : on les déclare donc via les tokens sémantiques du thème (un seul
- * jeu clair/sombre, bascule instantaneous) plutôt que des hex en dur dans le
- * JSX. La couleur de référence reste celle du backend
- * (`EtatReferentiel.couleur`) ; ces valeurs ne servent que si elle manque.
- */
-const COULEUR_CARIE = 'hsl(var(--danger))'
-const COULEUR_SOIGNEE = 'hsl(var(--accent-blue))'
-const COULEUR_COURONNE = 'hsl(var(--warning))'
-/** Dent saine : vert sémantique. */
-const COULEUR_SAINE = 'hsl(var(--success))'
-/** Croix de dent absente : gris neutre du thème. */
-const COULEUR_ABSENTE = 'hsl(var(--muted-foreground))'
 
 // Numéros FDI par quadrant
 const QUADRANTS_ADULTE = {
@@ -63,16 +48,13 @@ function DentItem({
 }) {
   if (!dent) return null
 
-  // Couleur des 5 faces si renseignées, sinon couleur globale
+  // Couleur des 5 faces si renseignées, sinon couleur globale. Le mapping est
+  // celui de `etats-couleurs` — le duplicer ici avait déjà diverge une fois.
   const getCouleurFace = (faceNom: string) => {
     const f = dent.faces.find(
       (fc) => fc.face === faceNom || fc.face_courte === faceNom.charAt(0),
     )
-    if (f && f.etat !== 'SAINE') {
-      if (f.etat.includes('CARIE')) return COULEUR_CARIE
-      if (f.etat.includes('SOIGNEE') || f.etat.includes('OBTUR')) return COULEUR_SOIGNEE
-      if (f.etat.includes('COURONNE')) return COULEUR_COURONNE
-    }
+    if (f && f.etat !== 'SAINE') return couleurEtatDentaire(f.etat)
     return couleurGlobale
   }
 
@@ -198,9 +180,11 @@ export function OdontogrammeSvg({
   onSelectDent,
   typeOdontogramme,
 }: OdontogrammeSvgProps) {
-  // Mapping couleur par état
+  // Couleur par état : mapping de thème (voir `couleurEtatDentaire`). Le hex
+  // du backend ne sert plus qu'à documenter la convention — c'est le token
+  // qui est appliqué, pour que la bascule de thème s'applique aussi aux dents.
   const couleurMap = new Map<string, string>()
-  referentielEtats.forEach((e) => couleurMap.set(e.code, e.couleur))
+  referentielEtats.forEach((e) => couleurMap.set(e.code, couleurEtatDentaire(e.code, e.couleur)))
 
   const dentParFdi = new Map<number, DentOdontogramme>()
   dents.forEach((d) => dentParFdi.set(d.numero_fdi, d))

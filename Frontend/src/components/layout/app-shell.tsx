@@ -4,6 +4,7 @@ import { AppSidebar } from '@/components/layout/sidebar'
 import { Topbar } from '@/components/layout/topbar'
 import { ToastContainer } from '@/components/ui/toast'
 import { useAuthStore } from '@/stores/auth-store'
+import { cn } from '@/lib/utils'
 
 /**
  * Coquille applicative — layout flottant (refonte visuelle 2026-10).
@@ -27,17 +28,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   const [replie, setReplie] = useState(false)
   const [drawerMobile, setDrawerMobile] = useState(false)
-  const [sousLargeur, setSousLargeur] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches,
-  )
 
-  // Suit la largeur réelle plutôt que de la sonder au clic : le bouton de la
-  // navbar et le libellé accessible restent justes après un redimensionnement.
+  // En repassant en grand écran, un drawer resté ouvert n'aurait plus d'ancre.
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 1023px)')
     const surChangement = (e: MediaQueryListEvent) => {
-      setSousLargeur(e.matches)
-      // En repassant en large, un drawer resté ouvert n'aurait plus d'ancre.
       if (!e.matches) setDrawerMobile(false)
     }
     mq.addEventListener('change', surChangement)
@@ -75,9 +70,20 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="relative flex h-screen overflow-hidden bg-background p-3 md:p-4">
       {/* Sidebar ancrée (≥ lg) */}
-      <div className="mr-3 hidden w-[268px] shrink-0 lg:mr-4 lg:block">
-        <div className={replie ? 'w-[80px]' : 'w-full'}>
-          <AppSidebar collapsed={replie} />
+      {/* La largeur est portée par CE wrapper, pas par le panneau : sans cela le
+          rail restait sur 268 px et laissa derrière lui une bande vide que ni la
+          navbar ni le contenu ne réquisitionnaient. La colonne principale est
+          en `flex-1` : elle occupe automatiquement tout l'espace libéré.
+          `h-full` + `min-h-0` règlent la hauteur du panneau (sans quoi `h-full`
+          se résolvait sur la hauteur du contenu et la liste ne défilerait pas). */}
+      <div
+        className={cn(
+          'mr-3 hidden shrink-0 transition-[width] duration-200 lg:mr-4 lg:block',
+          replie ? 'w-[80px]' : 'w-[268px]',
+        )}
+      >
+        <div className="h-full min-h-0 w-full">
+          <AppSidebar collapsed={replie} onToggle={() => setReplie((v) => !v)} />
         </div>
       </div>
 
@@ -96,7 +102,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             aria-hidden
           />
           <div className="absolute inset-y-3 left-3 w-[268px] animate-in slide-in-from-left duration-200">
-            <AppSidebar collapsed={false} />
+            <AppSidebar collapsed={false} onToggle={() => setDrawerMobile(false)} />
           </div>
         </div>
       )}
@@ -104,15 +110,15 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Colonne principale : navbar + contenu scrollable */}
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar
-          collapsed={replie}
-          mode={sousLargeur ? 'drawer' : 'rail'}
-          onToggleSidebar={() => {
-            // < lg : ouvre le drawer ; ≥ lg : replie le rail.
-            if (sousLargeur) setDrawerMobile(true)
-            else setReplie((v) => !v)
-          }}
+          onOpenMenu={() => setDrawerMobile(true)}
+          drawerOuvert={drawerMobile}
         />
-        <main className="mt-3 flex-1 overflow-y-auto rounded-xl2 md:mt-4">{children}</main>
+        {/* `pb-20` : le bouton d'aide flottant est fixe, en bas à droite. Sans cette
+            réserve, il recouvre en permanence le dernier contenu de la page —
+            sur mobile, le lien « Voir tout → » d'un panneau. */}
+        <main className="mt-3 flex-1 overflow-y-auto rounded-xl2 pb-20 md:mt-4">
+          {children}
+        </main>
       </div>
       <ToastContainer />
     </div>

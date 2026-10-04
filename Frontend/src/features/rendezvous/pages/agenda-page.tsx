@@ -27,6 +27,7 @@ import { formatDateFr } from '@/lib/format'
 import { toast } from '@/stores/toast-store'
 import { useCabinetStore } from '@/stores/cabinet-store'
 import { praticiensApi } from '@/features/praticiens/services/praticiens-api'
+import { nomComplet } from '@/features/praticiens/types'
 import { rendezvousApi } from '../services/rendezvous-api'
 import { RdvFormModal } from '../components/rdv-form-modal'
 import { BlocageFauteuilModal } from '../components/blocage-fauteuil-modal'
@@ -197,7 +198,7 @@ export function AgendaPage() {
             {praticiens.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.titre ? `${p.titre} ` : 'Dr '}
-                {p.nom_complet}
+                {nomComplet(p)}
               </option>
             ))}
           </Select>

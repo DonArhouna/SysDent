@@ -21,6 +21,9 @@ import { JournalCaissePage } from '@/features/facturation/pages/journal-caisse-p
 import { StockPage } from '@/features/stock/pages/stock-page'
 import { RolesPage } from '@/features/rbac/pages/roles-page'
 import { AuditPage } from '@/features/audit/pages/audit-page'
+import { MonComptePage } from '@/features/compte/pages/mon-compte-page'
+import { ParametresPage } from '@/features/compte/pages/parametres-page'
+import { UtilisateursPage } from '@/features/utilisateurs/pages/utilisateurs-page'
 
 export default function App() {
   return (
@@ -222,6 +225,33 @@ export default function App() {
           </AppShell>
         }
       />
+      <Route
+        path="/utilisateurs"
+        element={
+          <AppShell>
+            <ProtectedRoute permission="ADMIN:READ">
+              <UtilisateursPage />
+            </ProtectedRoute>
+          </AppShell>
+        }
+      />
+      <Route
+        path="/compte"
+        element={
+          <AppShell>
+            <MonComptePage />
+          </AppShell>
+        }
+      />
+      <Route
+        path="/parametres"
+        element={
+          <AppShell>
+            <ParametresPage />
+          </AppShell>
+        }
+      />
+
       <Route
         path="/404"
         element={

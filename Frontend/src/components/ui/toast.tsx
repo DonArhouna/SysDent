@@ -41,7 +41,13 @@ export function ToastContainer() {
   return (
     <div
       aria-live="polite"
-      className="pointer-events-none fixed top-4 right-4 z-50 flex max-h-screen w-full max-w-sm flex-col gap-2 p-2 sm:max-w-md"
+      // Les toasts vivaient en haut à droite : ils recouvraient la navbar
+      // (rôle, date, notifications, avatar) ET les boutons d'action de
+      // l'en-tête de page (« Créer un rôle »). Le bas-gauche n'est pas mieux —
+      // la sidebar occupe toute la colonne gauche jusqu'en bas.
+      // Il reste le bas-droite, au-dessus du bouton d'aide flottant
+      // (`bottom-5 right-5`) : c'est la seule zone libre du layout.
+      className="pointer-events-none fixed bottom-20 right-4 z-50 flex max-h-[70vh] w-full max-w-sm flex-col-reverse gap-2 p-2 sm:max-w-md"
     >
       {toasts.map((t) => {
         const Icone = ICONES[t.type]
@@ -52,7 +58,7 @@ export function ToastContainer() {
             key={t.id}
             role="alert"
             className={cn(
-              'pointer-events-auto flex items-start gap-3 rounded-lg border p-3.5 shadow-lg backdrop-blur transition-all duration-200 animate-in fade-in slide-in-from-top-2',
+              'pointer-events-auto flex items-start gap-3 rounded-lg border p-3.5 shadow-lg backdrop-blur transition-all duration-200 animate-in fade-in slide-in-from-bottom-2',
               style.border,
               style.bg,
             )}

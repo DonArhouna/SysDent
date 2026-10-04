@@ -247,7 +247,7 @@ export function PatientsListPage() {
               <TBody>
                 {patients.map((patient) => (
                   <TRow key={patient.id} className={patient.archive ? 'opacity-60 bg-muted/20' : ''}>
-                    <TD className="font-mono text-xs font-semibold text-primary">
+                    <TD className="whitespace-nowrap font-mono text-xs font-semibold text-primary">
                       <Link
                         to={`/patients/${patient.id}`}
                         className="hover:underline flex items-center gap-1.5"

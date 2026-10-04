@@ -23,7 +23,7 @@ import { praticiensApi } from '@/features/praticiens/services/praticiens-api'
 import { consultationsApi } from '../services/consultations-api'
 import type { StatutConsultation } from '../types'
 import type { Patient } from '@/features/patients/types'
-import type { Praticien } from '@/features/praticiens/types'
+import { nomComplet, type Praticien } from '@/features/praticiens/types'
 
 const STATUT_BADGES: Record<StatutConsultation, { label: string; tone: StatusTone }> = {
   PLANIFIEE: { label: 'Planifiée', tone: 'info' },
@@ -298,7 +298,7 @@ export function ConsultationsListPage() {
               {praticiens.map((pr) => (
                 <option key={pr.id} value={pr.id}>
                   {pr.titre ? `${pr.titre} ` : 'Dr '}
-                  {pr.nom_complet}
+                  {nomComplet(pr)}
                 </option>
               ))}
             </Select>

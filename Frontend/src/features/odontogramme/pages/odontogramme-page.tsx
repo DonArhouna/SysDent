@@ -21,6 +21,7 @@ import { toast } from '@/stores/toast-store'
 import { patientsApi } from '@/features/patients/services/patients-api'
 import { odontogrammeApi } from '../services/odontogramme-api'
 import { OdontogrammeSvg } from '../components/odontogramme-svg'
+import { couleurEtatDentaire } from '../etats-couleurs'
 import { DentDrawer } from '../components/dent-drawer'
 import type { DentOdontogramme, TypeOdontogramme } from '../types'
 import type { Patient } from '@/features/patients/types'
@@ -284,7 +285,7 @@ export function OdontogrammePage() {
                   <div key={etat.code} className="flex items-center gap-1.5">
                     <span
                       className="h-3 w-3 rounded-full shrink-0 border border-black/10"
-                      style={{ backgroundColor: etat.couleur }}
+                      style={{ backgroundColor: couleurEtatDentaire(etat.code, etat.couleur) }}
                     />
                     <span className="text-muted-foreground">{etat.libelle}</span>
                   </div>

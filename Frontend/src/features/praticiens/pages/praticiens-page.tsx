@@ -7,7 +7,6 @@ import {
   Plus,
   Trash2,
   Mail,
-  Phone,
   ShieldCheck,
   Calendar,
   RefreshCw,
@@ -26,7 +25,7 @@ import { Can } from '@/components/auth/can'
 import { toast } from '@/stores/toast-store'
 import { useCabinetStore } from '@/stores/cabinet-store'
 import { praticiensApi } from '../services/praticiens-api'
-import type { Disponibilite } from '../types'
+import { nomComplet, type Disponibilite } from '../types'
 
 const JOURS_SEMAINE = [
   { index: 0, nom: 'Lundi' },
@@ -41,6 +40,12 @@ const JOURS_SEMAINE = [
 export function PraticiensPage() {
   const queryClient = useQueryClient()
   const cabinetActifId = useCabinetStore((s) => s.cabinetActifId)
+  // `Praticien.cabinets` contient des identifiants, pas des objets : le nom
+  // affiché est résolu ici. Repli sur l'identifiant court plutôt qu'un trou.
+  const nomCabinet = (cabinetId: string): string => {
+    const cabinet = cabinets.find((c) => c.id === cabinetId)
+    return cabinet?.nom ?? `${cabinetId.slice(0, 8)}…`
+  }
   const cabinets = useCabinetStore((s) => s.cabinets)
 
   const [praticienSelectionneId, setPraticienSelectionneId] = useState<string | null>(null)
@@ -186,8 +191,7 @@ export function PraticiensPage() {
                         <div className="flex items-center gap-2">
                           <Stethoscope className="h-4 w-4 text-primary" />
                           <h4 className="font-bold text-sm text-foreground">
-                            {praticien.titre ? `${praticien.titre} ` : 'Dr '}
-                            {praticien.nom_complet}
+                            {nomComplet(praticien) || 'Dr'}
                           </h4>
                         </div>
                         <p className="text-xs text-muted-foreground font-medium">
@@ -199,17 +203,17 @@ export function PraticiensPage() {
                           </p>
                         )}
                       </div>
-                      <Badge variant={praticien.actif ? 'success' : 'neutral'}>
-                        {praticien.actif ? 'Actif' : 'Inactif'}
+                      <Badge variant={praticien.compte_actif ? 'success' : 'neutral'}>
+                        {praticien.compte_actif ? 'Actif' : 'Inactif'}
                       </Badge>
                     </div>
 
-                    {praticien.cabinets_rattaches.length > 0 && (
+                    {praticien.cabinets.length > 0 && (
                       <div className="mt-3 flex flex-wrap gap-1 border-t border-border pt-2">
-                        {praticien.cabinets_rattaches.map((r) => (
-                          <Badge key={r.cabinet_id} variant="neutral" className="text-[10px]">
+                        {praticien.cabinets.map((cabinetId) => (
+                          <Badge key={cabinetId} variant="neutral" className="text-[10px]">
                             <Building2 className="h-2.5 w-2.5 mr-1" />
-                            {r.nom}
+                            {nomCabinet(cabinetId)}
                           </Badge>
                         ))}
                       </div>
@@ -230,8 +234,7 @@ export function PraticiensPage() {
                     <div>
                       <CardTitle className="flex items-center gap-2">
                         <Stethoscope className="h-5 w-5 text-primary" />
-                        {praticienActif.titre ? `${praticienActif.titre} ` : 'Dr '}
-                        {praticienActif.nom_complet}
+                        {nomComplet(praticienActif)}
                       </CardTitle>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {praticienActif.specialite ?? 'Omnipratique & Chirurgie dentaire'}
@@ -259,12 +262,7 @@ export function PraticiensPage() {
                         <Mail className="h-3.5 w-3.5 text-primary" />
                         <span className="truncate">{praticienActif.email}</span>
                       </div>
-                      {praticienActif.telephone && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Phone className="h-3.5 w-3.5 text-primary" />
-                          <span>{praticienActif.telephone}</span>
-                        </div>
-                      )}
+
                       <div className="flex items-center gap-2 text-muted-foreground font-mono">
                         <ShieldCheck className="h-3.5 w-3.5 text-primary" />
                         <span>N° {praticienActif.numero_ordre ?? 'Ordre non renseigné'}</span>

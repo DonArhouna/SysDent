@@ -75,7 +75,12 @@ export function StatCard({
             aria-label="Chargement en cours"
           />
         ) : (
-          <p className="mt-3 truncate text-3xl font-bold tabular-nums">{value}</p>
+          // Pas de `truncate` ici : un montant réaliste (« 200 000 FCFA »)
+          // débordait la carte et se retrouvait coupé en « 200 000 F… ».
+          // La valeur passe à la ligne plutôt que de perdre son dernier chiffre.
+          <p className="mt-3 break-words text-2xl font-bold leading-tight tabular-nums sm:text-3xl">
+            {value}
+          </p>
         )}
         <p className="mt-1 truncate text-xs text-muted-foreground">{hint ?? detail}</p>
       </div>

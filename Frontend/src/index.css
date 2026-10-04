@@ -122,6 +122,24 @@
   }
 
   /*
+   * Masque la barre de défilement sans empêcher le défilement.
+   *
+   * La molette, le tactile et le clavier continuent de fonctionner : seuls
+   * `scrollbar-width` (Firefox) et le pseudo-élément (Chromium) sont neutralisés.
+   * Utilisé sur la navigation du sidebar, où la barre de défilement ne doit pas
+   * concurrencer le panneau flottant.
+   */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  /*
    * Aide au focus clavier homogène : à poser sur tout élément interactif
    * custom (lignes cliquables, pills…). Les composants natifs l'ont déjà
    * via leurs classes utilitaires.

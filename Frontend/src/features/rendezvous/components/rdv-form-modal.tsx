@@ -12,7 +12,7 @@ import { cabinetsApi } from '@/features/cabinets/services/cabinets-api'
 import { rendezvousApi } from '../services/rendezvous-api'
 import type { CreneauLibre, RdvCreateInput, RendezVous } from '../types'
 import type { Patient } from '@/features/patients/types'
-import type { Praticien } from '@/features/praticiens/types'
+import { nomComplet, type Praticien } from '@/features/praticiens/types'
 import type { Fauteuil } from '@/features/cabinets/types'
 import { ApiError } from '@/lib/api'
 import { AlertCircle, Clock, Check } from 'lucide-react'
@@ -275,7 +275,7 @@ export function RdvFormModal({
               {praticiens.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.titre ? `${p.titre} ` : 'Dr '}
-                  {p.nom_complet} ({p.specialite ?? 'Généraliste'})
+                  {nomComplet(p)} ({p.specialite ?? 'Généraliste'})
                 </option>
               ))}
             </Select>
