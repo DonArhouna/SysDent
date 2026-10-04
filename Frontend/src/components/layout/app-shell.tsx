@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Topbar } from '@/components/layout/topbar'
+import { ToastContainer } from '@/components/ui/toast'
 import { useAuthStore } from '@/stores/auth-store'
 
 /**
@@ -40,6 +41,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Topbar collapsed={replie} onToggleSidebar={() => setReplie((v) => !v)} />
         <main className="flex-1 overflow-y-auto px-4 py-6 md:px-8">{children}</main>
       </div>
+      <ToastContainer />
     </div>
   )
 }

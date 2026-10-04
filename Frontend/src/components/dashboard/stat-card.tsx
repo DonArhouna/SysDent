@@ -21,6 +21,7 @@ const CHIPS: Record<AccentStat, string> = {
  * Carte de statistique du tableau de bord : bordure gauche colorée, libellé
  * capitales, grand chiffre, sous-titre et chip d'icône (maquette de réf.).
  * `value` est TOUJOURS fourni par l'UI formaté : la carte ne connaît pas l'API.
+ * Trois états : `chargement` (skeleton), `hint` (erreur API), sinon la valeur.
  */
 export function StatCard({
   label,
@@ -29,6 +30,7 @@ export function StatCard({
   icon: Icone,
   accent,
   hint,
+  chargement = false,
 }: {
   label: string
   value: string
@@ -37,6 +39,8 @@ export function StatCard({
   accent: AccentStat
   /** Message affiché sous le chiffre en cas d'échec de chargement. */
   hint?: string
+  /** Affiche un skeleton à la place de la valeur pendant le fetch. */
+  chargement?: boolean
 }) {
   return (
     <article
@@ -49,8 +53,16 @@ export function StatCard({
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {label}
         </p>
-        <p className="mt-3 truncate text-3xl font-bold tabular-nums">{value}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{hint ?? detail}</p>
+        {chargement ? (
+          <div
+            className="mt-3 h-9 w-24 animate-pulse rounded-md bg-muted"
+            role="status"
+            aria-label="Chargement en cours"
+          />
+        ) : (
+          <p className="mt-3 truncate text-3xl font-bold tabular-nums">{value}</p>
+        )}
+        <p className="mt-1 truncate text-xs text-muted-foreground">{hint ?? detail}</p>
       </div>
       <span className={cn('icon-chip', CHIPS[accent])} aria-hidden>
         <Icone className="h-5 w-5" />

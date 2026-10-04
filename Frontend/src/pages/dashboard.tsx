@@ -5,6 +5,7 @@ import {
   FileText,
   Receipt,
   RefreshCw,
+  Sparkles,
   Users,
   type LucideIcon,
 } from 'lucide-react'
@@ -111,6 +112,7 @@ export function DashboardPage() {
     accent: AccentStat
     hint?: string
     icon: LucideIcon
+    chargement?: boolean
   }> = [
     {
       label: 'Total patients',
@@ -119,6 +121,7 @@ export function DashboardPage() {
       accent: 'blue',
       icon: Users,
       hint: patients.isError ? 'API injoignable' : undefined,
+      chargement: patients.isPending,
     },
     {
       label: 'Factures en attente',
@@ -127,14 +130,16 @@ export function DashboardPage() {
       accent: 'green',
       icon: FileText,
       hint: facturesEmises.isError ? 'API injoignable' : undefined,
+      chargement: facturesEmises.isPending,
     },
     {
       label: 'Devis envoyés',
       value: chiffre(devisEnvoyes.data),
-      detail: "En attente de signature",
+      detail: 'En attente de signature',
       accent: 'purple',
       icon: Receipt,
       hint: devisEnvoyes.isError ? 'API injoignable' : undefined,
+      chargement: devisEnvoyes.isPending,
     },
     {
       label: 'Encaissé du jour',
@@ -143,6 +148,7 @@ export function DashboardPage() {
       accent: 'orange',
       icon: Banknote,
       hint: caisseJour.isError ? 'API injoignable' : undefined,
+      chargement: caisseJour.isPending,
     },
   ]
 
@@ -252,6 +258,31 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Bulle d'aide (maquette) — un conseil pratique par jour. */}
+      <AstuceJour />
+    </div>
+  )
+}
+
+const ASTUCES: string[] = [
+  "Astuce : Ctrl + K lance une recherche globale depuis n'importe quelle page.",
+  "Astuce : cliquez sur une dent de l'odontogramme pour saisir son état et l'historique.",
+  'Astuce : le sélecteur de cabinet en haut filtre les données par site.',
+  'Astuce : « Voir tout » ouvre le journal de caisse complet avec filtres.',
+]
+
+function AstuceJour() {
+  const index = new Date().getDate() % ASTUCES.length
+  return (
+    <div
+      role="note"
+      className="flex items-start gap-3 rounded-card border border-primary/25 bg-primary/5 px-5 py-4 text-sm text-foreground"
+    >
+      <span aria-hidden className="icon-chip mt-0.5 h-8 w-8 bg-primary/15 text-primary">
+        <Sparkles className="h-4 w-4" />
+      </span>
+      <p className="leading-relaxed">{ASTUCES[index]}</p>
     </div>
   )
 }

@@ -5,6 +5,7 @@ import { ApiError } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
+import { ToastContainer } from '@/components/ui/toast'
 
 /**
  * Connexion multi-tenant : le backend résout le cabinet rattaché à l'email
@@ -123,6 +124,7 @@ export function LoginPage() {
           </p>
         </form>
       </div>
+      <ToastContainer />
     </div>
   )
 }

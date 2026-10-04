@@ -17,6 +17,7 @@ const buttonVariants = cva(
         outline: 'border border-border bg-card text-foreground hover:bg-muted',
         ghost: 'text-muted-foreground hover:bg-muted hover:text-foreground',
         danger: 'bg-danger text-white hover:bg-danger/90',
+        secondary: 'bg-muted text-foreground hover:bg-muted/80',
         // Lien discret « Voir tout → » des panneaux de la maquette.
         link: 'text-primary underline-offset-4 hover:underline',
       },

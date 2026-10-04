@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { ChevronDown, ChevronsLeft, LogOut, Search, Sparkles } from 'lucide-react'
+import { ChevronDown, LogOut, Search, Sparkles } from 'lucide-react'
 import { NAVIGATION } from '@/lib/navigation'
 import { useAuthStore, possedePermission } from '@/stores/auth-store'
 import { Avatar, initiales } from '@/components/ui/avatar'
@@ -12,24 +12,28 @@ import { cn } from '@/lib/utils'
  * - Navigation pilotée par `@/lib/navigation` : une seule source à maintenir ;
  * - filtrage RBAC local avec `possedePermission` (le backend reste garant —
  *   c'est un confort d'affichage, pas une sécurité) ;
- * - repli en rail d'icônes (chevron d'en-tête).
+ * - recherche de fonction : filtre les entrées en temps réel (les sections
+ *   s'auto-déplient quand on cherche) ;
+ * - repli en rail d'icônes (chevron de la topbar).
  */
 export function Sidebar({ collapsed }: { collapsed: boolean }) {
   const profil = useAuthStore((etat) => etat.profil)
   const deconnexion = useAuthStore((etat) => etat.deconnexion)
   const { pathname } = useLocation()
   const [sectionsRepliees, setSectionsRepliees] = useState<Set<string>>(new Set())
+  const [recherche, setRecherche] = useState('')
 
-  const sections = useMemo(
-    () =>
-      NAVIGATION.map((section) => ({
-        ...section,
-        items: section.items.filter(
-          (item) => !item.permission || possedePermission(profil, item.permission),
-        ),
-      })).filter((section) => section.items.length > 0),
-    [profil],
-  )
+  const sections = useMemo(() => {
+    const terme = recherche.trim().toLowerCase()
+    return NAVIGATION.map((section) => ({
+      ...section,
+      items: section.items.filter(
+        (item) =>
+          (!item.permission || possedePermission(profil, item.permission)) &&
+          (terme === '' || item.label.toLowerCase().includes(terme)),
+      ),
+    })).filter((section) => section.items.length > 0)
+  }, [profil, recherche])
 
   const basculerSection = (titre: string) => {
     setSectionsRepliees((ensemble) => {
@@ -50,7 +54,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
         collapsed ? 'w-[76px]' : 'w-[264px]',
       )}
     >
-      {/* En-tête : logo + nom + repli */}
+      {/* En-tête : logo + nom */}
       <div className="flex items-center gap-3 px-4 pt-4 pb-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-black text-white">
           SD
@@ -66,13 +70,15 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
         )}
       </div>
 
-      {/* Recherche de fonction (visuelle pour le socle) */}
+      {/* Recherche de fonction : filtre réel de la navigation */}
       {!collapsed && (
         <div className="px-4 pb-3">
-          <div className="flex h-9 items-center gap-2 rounded-lg border border-sidebar-border bg-background px-3">
-            <Search className="h-4 w-4 text-muted-foreground" />
+          <div className="flex h-9 items-center gap-2 rounded-lg border border-sidebar-border bg-background px-3 focus-within:ring-2 focus-within:ring-primary/40">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
             <input
               type="search"
+              value={recherche}
+              onChange={(e) => setRecherche(e.target.value)}
               placeholder="Rechercher une fonction..."
               className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
               aria-label="Rechercher une fonction"
@@ -82,9 +88,16 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
       )}
 
       {/* Sections de navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 pb-4">
+      <nav className="flex-1 overflow-y-auto px-3 pb-4" aria-label="Navigation principale">
+        {sections.length === 0 && !collapsed && (
+          <p className="px-2 pt-3 text-xs text-muted-foreground">
+            Aucune fonction ne correspond à « {recherche} ».
+          </p>
+        )}
         {sections.map((section) => {
-          const repliee = sectionsRepliees.has(section.titre) && !collapsed
+          // Pendant une recherche : tout est déplié pour voir les résultats.
+          const repliee =
+            recherche.trim() === '' && sectionsRepliees.has(section.titre) && !collapsed
           return (
             <div key={section.titre} className="pt-3">
               <button
@@ -167,11 +180,6 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
             </>
           )}
         </div>
-        {!collapsed && (
-          <p className="mt-2 px-1 text-[10px] text-muted-foreground/70">
-            <ChevronsLeft className="inline h-3 w-3" /> Utilisez le menu pour naviguer
-          </p>
-        )}
       </div>
     </aside>
   )
