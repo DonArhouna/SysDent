@@ -4,11 +4,12 @@ import { Link, useSearchParams } from 'react-router-dom'
 import {
   Stethoscope,
   Plus,
-  RefreshCw,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Table, TBody, TD, TH, THead, TRow, TableEmpty } from '@/components/ui/table'
+import { PageHeader } from '@/components/ui/page-header'
+import { StatusBadge, type StatusTone } from '@/components/ui/status-badge'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Table, TBody, TD, TH, THead, TRow } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Modal } from '@/components/ui/modal'
 import { Input, Label } from '@/components/ui/input'
@@ -24,15 +25,12 @@ import type { StatutConsultation } from '../types'
 import type { Patient } from '@/features/patients/types'
 import type { Praticien } from '@/features/praticiens/types'
 
-const STATUT_BADGES: Record<
-  StatutConsultation,
-  { label: string; variant: 'info' | 'success' | 'warning' | 'purple' | 'danger' | 'neutral' }
-> = {
-  PLANIFIEE: { label: 'Planifiée', variant: 'info' },
-  EN_ATTENTE: { label: 'En attente', variant: 'warning' },
-  EN_COURS: { label: 'En cours', variant: 'purple' },
-  TERMINEE: { label: 'Terminée', variant: 'success' },
-  ANNULEE: { label: 'Annulée', variant: 'danger' },
+const STATUT_BADGES: Record<StatutConsultation, { label: string; tone: StatusTone }> = {
+  PLANIFIEE: { label: 'Planifiée', tone: 'info' },
+  EN_ATTENTE: { label: 'En attente', tone: 'warning' },
+  EN_COURS: { label: 'En cours', tone: 'purple' },
+  TERMINEE: { label: 'Terminée', tone: 'success' },
+  ANNULEE: { label: 'Annulée', tone: 'danger' },
 }
 
 export function ConsultationsListPage() {
@@ -114,33 +112,26 @@ export function ConsultationsListPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       {/* En-tête */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl flex items-center gap-2">
-            <Stethoscope className="h-7 w-7 text-primary" />
-            Consultations Médicales & Actes
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Examens cliniques, diagnostics CIM-10, soins dentaires et total facturable
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => void refetch()}>
-            <RefreshCw className="h-4 w-4" />
+      <PageHeader
+        titre={
+          <span className="flex items-center gap-2">
+            <Stethoscope className="h-7 w-7 text-primary" aria-hidden />
+            Consultations Médicales &amp; Actes
+          </span>
+        }
+        sousTitre="Examens cliniques, diagnostics CIM-10, soins dentaires et total facturable"
+        onRefresh={() => void refetch()}
+      >
+        <Can permission="CONSULTATIONS:CREATE">
+          <Button variant="primary" size="sm" onClick={ouvrirDemarrage}>
+            <Plus className="h-4 w-4" />
+            Nouvelle consultation
           </Button>
-
-          <Can permission="CONSULTATIONS:CREATE">
-            <Button variant="primary" size="sm" onClick={ouvrirDemarrage}>
-              <Plus className="h-4 w-4" />
-              Nouvelle consultation
-            </Button>
-          </Can>
-        </div>
-      </div>
+        </Can>
+      </PageHeader>
 
       {/* Filtres */}
-      <div className="rounded-xl border border-border bg-card p-4 shadow-xs flex flex-wrap items-center gap-3">
+      <div className="rounded-xl2 border border-border bg-card p-4 shadow-float flex flex-wrap items-center gap-3">
         <Select
           value={statutFiltre}
           onChange={(e) => setStatutFiltre(e.target.value)}
@@ -181,7 +172,7 @@ export function ConsultationsListPage() {
       </div>
 
       {/* Tableau des consultations */}
-      <div className="rounded-xl border border-border bg-card shadow-xs overflow-hidden">
+      <div className="rounded-xl2 border border-border bg-card shadow-float overflow-hidden">
         {isLoading ? (
           <div className="p-6 space-y-3">
             <Skeleton className="h-10 w-full" />
@@ -189,21 +180,23 @@ export function ConsultationsListPage() {
             <Skeleton className="h-12 w-full" />
           </div>
         ) : isError ? (
-          <div className="p-8 text-center text-sm text-danger">
-            Impossible de charger les consultations.
-          </div>
+          <EmptyState
+            icon={Stethoscope}
+            titre="Consultations indisponibles"
+            description="Impossible de charger les consultations. Vérifiez votre session puis réessayez via « Actualiser »."
+          />
         ) : consultations.length === 0 ? (
-          <TableEmpty>
-            <div className="text-center py-8">
-              <Stethoscope className="h-10 w-10 text-muted-foreground/50 mx-auto mb-2" />
-              <p className="font-semibold text-foreground">Aucune consultation trouvée</p>
-              <Can permission="CONSULTATIONS:CREATE">
-                <Button variant="outline" size="sm" className="mt-3" onClick={ouvrirDemarrage}>
-                  Démarrer une consultation
-                </Button>
-              </Can>
-            </div>
-          </TableEmpty>
+          <EmptyState
+            icon={Stethoscope}
+            titre="Aucune consultation trouvée"
+            description="Démarrez une consultation pour alimenter l'historique du patient."
+          >
+            <Can permission="CONSULTATIONS:CREATE">
+              <Button variant="outline" size="sm" onClick={ouvrirDemarrage}>
+                Démarrer une consultation
+              </Button>
+            </Can>
+          </EmptyState>
         ) : (
           <Table>
             <THead>
@@ -218,7 +211,7 @@ export function ConsultationsListPage() {
             </THead>
             <TBody>
               {consultations.map((c) => {
-                const conf = STATUT_BADGES[c.statut] ?? { label: c.statut, variant: 'neutral' }
+                const conf = STATUT_BADGES[c.statut] ?? { label: c.statut, tone: 'neutral' as StatusTone }
                 return (
                   <TRow key={c.id}>
                     <TD className="text-xs font-mono">
@@ -242,7 +235,7 @@ export function ConsultationsListPage() {
                       {c.diagnostic_principal ?? '—'}
                     </TD>
                     <TD>
-                      <Badge variant={conf.variant}>{conf.label}</Badge>
+                      <StatusBadge tone={conf.tone}>{conf.label}</StatusBadge>
                     </TD>
                     <TD className="text-right">
                       <Link to={`/consultations/${c.id}`}>

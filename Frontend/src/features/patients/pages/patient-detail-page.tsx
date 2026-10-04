@@ -11,6 +11,7 @@ import {
   Plus,
   RefreshCw,
   Stethoscope,
+  WifiOff,
   ClipboardList,
   Pill,
   Receipt,
@@ -24,6 +25,9 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { PageHeader } from '@/components/ui/page-header'
+import { StatusBadge } from '@/components/ui/status-badge'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -72,19 +76,30 @@ export function PatientDetailPage() {
   }
 
   if (isError || !patient) {
+    // Un échec réseau n'est pas un dossier supprimé : le dire explicitement,
+    // sinon l'utilisateur croit à une perte de données.
     return (
-      <div className="mx-auto max-w-lg text-center py-16 space-y-4">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-danger/10 text-danger mx-auto">
-          <AlertCircle className="h-8 w-8" />
-        </div>
-        <h2 className="text-xl font-bold text-foreground">Dossier patient introuvable</h2>
-        <p className="text-sm text-muted-foreground">
-          Le dossier demandé n'existe pas ou vous n'avez pas la permission d'y accéder.
-        </p>
-        <Button variant="outline" onClick={() => navigate('/patients')}>
-          <ArrowLeft className="h-4 w-4" />
-          Retour à la liste des patients
-        </Button>
+      <div className="mx-auto max-w-lg rounded-xl2 border border-border bg-card shadow-float">
+        <EmptyState
+          icon={isError ? WifiOff : AlertCircle}
+          titre={isError ? 'Dossier patient indisponible' : 'Dossier patient introuvable'}
+          description={
+            isError
+              ? "Le dossier n'a pas pu être chargé. Vérifiez que le backend est démarré puis réessayez."
+              : "Le dossier demandé n'existe pas ou vous n'avez pas la permission d'y accéder."
+          }
+        >
+          {isError ? (
+            <Button variant="outline" onClick={() => void refetch()}>
+              <RefreshCw className="h-4 w-4" /> Réessayer
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={() => navigate('/patients')}>
+              <ArrowLeft className="h-4 w-4" />
+              Retour à la liste des patients
+            </Button>
+          )}
+        </EmptyState>
       </div>
     )
   }
@@ -137,21 +152,37 @@ export function PatientDetailPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      {/* Navigation et Actions Haut de page */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <Link
-          to="/patients"
-          className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Retour aux dossiers
-        </Link>
-
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => void refetch()} title="Actualiser la fiche">
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-
+      {/* En-tête : identité du dossier + actions */}
+      <PageHeader
+        titre={
+          <span className="flex flex-wrap items-center gap-2">
+            {patient.prenom} {patient.nom}
+            <StatusBadge tone={patient.archive ? 'warning' : 'success'}>
+              {patient.archive ? 'Archivé' : 'Dossier actif'}
+            </StatusBadge>
+            {patient.groupe_sanguin && (
+              <StatusBadge tone="purple" className="font-mono">
+                Groupe {patient.groupe_sanguin}
+              </StatusBadge>
+            )}
+          </span>
+        }
+        sousTitre={
+          <>
+            <span className="font-mono font-semibold text-primary">
+              {patient.numero_dossier}
+            </span>{' '}
+            • {calculerAge(patient.date_naissance)} ans (
+            {patient.sexe === 'F' ? 'Femme' : 'Homme'}) • Né(e) le{' '}
+            {formatDateFr(patient.date_naissance)} •{' '}
+            {patient.nb_consultations} consultation
+            {patient.nb_consultations > 1 ? 's' : ''}
+          </>
+        }
+        retour={{ to: '/patients', label: 'Retour aux dossiers' }}
+        onRefresh={() => void refetch()}
+      >
+        <>
           <Can permission="PATIENTS:UPDATE">
             <Button variant="outline" size="sm" onClick={() => setModalEditOpen(true)}>
               <Pencil className="h-4 w-4" />
@@ -167,47 +198,32 @@ export function PatientDetailPage() {
               </Button>
             </Link>
           </Can>
-        </div>
-      </div>
+        </>
+      </PageHeader>
 
       {/* Bandeau d'alertes médicales en tête */}
       <AlertesBanner alertes={patient.alertes} />
 
       {/* Carte d'identité principale du patient */}
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <div className="rounded-xl2 border border-border bg-card p-6 shadow-float">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-start gap-4">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-xl font-black text-primary">
+            <span
+              aria-hidden
+              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl3 bg-primary/10 text-xl font-black text-primary"
+            >
               {patient.prenom[0]}
               {patient.nom[0]}
-            </div>
+            </span>
 
             <div className="space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                  {patient.prenom} {patient.nom}
-                </h1>
-                <Badge variant={patient.archive ? 'warning' : 'success'}>
-                  {patient.archive ? 'Archivé' : 'Dossier Actif'}
-                </Badge>
-                {patient.groupe_sanguin && (
-                  <Badge variant="purple" className="font-mono">
-                    Groupe {patient.groupe_sanguin}
-                  </Badge>
-                )}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm text-muted-foreground">
-                <span className="font-mono font-semibold text-primary">
-                  {patient.numero_dossier}
-                </span>
-                <span>•</span>
-                <span>
-                  {calculerAge(patient.date_naissance)} ({patient.sexe === 'F' ? 'Femme' : 'Homme'})
-                </span>
-                <span>•</span>
-                <span>Né(e) le {formatDateFr(patient.date_naissance)}</span>
-              </div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Dossier patient
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {patient.ville ?? 'Dakar'}
+                {patient.profession ? ` • ${patient.profession}` : ''}
+              </p>
             </div>
           </div>
 

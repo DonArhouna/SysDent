@@ -2,8 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { EmptyState } from '@/components/ui/empty-state'
+import { PageHeader } from '@/components/ui/page-header'
+import { Skeleton } from '@/components/ui/skeleton'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { useToastStore } from '@/stores/toast-store'
 import { facturationApi } from '../services/facturation-api'
+import { tonStatutFacture } from './factures-list-page'
 import { formatFcfa, formatDateFr, formatDateTimeFr } from '@/lib/format'
 import type {
   FactureResponse,
@@ -19,6 +24,8 @@ import {
   CreditCard,
   Layers,
   Printer,
+  RefreshCw,
+  WifiOff,
 } from 'lucide-react'
 
 export function FactureDetailPage() {
@@ -28,6 +35,8 @@ export function FactureDetailPage() {
   const [facture, setFacture] = useState<FactureResponse | null>(null)
   const [echelonnement, setEchelonnement] = useState<PlanEchelonnementResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  /** Distingue « facture absente » d'un échec de chargement réseau. */
+  const [erreurChargement, setErreurChargement] = useState(false)
 
   // Modales
   const [isPaiementOpen, setIsPaiementOpen] = useState(false)
@@ -45,6 +54,7 @@ export function FactureDetailPage() {
     if (!id) return
     try {
       setLoading(true)
+      setErreurChargement(false)
       const [resFacture, resEchelonnement] = await Promise.all([
         facturationApi.obtenirFacture(id),
         facturationApi.obtenirEchelonnement(id),
@@ -53,6 +63,7 @@ export function FactureDetailPage() {
       setEchelonnement(resEchelonnement.data ?? null)
     } catch {
       // toast géré par l'intercepteur API
+      setErreurChargement(true)
     } finally {
       setLoading(false)
     }
@@ -82,72 +93,71 @@ export function FactureDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-12 text-center text-sm text-muted-foreground">
-        Chargement des détails de la facture...
+      <div className="space-y-6">
+        <Skeleton className="h-10 w-72" />
+        <Skeleton className="h-24 w-full rounded-xl2" />
+        <Skeleton className="h-64 w-full rounded-xl2" />
       </div>
     )
   }
 
   if (!facture) {
     return (
-      <div className="p-12 text-center space-y-4">
-        <p className="text-muted-foreground text-sm">Facture introuvable.</p>
-        <Link to="/factures">
-          <Button variant="outline" size="sm">
-            <ArrowLeft className="w-4 h-4 mr-1.5" /> Retour aux factures
+      <EmptyState
+        icon={erreurChargement ? WifiOff : CreditCard}
+        titre={erreurChargement ? 'Facture indisponible' : 'Facture introuvable'}
+        description={
+          erreurChargement
+            ? "La facture n'a pas pu être chargée. Vérifiez que le backend est démarré puis réessayez."
+            : "La facture demandée n'existe pas ou a été supprimée."
+        }
+      >
+        {erreurChargement ? (
+          <Button variant="outline" size="sm" onClick={() => void chargerDetails()}>
+            <RefreshCw className="h-4 w-4 mr-1.5" /> Réessayer
           </Button>
-        </Link>
-      </div>
+        ) : (
+          <Link to="/factures">
+            <Button variant="outline" size="sm">
+              <ArrowLeft className="w-4 h-4 mr-1.5" /> Retour aux factures
+            </Button>
+          </Link>
+        )}
+      </EmptyState>
     )
   }
 
   const estPayee = facture.statut === 'PAYEE'
-  const estPartielle = facture.statut === 'PARTIELLEMENT_PAYEE'
   const estAnnulee = facture.statut === 'ANNULEE'
   const sansPaiement = facture.paiements.length === 0
 
   return (
     <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Link to="/factures">
-            <Button variant="outline" size="sm" className="h-9 px-2.5">
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-          </Link>
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-2xl font-black text-foreground font-mono tracking-tight">
-                {facture.numero}
-              </h1>
-              <span
-                className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
-                  estPayee
-                    ? 'bg-success/15 border border-success/40 text-success'
-                    : estPartielle
-                    ? 'bg-primary/15 border border-primary/40 text-primary'
-                    : estAnnulee
-                    ? 'bg-muted border border-border text-muted-foreground line-through'
-                    : 'bg-warning/15 border border-warning/40 text-warning'
-                }`}
-              >
-                {facture.statut}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Émise le {formatDateFr(facture.date_emission)} • Patient :{' '}
-              <Link
-                to={`/patients/${facture.patient_id}`}
-                className="text-primary hover:underline"
-              >
-                Voir dossier patient
-              </Link>
-            </p>
-          </div>
-        </div>
+      {/* En-tête */}
+      <PageHeader
+        titre={
+          <span className="flex flex-wrap items-center gap-2.5 font-mono">
+            {facture.numero}
+            <StatusBadge tone={tonStatutFacture(facture.statut)} className="font-sans">
+              {facture.statut}
+            </StatusBadge>
+          </span>
+        }
+        sousTitre={
+          <>
+            Émise le {formatDateFr(facture.date_emission)} • Patient :{' '}
+            <Link
+              to={`/patients/${facture.patient_id}`}
+              className="text-primary hover:underline"
+            >
+              Voir dossier patient
+            </Link>
+          </>
+        }
+        retour={{ to: '/factures', label: 'Retour aux factures' }}
+      >
+        <>
 
-        <div className="flex items-center gap-2">
           {!estPayee && !estAnnulee && (
             <Button
               variant="primary"
@@ -182,8 +192,8 @@ export function FactureDetailPage() {
               <Ban className="w-3.5 h-3.5" /> Annuler
             </Button>
           )}
-        </div>
-      </div>
+        </>
+      </PageHeader>
 
       {/* Synthèse financière */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
@@ -436,7 +446,7 @@ export function FactureDetailPage() {
           </label>
           <input
             type="text"
-            className="w-full h-9 px-3 rounded-lg border border-border bg-card text-xs text-white"
+            className="w-full h-9 px-3 rounded-lg border border-border bg-card text-xs text-foreground"
             placeholder="Ex: Erreur de saisie des actes..."
             value={motifAnnulation}
             onChange={(e) => setMotifAnnulation(e.target.value)}

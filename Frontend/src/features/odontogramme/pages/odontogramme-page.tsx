@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams, Link } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ClipboardList,
-  RefreshCw,
-  ArrowLeft,
   User,
   Plus,
+  RefreshCw,
+  WifiOff,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { PageHeader } from '@/components/ui/page-header'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -83,6 +85,7 @@ export function OdontogrammePage() {
   const {
     data: resOdonto,
     isLoading: loadingOdonto,
+    isError: erreurOdonto,
     refetch,
   } = useQuery({
     queryKey: ['odontogramme-patient', patientSelectionne?.id],
@@ -132,35 +135,26 @@ export function OdontogrammePage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       {/* En-tête */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            {patientSelectionne && (
-              <Link
-                to={`/patients/${patientSelectionne.id}`}
-                className="text-muted-foreground hover:text-foreground mr-1"
-                title="Retour au dossier patient"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Link>
-            )}
-            <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl flex items-center gap-2">
-              <ClipboardList className="h-7 w-7 text-primary" />
-              Odontogramme & Charting Parodontal
-            </h1>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Cartographie dentaire vectorielle FDI interactive (32 dents adultes & 20 temporaires)
-          </p>
-        </div>
-
-        {patientSelectionne && (
-          <Button variant="outline" size="sm" onClick={() => void refetch()}>
-            <RefreshCw className="h-4 w-4" />
-            Actualiser le schéma
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        titre={
+          <span className="flex items-center gap-2">
+            <ClipboardList className="h-7 w-7 text-primary" aria-hidden />
+            Odontogramme &amp; Charting Parodontal
+          </span>
+        }
+        sousTitre={
+          patientSelectionne
+            ? `${patientSelectionne.prenom} ${patientSelectionne.nom} — cartographie dentaire vectorielle FDI interactive (32 dents adultes & 20 temporaires)`
+            : 'Cartographie dentaire vectorielle FDI interactive (32 dents adultes & 20 temporaires)'
+        }
+        retour={
+          patientSelectionne
+            ? { to: `/patients/${patientSelectionne.id}`, label: 'Retour au dossier patient' }
+            : undefined
+        }
+        onRefresh={patientSelectionne ? () => void refetch() : undefined}
+        libelleRefresh="Actualiser le schéma"
+      />
 
       {/* Sélecteur de patient si non défini */}
       {!patientSelectionne ? (
@@ -303,6 +297,18 @@ export function OdontogrammePage() {
                   <Skeleton className="h-44 w-full rounded-2xl" />
                   <Skeleton className="h-44 w-full rounded-2xl" />
                 </div>
+              ) : erreurOdonto ? (
+                /* Ne pas dessiner un schéma vide : cela laisserait croire à un
+                   patient sans dentition alors que le chargement a échoué. */
+                <EmptyState
+                  icon={WifiOff}
+                  titre="Schéma indisponible"
+                  description="L'odontogramme n'a pas pu être chargé. Vérifiez que le backend est démarré puis réessayez."
+                >
+                  <Button variant="outline" onClick={() => void refetch()}>
+                    <RefreshCw className="h-4 w-4" /> Réessayer
+                  </Button>
+                </EmptyState>
               ) : (
                 <OdontogrammeSvg
                   dents={dents}

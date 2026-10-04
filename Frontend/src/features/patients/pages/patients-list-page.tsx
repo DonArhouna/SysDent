@@ -6,7 +6,6 @@ import {
   UserPlus,
   Search,
   Filter,
-  RefreshCw,
   Archive,
   RotateCcw,
   Pencil,
@@ -17,8 +16,10 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Table, TBody, TD, TH, THead, TRow, TableEmpty } from '@/components/ui/table'
+import { Table, TBody, TD, TH, THead, TRow } from '@/components/ui/table'
+import { PageHeader } from '@/components/ui/page-header'
+import { EmptyState } from '@/components/ui/empty-state'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Can } from '@/components/auth/can'
 import { formatDateFr, calculerAge } from '@/lib/format'
@@ -85,42 +86,28 @@ export function PatientsListPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       {/* En-tête */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">
-              Dossiers Patients
-            </h1>
-            {meta && (
-              <Badge variant="neutral" className="text-xs">
-                {meta.total_records} dossier{meta.total_records > 1 ? 's' : ''}
-              </Badge>
-            )}
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Gestion du fichier patient, consultations médicales, antécédents et coordonnées
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => void refetch()} title="Actualiser la liste">
-            <RefreshCw className="h-4 w-4" />
+      <PageHeader
+        titre="Dossiers Patients"
+        sousTitre={
+          meta
+            ? `Gestion du fichier patient, consultations médicales, antécédents et coordonnées — ${meta.total_records} dossier${meta.total_records > 1 ? 's' : ''}`
+            : 'Gestion du fichier patient, consultations médicales, antécédents et coordonnées'
+        }
+        onRefresh={() => void refetch()}
+      >
+        <Can permission="PATIENTS:CREATE">
+          <Button
+            variant="primary"
+            onClick={() => {
+              setPatientToEdit(null)
+              setModalFormOpen(true)
+            }}
+          >
+            <UserPlus className="h-4 w-4" />
+            Nouveau patient
           </Button>
-
-          <Can permission="PATIENTS:CREATE">
-            <Button
-              variant="primary"
-              onClick={() => {
-                setPatientToEdit(null)
-                setModalFormOpen(true)
-              }}
-            >
-              <UserPlus className="h-4 w-4" />
-              Nouveau patient
-            </Button>
-          </Can>
-        </div>
-      </div>
+        </Can>
+      </PageHeader>
 
       {/* Barre de recherche et filtres */}
       <div className="rounded-xl border border-border bg-card p-4 shadow-xs space-y-3">
@@ -220,31 +207,29 @@ export function PatientsListPage() {
             Impossible de charger la liste des patients. Veuillez vérifier la connexion au serveur.
           </div>
         ) : patients.length === 0 ? (
-          <TableEmpty>
-            <div className="flex flex-col items-center justify-center p-6 text-center">
-              <Users className="h-10 w-10 text-muted-foreground/50 mb-2" />
-              <p className="font-semibold text-foreground">Aucun patient trouvé</p>
-              <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-                {recherche || nomFiltre || telFiltre
-                  ? 'Aucun résultat ne correspond à vos critères de recherche.'
-                  : 'Commencez par enregistrer un premier patient pour démarrer les dossiers cliniques.'}
-              </p>
-              <Can permission="PATIENTS:CREATE">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-4"
-                  onClick={() => {
-                    setPatientToEdit(null)
-                    setModalFormOpen(true)
-                  }}
-                >
-                  <UserPlus className="h-4 w-4" />
-                  Créer un dossier
-                </Button>
-              </Can>
-            </div>
-          </TableEmpty>
+          <EmptyState
+            icon={Users}
+            titre="Aucun patient trouvé"
+            description={
+              recherche || nomFiltre || telFiltre
+                ? 'Aucun résultat ne correspond à vos critères de recherche.'
+                : 'Commencez par enregistrer un premier patient pour démarrer les dossiers cliniques.'
+            }
+          >
+            <Can permission="PATIENTS:CREATE">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setPatientToEdit(null)
+                  setModalFormOpen(true)
+                }}
+              >
+                <UserPlus className="h-4 w-4" />
+                Créer un dossier
+              </Button>
+            </Can>
+          </EmptyState>
         ) : (
           <div className="overflow-x-auto">
             <Table>
@@ -311,9 +296,9 @@ export function PatientsListPage() {
                     </TD>
                     <TD>
                       {patient.archive ? (
-                        <Badge variant="warning">Archivé</Badge>
+                        <StatusBadge tone="warning">Archivé</StatusBadge>
                       ) : (
-                        <Badge variant="success">Actif</Badge>
+                        <StatusBadge tone="success">Actif</StatusBadge>
                       )}
                     </TD>
                     <TD className="text-right">

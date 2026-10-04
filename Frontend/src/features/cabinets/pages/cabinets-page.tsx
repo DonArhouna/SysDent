@@ -7,13 +7,14 @@ import {
   Plus,
   Pencil,
   Trash2,
-  RefreshCw,
   Phone,
   Mail,
   MapPin,
   Clock,
   CheckCircle2,
   XCircle,
+  RefreshCw,
+  WifiOff,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -22,6 +23,8 @@ import { Modal } from '@/components/ui/modal'
 import { Input, Label } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PageHeader } from '@/components/ui/page-header'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Can } from '@/components/auth/can'
 import { toast } from '@/stores/toast-store'
 import { cabinetsApi } from '../services/cabinets-api'
@@ -53,7 +56,7 @@ export function CabinetsPage() {
   const [loadingAction, setLoadingAction] = useState(false)
 
   // Liste des cabinets
-  const { data: resCabinets, isLoading, refetch } = useQuery({
+  const { data: resCabinets, isLoading, isError, refetch } = useQuery({
     queryKey: ['cabinets-list'],
     queryFn: () => cabinetsApi.lister(true),
   })
@@ -188,26 +191,29 @@ export function CabinetsPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       {/* En-tête */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">
-            Cabinets & Ressources Matérielles
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Configuration des sites, des salles de soins et du parc de fauteuils dentaires
-          </p>
-        </div>
-
-        <Button variant="outline" size="sm" onClick={() => void refetch()}>
-          <RefreshCw className="h-4 w-4" />
-          Actualiser
-        </Button>
-      </div>
+      <PageHeader
+        titre="Cabinets & Ressources Matérielles"
+        sousTitre="Configuration des sites, des salles de soins et du parc de fauteuils dentaires"
+        onRefresh={() => void refetch()}
+      />
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Skeleton className="h-64 w-full rounded-2xl" />
           <Skeleton className="h-64 md:col-span-2 w-full rounded-2xl" />
+        </div>
+      ) : isError ? (
+        /* Un échec de chargement n'est pas un cabinetier vide : le dire. */
+        <div className="rounded-xl2 border border-border bg-card shadow-float">
+          <EmptyState
+            icon={WifiOff}
+            titre="Cabinets indisponibles"
+            description="La liste des sites n'a pas pu être chargée. Vérifiez que le backend est démarré puis réessayez."
+          >
+            <Button variant="outline" onClick={() => void refetch()}>
+              <RefreshCw className="h-4 w-4" /> Réessayer
+            </Button>
+          </EmptyState>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -370,9 +376,11 @@ export function CabinetsPage() {
                         <Skeleton className="h-20 w-full rounded-xl" />
                       </div>
                     ) : fauteuils.length === 0 ? (
-                      <div className="text-center py-8 text-xs text-muted-foreground border border-dashed border-border rounded-xl">
-                        Aucun fauteuil installé. Créez d'abord une salle puis ajoutez un fauteuil.
-                      </div>
+                      <EmptyState
+                        icon={Armchair}
+                        titre="Aucun fauteuil installé"
+                        description="Créez d'abord une salle puis ajoutez un fauteuil."
+                      />
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                         {fauteuils.map((f) => (
@@ -440,9 +448,11 @@ export function CabinetsPage() {
                     {loadingSalles ? (
                       <Skeleton className="h-16 w-full rounded-xl" />
                     ) : salles.length === 0 ? (
-                      <div className="text-center py-6 text-xs text-muted-foreground border border-dashed border-border rounded-xl">
-                        Aucune salle déclarée pour ce site.
-                      </div>
+                      <EmptyState
+                        icon={DoorOpen}
+                        titre="Aucune salle déclarée"
+                        description="Aucune salle déclarée pour ce site."
+                      />
                     ) : (
                       <div className="divide-y divide-border">
                         {salles.map((salle) => (

@@ -1,20 +1,25 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Banknote,
+  Building2,
   FileText,
+  LifeBuoy,
   Receipt,
-  RefreshCw,
   Sparkles,
   Users,
+  X,
   type LucideIcon,
 } from 'lucide-react'
 import { api, type ApiReponse, type PageReponse } from '@/lib/api'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Table, TBody, TD, TH, THead, TRow, TableEmpty } from '@/components/ui/table'
+import { Table, TBody, TD, TH, THead, TRow } from '@/components/ui/table'
 import { StatCard, type AccentStat } from '@/components/dashboard/stat-card'
+import { PageHeader } from '@/components/ui/page-header'
+import { EmptyState } from '@/components/ui/empty-state'
+import { StatusBadge } from '@/components/ui/status-badge'
+import { FloatingActionButton } from '@/components/ui/floating-action-button'
 
 /** Ligne du journal de caisse (cf. PaiementService.journal_caisse). */
 interface LigneCaisse {
@@ -47,12 +52,88 @@ const MODES_CAISSE: Record<string, 'info' | 'success' | 'warning' | 'purple' | '
   ASSURANCE: 'neutral',
 }
 
+/* Libellés d'interface (i18n de fait) — seules chaînes statiques tolérées. */
+const ASTUCES: string[] = [
+  "Astuce : Ctrl + K lance une recherche globale depuis n'importe quelle page.",
+  "Astuce : cliquez sur une dent de l'odontogramme pour saisir son état et l'historique.",
+  'Astuce : le sélecteur de cabinet en haut filtre les données par site.',
+  'Astuce : « Voir tout » ouvre le journal de caisse complet avec filtres.',
+]
+
+/**
+ * Astuce du jour. L'index est figé pour la session (et non recalculé à chaque
+ * rendu) : l'astuce affichée reste stable tant que l'onglet est ouvert.
+ */
+const INDEX_ASTUCE_DU_JOUR = new Date().getDate() % ASTUCES.length
+
+function AstuceJour() {
+  const index = INDEX_ASTUCE_DU_JOUR
+  return (
+    <div
+      role="note"
+      className="flex items-start gap-3 rounded-xl2 border border-primary/25 bg-primary/5 px-5 py-4 text-sm text-foreground"
+    >
+      <span aria-hidden className="icon-chip mt-0.5 h-8 w-8 bg-primary/15 text-primary">
+        <Sparkles className="h-4 w-4" />
+      </span>
+      <p className="leading-relaxed">{ASTUCES[index]}</p>
+    </div>
+  )
+}
+
+/** Menu d'aide du FAB : raccourcis et contact support. */
+function FabAide() {
+  const [ouvert, setOuvert] = useState(false)
+
+  return (
+    <>
+      {ouvert && (
+        <div
+          role="dialog"
+          aria-label="Aide et assistance"
+          className="floating-panel fixed bottom-20 right-5 z-40 w-72 rounded-xl2 p-4 animate-in fade-in slide-in-from-bottom-2 duration-150"
+        >
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-sm font-semibold">Aide & assistance</p>
+            <button
+              type="button"
+              onClick={() => setOuvert(false)}
+              aria-label="Fermer l'aide"
+              className="focus-ring rounded-md p-1 text-muted-foreground hover:bg-muted"
+            >
+              <X className="h-3.5 w-3.5" aria-hidden />
+            </button>
+          </div>
+          <ul className="space-y-1.5 text-xs text-muted-foreground">
+            {ASTUCES.map((astuce) => (
+              <li key={astuce}>{astuce.replace(/^Astuce : /, '')}</li>
+            ))}
+          </ul>
+          <p className="mt-3 border-t border-border pt-2 text-[11px] text-muted-foreground">
+            Support : support@sysdent.pro
+          </p>
+        </div>
+      )}
+      <FloatingActionButton
+        onClick={() => setOuvert((v) => !v)}
+        label="Aide & assistance"
+        badge
+      >
+        <LifeBuoy className="h-5 w-5" aria-hidden />
+      </FloatingActionButton>
+    </>
+  )
+}
+
+/** Date du jour (AAAA-MM-JJ), figée pour la session de l'onglet. */
+const AUJOURDHUI = new Date().toISOString().slice(0, 10)
+
 const formatFcfa = (valeur: number) =>
   new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(valeur)
 
 /** Charge l'API, puis `/factures` (émises), `/devis` (envoyés), caisse et cabinets. */
 function useStatsCabinet() {
-  const aujourdhui = new Date().toISOString().slice(0, 10)
+  const aujourdhui = AUJOURDHUI
 
   const patients = useQuery({
     queryKey: ['stats', 'patients'],
@@ -155,20 +236,11 @@ export function DashboardPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       {/* En-tête de page */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-            Tableau de Bord Global
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Vue d'ensemble en temps réel des patients, des soins et des encaissements
-          </p>
-        </div>
-        <Button variant="outline" onClick={actualiser}>
-          <RefreshCw />
-          Actualiser
-        </Button>
-      </div>
+      <PageHeader
+        titre="Tableau de Bord Global"
+        sousTitre="Vue d'ensemble en temps réel des patients, des soins et des encaissements"
+        onRefresh={actualiser}
+      />
 
       {/* Cartes de statistiques */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -203,9 +275,9 @@ export function DashboardPage() {
                       <TD className="font-mono text-xs">{ligne.recu_numero}</TD>
                       <TD className="font-medium">{ligne.patient}</TD>
                       <TD>
-                        <Badge variant={MODES_CAISSE[ligne.mode] ?? 'neutral'}>
+                        <StatusBadge tone={MODES_CAISSE[ligne.mode] ?? 'neutral'}>
                           {ligne.mode.replace('_', ' ')}
-                        </Badge>
+                        </StatusBadge>
                       </TD>
                       <TD className="text-right font-semibold tabular-nums">
                         {formatFcfa(Number(ligne.montant))} FCFA
@@ -215,11 +287,19 @@ export function DashboardPage() {
                 </TBody>
               </Table>
             ) : (
-              <TableEmpty>
-                {derniers.isError
-                  ? 'API injoignable — vérifiez que le backend est démarré.'
-                  : 'Aucun encaissement enregistré pour le moment.'}
-              </TableEmpty>
+              <EmptyState
+                icon={Banknote}
+                titre={
+                  derniers.isError
+                    ? 'API injoignable'
+                    : 'Aucun encaissement enregistré'
+                }
+                description={
+                  derniers.isError
+                    ? 'Vérifiez que le backend est démarré puis réessayez.'
+                    : 'Les paiements encaissés apparaîtront ici.'
+                }
+              />
             )}
           </CardContent>
         </Card>
@@ -233,7 +313,7 @@ export function DashboardPage() {
               cabinets.data.data.map((cabinet) => (
                 <div
                   key={cabinet.id}
-                  className="flex items-center justify-between gap-4 rounded-card border border-border bg-muted/40 px-4 py-3"
+                  className="flex items-center justify-between gap-4 rounded-xl2 border border-border bg-muted/40 px-4 py-3"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold">{cabinet.nom}</p>
@@ -243,17 +323,23 @@ export function DashboardPage() {
                       {cabinet.nb_praticiens_actifs} praticien(s)
                     </p>
                   </div>
-                  <Badge variant={cabinet.actif ? 'success' : 'neutral'}>
+                  <StatusBadge tone={cabinet.actif ? 'success' : 'neutral'}>
                     {cabinet.actif ? 'Actif' : 'Inactif'}
-                  </Badge>
+                  </StatusBadge>
                 </div>
               ))
             ) : (
-              <div className="rounded-card border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-                {cabinets.isError
-                  ? 'API injoignable — vérifiez que le backend est démarré.'
-                  : 'Aucun cabinet déclaré — provisionnez-en un depuis la console Master.'}
-              </div>
+              <EmptyState
+                icon={Building2}
+                titre={
+                  cabinets.isError ? 'API injoignable' : 'Aucun cabinet déclaré'
+                }
+                description={
+                  cabinets.isError
+                    ? 'Vérifiez que le backend est démarré puis réessayez.'
+                    : 'Provisionnez-en un depuis la console Master.'
+                }
+              />
             )}
           </CardContent>
         </Card>
@@ -261,28 +347,9 @@ export function DashboardPage() {
 
       {/* Bulle d'aide (maquette) — un conseil pratique par jour. */}
       <AstuceJour />
-    </div>
-  )
-}
 
-const ASTUCES: string[] = [
-  "Astuce : Ctrl + K lance une recherche globale depuis n'importe quelle page.",
-  "Astuce : cliquez sur une dent de l'odontogramme pour saisir son état et l'historique.",
-  'Astuce : le sélecteur de cabinet en haut filtre les données par site.',
-  'Astuce : « Voir tout » ouvre le journal de caisse complet avec filtres.',
-]
-
-function AstuceJour() {
-  const index = new Date().getDate() % ASTUCES.length
-  return (
-    <div
-      role="note"
-      className="flex items-start gap-3 rounded-card border border-primary/25 bg-primary/5 px-5 py-4 text-sm text-foreground"
-    >
-      <span aria-hidden className="icon-chip mt-0.5 h-8 w-8 bg-primary/15 text-primary">
-        <Sparkles className="h-4 w-4" />
-      </span>
-      <p className="leading-relaxed">{ASTUCES[index]}</p>
+      {/* Bouton d'action flottant : menu d'aide. */}
+      <FabAide />
     </div>
   )
 }

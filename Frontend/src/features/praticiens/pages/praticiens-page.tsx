@@ -6,11 +6,12 @@ import {
   Building2,
   Plus,
   Trash2,
-  RefreshCw,
   Mail,
   Phone,
   ShieldCheck,
   Calendar,
+  RefreshCw,
+  WifiOff,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -19,6 +20,8 @@ import { Modal } from '@/components/ui/modal'
 import { Input, Label } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PageHeader } from '@/components/ui/page-header'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Can } from '@/components/auth/can'
 import { toast } from '@/stores/toast-store'
 import { useCabinetStore } from '@/stores/cabinet-store'
@@ -60,7 +63,7 @@ export function PraticiensPage() {
   )
 
   // Requête des praticiens
-  const { data: resPraticiens, isLoading, refetch } = useQuery({
+  const { data: resPraticiens, isLoading, isError, refetch } = useQuery({
     queryKey: ['praticiens-list', cabinetActifId],
     queryFn: () => praticiensApi.lister(cabinetActifId),
   })
@@ -133,26 +136,29 @@ export function PraticiensPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       {/* En-tête */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">
-            Praticiens & Disponibilités
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Chirurgiens-dentistes, spécialités, numéros d'ordre et plages horaires de consultation
-          </p>
-        </div>
-
-        <Button variant="outline" size="sm" onClick={() => void refetch()}>
-          <RefreshCw className="h-4 w-4" />
-          Actualiser
-        </Button>
-      </div>
+      <PageHeader
+        titre="Praticiens & Disponibilités"
+        sousTitre="Chirurgiens-dentistes, spécialités, numéros d'ordre et plages horaires de consultation"
+        onRefresh={() => void refetch()}
+      />
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Skeleton className="h-64 w-full rounded-2xl" />
           <Skeleton className="h-64 md:col-span-2 w-full rounded-2xl" />
+        </div>
+      ) : isError ? (
+        /* Un échec de chargement n'est pas un cabinet sans praticien : le dire. */
+        <div className="rounded-xl2 border border-border bg-card shadow-float">
+          <EmptyState
+            icon={WifiOff}
+            titre="Praticiens indisponibles"
+            description="La liste des praticiens n'a pas pu être chargée. Vérifiez que le backend est démarré puis réessayez."
+          >
+            <Button variant="outline" onClick={() => void refetch()}>
+              <RefreshCw className="h-4 w-4" /> Réessayer
+            </Button>
+          </EmptyState>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -281,9 +287,11 @@ export function PraticiensPage() {
                     {loadingDispos ? (
                       <Skeleton className="h-24 w-full rounded-xl" />
                     ) : disponibilites.length === 0 ? (
-                      <div className="text-center py-6 text-xs text-muted-foreground border border-dashed border-border rounded-xl">
-                        Aucune plage horaire déclarée. Le praticien ne sera pas proposé lors de la prise de rendez-vous.
-                      </div>
+                      <EmptyState
+                        icon={Clock}
+                        titre="Aucune plage horaire déclarée"
+                        description="Le praticien ne sera pas proposé lors de la prise de rendez-vous."
+                      />
                     ) : (
                       <div className="divide-y divide-border">
                         {disponibilites.map((d) => {
@@ -391,10 +399,14 @@ export function PraticiensPage() {
                         </p>
                       </div>
                     ) : (
-                      <div className="text-center py-6 text-xs text-muted-foreground border border-dashed border-border rounded-xl">
-                        {creneauxData?.avertissement ??
-                          'Aucun créneau disponible pour cette date (vérifiez les plages déclarées).'}
-                      </div>
+                      <EmptyState
+                        icon={Calendar}
+                        titre="Aucun créneau disponible"
+                        description={
+                          creneauxData?.avertissement ??
+                          'Aucun créneau pour cette date (vérifiez les plages déclarées).'
+                        }
+                      />
                     )}
                   </CardContent>
                 </Card>

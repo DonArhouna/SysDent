@@ -1,9 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { formatFcfa, formatDateFr } from '@/lib/format'
-import { stockApi } from '../services/stock-api'
-import type { ArticleStock, MouvementStock } from '../types'
+import { PageHeader } from '@/components/ui/page-header'
+import { EmptyState } from '@/components/ui/empty-state'
+import { StatusBadge } from '@/components/ui/status-badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import { ApiError } from '@/lib/api'
+import { estEndpointManquant, stockApi } from '../services/stock-api'
+import type { ArticleStock } from '../types'
 import { ArticleModal } from '../components/article-modal'
 import { MouvementModal } from '../components/mouvement-modal'
 import {
@@ -12,21 +17,27 @@ import {
   ArrowUpRight,
   Boxes,
   Clock,
-  Edit2,
   Package,
+  PackageX,
   Plus,
   RefreshCw,
   Search,
   SlidersHorizontal,
+  WifiOff,
 } from 'lucide-react'
 
+/**
+ * Page Stock — module EN ATTENTE côté backend.
+ *
+ * Aucune route `/stock/*` n'existe dans l'API (cf. Backend/src/api/v1/router.py).
+ * Conformément à la règle « pas de mock silencieux » :
+ * - le service (`stock-api.ts`) est déjà écrit sur les contrats cibles ;
+ * - cette page tente l'appel réel et affiche un état « Non disponible » propre
+ *   dès que l'API répond 404/501 — aucune donnée fictive n'est montrée ;
+ * - le bandeau d'avertissement explicite la situation et renvoie au plan.
+ */
 export function StockPage() {
-  const [articles, setArticles] = useState<ArticleStock[]>([])
-  const [mouvements, setMouvements] = useState<MouvementStock[]>([])
-  const [loading, setLoading] = useState(true)
   const [onglet, setOnglet] = useState<'CATALOGUE' | 'MOUVEMENTS'>('CATALOGUE')
-
-  // Filtres
   const [recherche, setRecherche] = useState('')
   const [categorieFiltre, setCategorieFiltre] = useState('')
   const [alerteSeul, setAlerteSeul] = useState(false)
@@ -36,166 +47,229 @@ export function StockPage() {
   const [selectedArticle, setSelectedArticle] = useState<ArticleStock | null>(null)
   const [isMouvementModalOpen, setIsMouvementModalOpen] = useState(false)
 
-  const chargerDonnees = async () => {
-    try {
-      setLoading(true)
-      const [resArticles, resMouvements] = await Promise.all([
-        stockApi.listerArticles({
-          q: recherche.trim() || undefined,
-          categorie: categorieFiltre || undefined,
-          alerte_seuil: alerteSeul || undefined,
-        }),
-        stockApi.listerMouvements(50),
-      ])
-      setArticles(resArticles.items)
-      setMouvements(resMouvements)
-    } catch {
-      //
-    } finally {
-      setLoading(false)
-    }
-  }
+  const articlesQuery = useQuery({
+    queryKey: ['stock', 'articles', recherche, categorieFiltre, alerteSeul],
+    queryFn: () =>
+      stockApi.listerArticles({
+        q: recherche.trim() || undefined,
+        categorie: categorieFiltre || undefined,
+        alerte_seuil: alerteSeul || undefined,
+      }),
+    // Le endpoint n'existe pas encore : inutile de marteler l'API.
+    retry: false,
+  })
 
-  useEffect(() => {
-    chargerDonnees()
-  }, [recherche, categorieFiltre, alerteSeul])
+  const mouvementsQuery = useQuery({
+    queryKey: ['stock', 'mouvements'],
+    queryFn: () => stockApi.listerMouvements(50),
+    retry: false,
+  })
 
-  // KPIs
+  const endpointAbsent =
+    estEndpointManquant(articlesQuery.error) || estEndpointManquant(mouvementsQuery.error)
+  const erreurReseau =
+    !endpointAbsent &&
+    (articlesQuery.error instanceof ApiError || mouvementsQuery.error instanceof ApiError)
+
+  const articles = articlesQuery.data?.items ?? []
+  const mouvements = mouvementsQuery.data?.items ?? []
+
+  // KPIs calculés depuis l'API — 0 tant que l'endpoint n'existe pas.
   const totalArticles = articles.length
   const articlesEnAlerte = articles.filter((a) => a.quantite_stock <= a.seuil_alerte)
   const valeurStockTotale = articles.reduce(
     (acc, a) => acc + a.quantite_stock * (a.prix_achat || 0),
-    0
+    0,
   )
-
   const categoriesUniques = Array.from(new Set(articles.map((a) => a.categorie)))
+
+  const recharger = () => {
+    void articlesQuery.refetch()
+    void mouvementsQuery.refetch()
+  }
+
+  // Bandeau module indisponible : endpoint backend absent (404/501).
+  if (endpointAbsent) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          titre="Gestion des Stocks & Consommables"
+          sousTitre="Suivi des produits dentaires, seuils de réapprovisionnement et péremptions"
+          onRefresh={recharger}
+        />
+
+        {/* TODO(backend): endpoints manquants – GET/POST /stock/articles,
+            GET/POST /stock/mouvements. Voir PLAN_RESTE_A_FAIRE.md (P0). */}
+        <EmptyState
+          icon={PackageX}
+          titre="Module Stock non disponible"
+          description="Le backend n'expose pas encore les endpoints /stock/articles et /stock/mouvements. L'interface est prête et se branchera dès leur livraison — aucune donnée fictive n'est affichée."
+        >
+          <Button variant="outline" onClick={recharger}>
+            <RefreshCw className="h-4 w-4" /> Réessayer
+          </Button>
+        </EmptyState>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2.5">
-            <Boxes className="w-6 h-6 text-primary" />
-            Gestion des Stocks & Consommables
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Suivi des produits dentaires, seuils de réapprovisionnement critique et dates de péremption.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <Button
-            variant="outline"
-            className="flex items-center gap-1.5 text-xs border-border"
-            onClick={() => {
-              setSelectedArticle(null)
-              setIsMouvementModalOpen(true)
-            }}
-          >
-            <SlidersHorizontal className="w-4 h-4 text-primary" /> Mouvement de stock
-          </Button>
-          <Button
-            variant="primary"
-            className="flex items-center gap-1.5 text-xs"
-            onClick={() => {
-              setSelectedArticle(null)
-              setIsArticleModalOpen(true)
-            }}
-          >
-            <Plus className="w-4 h-4" /> Nouvel article
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        titre="Gestion des Stocks & Consommables"
+        sousTitre="Suivi des produits dentaires, seuils de réapprovisionnement critique et dates de péremption"
+        onRefresh={recharger}
+      >
+        {erreurReseau && (
+          <StatusBadge tone="warning">
+            <WifiOff className="h-3 w-3" aria-hidden /> API injoignable
+          </StatusBadge>
+        )}
+        <Button
+          variant="outline"
+          onClick={() => {
+            setSelectedArticle(null)
+            setIsMouvementModalOpen(true)
+          }}
+        >
+          <SlidersHorizontal /> Mouvement de stock
+        </Button>
+        <Button
+          variant="primary"
+          onClick={() => {
+            setSelectedArticle(null)
+            setIsArticleModalOpen(true)
+          }}
+        >
+          <Plus /> Nouvel article
+        </Button>
+      </PageHeader>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-card p-4 rounded-xl border border-border flex items-center justify-between">
+        <div className="floating-panel bg-card/80 p-5 rounded-xl2 border border-border flex items-center justify-between">
           <div>
-            <span className="text-xs text-muted-foreground block font-medium">Références actives</span>
-            <span className="text-2xl font-bold text-foreground font-mono">{totalArticles}</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
+              Références actives
+            </span>
+            {articlesQuery.isPending ? (
+              <Skeleton className="mt-2 h-8 w-16" />
+            ) : (
+              <span className="text-2xl font-bold text-foreground tabular-nums">
+                {totalArticles}
+              </span>
+            )}
           </div>
-          <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-card-foreground">
-            <Package className="w-5 h-5" />
-          </div>
+          <span className="icon-chip bg-accent-blue/15 text-accent-blue">
+            <Package className="h-5 w-5" aria-hidden />
+          </span>
         </div>
 
-        <div
+        <button
+          type="button"
           onClick={() => setAlerteSeul(!alerteSeul)}
-          className={`p-4 rounded-xl border flex items-center justify-between cursor-pointer transition-colors ${
+          aria-pressed={alerteSeul}
+          className={`focus-ring p-5 rounded-xl2 border flex items-center justify-between text-left transition-colors ${
             articlesEnAlerte.length > 0
-              ? 'bg-danger/15 border-danger/40 hover:bg-danger/15'
-              : 'bg-card border-border'
+              ? 'bg-danger/10 border-danger/40 hover:bg-danger/15'
+              : 'floating-panel bg-card/80 border-border hover:bg-surface-hover'
           }`}
         >
           <div>
-            <span className="text-xs text-danger block font-medium">Stock Critique / Réappro</span>
-            <span className="text-2xl font-bold text-danger font-mono">
-              {articlesEnAlerte.length}
+            <span className="text-xs font-semibold uppercase tracking-wider text-danger block">
+              Stock critique / réappro
             </span>
+            {articlesQuery.isPending ? (
+              <Skeleton className="mt-2 h-8 w-16" />
+            ) : (
+              <span className="text-2xl font-bold text-danger tabular-nums">
+                {articlesEnAlerte.length}
+              </span>
+            )}
             <span className="text-[10px] text-muted-foreground block mt-0.5">
-              {alerteSeul ? 'Filtre actif (cliquer pour réinitialiser)' : 'Cliquer pour filtrer'}
+              {alerteSeul ? 'Filtre actif — cliquer pour réinitialiser' : 'Cliquer pour filtrer'}
             </span>
           </div>
-          <div className="w-10 h-10 rounded-lg bg-danger/15 border border-danger/40 flex items-center justify-center text-danger">
-            <AlertTriangle className="w-5 h-5" />
-          </div>
-        </div>
+          <span className="icon-chip bg-danger/15 text-danger">
+            <AlertTriangle className="h-5 w-5" aria-hidden />
+          </span>
+        </button>
 
-        <div className="bg-card p-4 rounded-xl border border-border flex items-center justify-between">
+        <div className="floating-panel bg-card/80 p-5 rounded-xl2 border border-border flex items-center justify-between">
           <div>
-            <span className="text-xs text-muted-foreground block font-medium">Valeur globale du stock</span>
-            <span className="text-2xl font-bold text-primary font-mono">
-              {formatFcfa(valeurStockTotale)}
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
+              Valeur globale du stock
             </span>
+            {articlesQuery.isPending ? (
+              <Skeleton className="mt-2 h-8 w-28" />
+            ) : (
+              <span className="text-2xl font-bold text-primary tabular-nums">
+                {new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(
+                  valeurStockTotale,
+                )}{' '}
+                FCFA
+              </span>
+            )}
           </div>
-          <div className="w-10 h-10 rounded-lg bg-primary/15 border border-primary/40 flex items-center justify-center text-primary">
-            <Boxes className="w-5 h-5" />
-          </div>
+          <span className="icon-chip bg-accent-green/15 text-accent-green">
+            <Boxes className="h-5 w-5" aria-hidden />
+          </span>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-border space-x-6 text-sm">
-        <button
-          onClick={() => setOnglet('CATALOGUE')}
-          className={`pb-3 font-semibold transition-colors flex items-center gap-2 ${
-            onglet === 'CATALOGUE'
-              ? 'text-primary border-b-2 border-primary/40'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <Package className="w-4 h-4" /> Catalogue & Disponibilités ({articles.length})
-        </button>
-        <button
-          onClick={() => setOnglet('MOUVEMENTS')}
-          className={`pb-3 font-semibold transition-colors flex items-center gap-2 ${
-            onglet === 'MOUVEMENTS'
-              ? 'text-primary border-b-2 border-primary/40'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <Clock className="w-4 h-4" /> Historique des Mouvements ({mouvements.length})
-        </button>
+      {/* Tabs (pills) */}
+      <div
+        role="tablist"
+        aria-label="Sections du module stock"
+        className="inline-flex items-center gap-1 rounded-full border border-surface-border bg-surface/70 p-1"
+      >
+        {(
+          [
+            { id: 'CATALOGUE', label: 'Catalogue', icon: Package, count: articles.length },
+            { id: 'MOUVEMENTS', label: 'Mouvements', icon: Clock, count: mouvements.length },
+          ] as const
+        ).map((ongletDef) => {
+          const Icone = ongletDef.icon
+          const actif = onglet === ongletDef.id
+          return (
+            <button
+              key={ongletDef.id}
+              type="button"
+              role="tab"
+              aria-selected={actif}
+              onClick={() => setOnglet(ongletDef.id)}
+              className={`focus-ring inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                actif
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Icone className="h-3.5 w-3.5" aria-hidden />
+              {ongletDef.label} ({ongletDef.count})
+            </button>
+          )
+        })}
       </div>
 
       {onglet === 'CATALOGUE' && (
         <div className="space-y-4">
           {/* Filtres de recherche */}
-          <div className="bg-card p-4 rounded-xl border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="floating-panel bg-card/80 p-4 rounded-xl2 border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="relative flex-1 max-w-sm">
-              <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden />
               <Input
-                placeholder="Rechercher désignation ou code..."
+                placeholder="Rechercher désignation ou code…"
                 value={recherche}
                 onChange={(e) => setRecherche(e.target.value)}
                 className="pl-9"
               />
             </div>
 
-            <div className="w-64">
+            <div className="w-full sm:w-64">
               <select
-                className="w-full h-10 px-3 rounded-lg border border-border bg-muted text-xs text-foreground"
+                aria-label="Filtrer par catégorie"
+                className="w-full h-10 px-3 rounded-full border border-border bg-background/60 text-xs text-foreground focus-ring"
                 value={categorieFiltre}
                 onChange={(e) => setCategorieFiltre(e.target.value)}
               >
@@ -210,23 +284,41 @@ export function StockPage() {
           </div>
 
           {/* Tableau des articles */}
-          <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
-            {loading ? (
-              <div className="p-8 text-center text-sm text-muted-foreground">Chargement du stock...</div>
-            ) : articles.length === 0 ? (
-              <div className="p-12 text-center text-sm text-muted-foreground">
-                Aucun article ne correspond à votre recherche.
+          <div className="floating-panel bg-card/80 rounded-xl2 border border-border overflow-hidden">
+            {articlesQuery.isPending ? (
+              <div className="p-6 space-y-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-10 w-full" />
+                ))}
               </div>
+            ) : articlesQuery.isError ? (
+              /* Un échec réseau n'est pas un catalogue vide : ne pas mentir
+                 sur l'état, afficher l'erreur et proposer un nouvel essai. */
+              <EmptyState
+                icon={WifiOff}
+                titre="Catalogue indisponible"
+                description="Le catalogue n'a pas pu être chargé. Vérifiez que le backend est démarré puis réessayez."
+              >
+                <Button variant="outline" onClick={recharger}>
+                  <RefreshCw className="h-4 w-4" /> Réessayer
+                </Button>
+              </EmptyState>
+            ) : articles.length === 0 ? (
+              <EmptyState
+                icon={Package}
+                titre="Aucun article trouvé"
+                description="Ajustez la recherche ou créez le premier article du catalogue."
+              />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs text-card-foreground">
-                  <thead className="bg-muted text-muted-foreground uppercase tracking-wider font-semibold border-b border-border">
+                  <thead className="bg-muted/60 text-muted-foreground uppercase tracking-wider font-semibold border-b border-border">
                     <tr>
                       <th className="px-4 py-3">Réf / Code</th>
                       <th className="px-4 py-3">Désignation</th>
                       <th className="px-4 py-3">Catégorie</th>
-                      <th className="px-4 py-3 text-center">Niveau de Stock</th>
-                      <th className="px-4 py-3 text-right">P.U Achat</th>
+                      <th className="px-4 py-3 text-center">Niveau de stock</th>
+                      <th className="px-4 py-3 text-right">P.U achat</th>
                       <th className="px-4 py-3">Péremption</th>
                       <th className="px-4 py-3 text-right">Actions</th>
                     </tr>
@@ -237,7 +329,7 @@ export function StockPage() {
                       const ratio = Math.min(100, (art.quantite_stock / (art.seuil_alerte * 3)) * 100)
 
                       return (
-                        <tr key={art.id} className="hover:bg-muted transition-colors">
+                        <tr key={art.id} className="hover:bg-surface-hover transition-colors">
                           <td className="px-4 py-3 font-mono font-bold text-foreground">
                             {art.code}
                           </td>
@@ -245,7 +337,7 @@ export function StockPage() {
                             <div className="font-semibold text-foreground">{art.designation}</div>
                             {art.emplacement && (
                               <div className="text-[11px] text-muted-foreground mt-0.5">
-                                Empl.: {art.emplacement}
+                                Empl. : {art.emplacement}
                               </div>
                             )}
                           </td>
@@ -258,17 +350,17 @@ export function StockPage() {
                                     estCritique ? 'text-danger' : 'text-foreground'
                                   }`}
                                 >
-                                  {art.quantite_stock} {art.unite}s
+                                  {art.quantite_stock} {art.unite}(s)
                                 </span>
                                 {estCritique && (
-                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-danger/15 text-danger border border-danger/40">
-                                    Alerte &lt;= {art.seuil_alerte}
-                                  </span>
+                                  <StatusBadge tone="danger">
+                                    Alerte ≤ {art.seuil_alerte}
+                                  </StatusBadge>
                                 )}
                               </div>
                               <div className="w-24 bg-muted rounded-full h-1.5 overflow-hidden">
                                 <div
-                                  className={`h-full rounded-full ${
+                                  className={`h-full rounded-full transition-all duration-200 ${
                                     estCritique ? 'bg-danger' : 'bg-success'
                                   }`}
                                   style={{ width: `${Math.max(10, ratio)}%` }}
@@ -276,35 +368,40 @@ export function StockPage() {
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-right font-mono text-card-foreground">
-                            {formatFcfa(art.prix_achat)}
+                          <td className="px-4 py-3 text-right font-mono text-card-foreground tabular-nums">
+                            {new Intl.NumberFormat('fr-FR', {
+                              maximumFractionDigits: 0,
+                            }).format(art.prix_achat)}{' '}
+                            FCFA
                           </td>
                           <td className="px-4 py-3 text-muted-foreground text-[11px]">
-                            {art.date_peremption ? formatDateFr(art.date_peremption) : '-'}
+                            {art.date_peremption
+                              ? new Date(art.date_peremption).toLocaleDateString('fr-FR')
+                              : '—'}
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex items-center justify-end gap-1.5">
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="text-xs h-7 px-2 text-primary border-primary/40"
+                                className="h-7 px-2 text-xs"
                                 onClick={() => {
                                   setSelectedArticle(art)
                                   setIsMouvementModalOpen(true)
                                 }}
                               >
-                                <RefreshCw className="w-3 h-3 mr-1" /> Mouvement
+                                <RefreshCw className="h-3 w-3" /> Mouvement
                               </Button>
                               <Button
                                 variant="secondary"
                                 size="sm"
-                                className="text-xs h-7 px-2"
+                                className="h-7 px-2"
                                 onClick={() => {
                                   setSelectedArticle(art)
                                   setIsArticleModalOpen(true)
                                 }}
                               >
-                                <Edit2 className="w-3 h-3" />
+                                Modifier
                               </Button>
                             </div>
                           </td>
@@ -320,15 +417,23 @@ export function StockPage() {
       )}
 
       {onglet === 'MOUVEMENTS' && (
-        <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
-          {mouvements.length === 0 ? (
-            <div className="p-12 text-center text-sm text-muted-foreground">
-              Aucun mouvement de stock enregistré.
+        <div className="floating-panel bg-card/80 rounded-xl2 border border-border overflow-hidden">
+          {mouvementsQuery.isPending ? (
+            <div className="p-6 space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
             </div>
+          ) : mouvements.length === 0 ? (
+            <EmptyState
+              icon={ArrowUpRight}
+              titre="Aucun mouvement de stock"
+              description="Les entrées, sorties et ajustements apparaîtront ici."
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-card-foreground">
-                <thead className="bg-muted text-muted-foreground uppercase tracking-wider font-semibold border-b border-border">
+                <thead className="bg-muted/60 text-muted-foreground uppercase tracking-wider font-semibold border-b border-border">
                   <tr>
                     <th className="px-4 py-3">Date</th>
                     <th className="px-4 py-3">Article</th>
@@ -346,38 +451,32 @@ export function StockPage() {
                       m.type_mouvement === 'PERTE_PEREMPTION'
 
                     return (
-                      <tr key={m.id} className="hover:bg-muted transition-colors">
+                      <tr key={m.id} className="hover:bg-surface-hover transition-colors">
                         <td className="px-4 py-3 text-muted-foreground">
-                          {formatDateFr(m.date_mouvement)}
+                          {new Date(m.date_mouvement).toLocaleDateString('fr-FR')}
                         </td>
                         <td className="px-4 py-3 font-semibold text-foreground">
                           {m.article_designation}
                         </td>
                         <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                              estEntree
-                                ? 'bg-success/15 border border-success/40 text-success'
-                                : estSortie
-                                ? 'bg-danger/15 border border-danger/40 text-danger'
-                                : 'bg-primary/15 border border-primary/40 text-primary'
-                            }`}
+                          <StatusBadge
+                            tone={estEntree ? 'success' : estSortie ? 'danger' : 'info'}
                           >
                             {estEntree ? (
-                              <ArrowUpRight className="w-3 h-3" />
+                              <ArrowUpRight className="h-3 w-3" aria-hidden />
                             ) : estSortie ? (
-                              <ArrowDownRight className="w-3 h-3" />
+                              <ArrowDownRight className="h-3 w-3" aria-hidden />
                             ) : (
-                              <RefreshCw className="w-3 h-3" />
+                              <RefreshCw className="h-3 w-3" aria-hidden />
                             )}
                             {m.type_mouvement}
-                          </span>
+                          </StatusBadge>
                         </td>
-                        <td className="px-4 py-3 text-center font-mono font-bold text-foreground">
+                        <td className="px-4 py-3 text-center font-mono font-bold text-foreground tabular-nums">
                           {estEntree ? `+${m.quantite}` : estSortie ? `-${m.quantite}` : m.quantite}
                         </td>
-                        <td className="px-4 py-3 text-card-foreground italic">{m.motif || '-'}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{m.auteur || 'Praticien'}</td>
+                        <td className="px-4 py-3 text-card-foreground italic">{m.motif || '—'}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{m.auteur || '—'}</td>
                       </tr>
                     )
                   })}
@@ -396,7 +495,7 @@ export function StockPage() {
           setSelectedArticle(null)
         }}
         article={selectedArticle}
-        onSuccess={() => chargerDonnees()}
+        onSuccess={() => recharger()}
       />
 
       {/* Modale Mouvement */}
@@ -408,7 +507,7 @@ export function StockPage() {
         }}
         articles={articles}
         articleInitial={selectedArticle}
-        onSuccess={() => chargerDonnees()}
+        onSuccess={() => recharger()}
       />
     </div>
   )

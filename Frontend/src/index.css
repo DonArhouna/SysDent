@@ -6,6 +6,13 @@
  * Changer le thème = changer les variables sous `html.dark`, aucun composant
  * à retoucher. Base chromatique inspirée de la maquette (navy profond,
  * accents vifs sur cartes de statistiques).
+ *
+ * Conventions de la refonte visuelle (capture de référence) :
+ * - Surfaces « flottantes » : sidebar et navbar détachées de l'écran, fond
+ *   légèrement translucide (surface/90 + backdrop-blur) ;
+ * - Rayons généreux : `rounded-xl/xl2` pour cartes, `rounded-full` pour pills ;
+ * - Ombres douces et diffuses (shadow-float) au lieu de bordures marquées ;
+ * - Accents colorés réservés aux liserés KPI, badges et états.
  */
 
 @tailwind base;
@@ -35,6 +42,21 @@
     --accent-green: 152 60% 45%;
     --accent-purple: 258 70% 58%;
     --accent-orange: 32 92% 50%;
+
+    /* Surfaces translucides (sidebar/navbar flottantes) : fond carte à 88 %,
+       la page transparaît très légèrement derrière le flou. */
+    --surface: 0 0% 100%;
+    --surface-border: 220 20% 88%;
+    --surface-hover: 220 25% 95%;
+
+    /* Liserés KPI (bordure gauche des cartes de statistiques). */
+    --kpi-blue: 220 85% 55%;
+    --kpi-green: 152 60% 45%;
+    --kpi-purple: 258 70% 58%;
+    --kpi-orange: 32 92% 50%;
+
+    /* Teinte des ring de focus (AA sur les deux fonds). */
+    --ring: 220 85% 55%;
   }
 
   .dark {
@@ -59,6 +81,19 @@
     --accent-green: 152 55% 50%;
     --accent-purple: 258 70% 65%;
     --accent-orange: 32 92% 55%;
+
+    /* Surfaces flottantes : navy un cran au-dessus de la page, translucide. */
+    --surface: 227 35% 10%;
+    --surface-border: 226 26% 18%;
+    --surface-hover: 226 30% 14%;
+
+    /* Liserés KPI plus lumineux la nuit pour garder un bon contraste. */
+    --kpi-blue: 213 94% 62%;
+    --kpi-green: 152 60% 52%;
+    --kpi-purple: 256 80% 68%;
+    --kpi-orange: 36 95% 58%;
+
+    --ring: 213 94% 62%;
   }
 
   * {
@@ -74,6 +109,38 @@
 @layer components {
   /* Chip d'icône des cartes de statistiques : carré arrondi teinté. */
   .icon-chip {
-    @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-lg;
+    @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-xl;
+  }
+
+  /*
+   * Panneau flottant : socle commun de la sidebar et de la navbar.
+   * Fond translucide + flou d'arrière-plan, bordure fine discrète, ombre
+   * douce diffuse — l'écran « respire » autour du panneau.
+   */
+  .floating-panel {
+    @apply border border-surface-border bg-surface/90 shadow-float backdrop-blur-xl;
+  }
+
+  /*
+   * Aide au focus clavier homogène : à poser sur tout élément interactif
+   * custom (lignes cliquables, pills…). Les composants natifs l'ont déjà
+   * via leurs classes utilitaires.
+   */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+}
+
+/* Respect des préférences système : aucune animation si l'utilisateur
+   demande un mouvement réduit. Les transitions utilitaires restent brèves
+   (≤ 200 ms) et sont neutralisées ici. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

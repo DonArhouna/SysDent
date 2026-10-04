@@ -2,10 +2,22 @@ import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
+import { Table, TBody, TD, TH, THead, TRow } from '@/components/ui/table'
+import { PageHeader } from '@/components/ui/page-header'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Skeleton } from '@/components/ui/skeleton'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { formatDateTimeFr } from '@/lib/format'
 import { auditApi } from '../services/audit-api'
 import type { AuditLog } from '../types'
-import { ChevronDown, ChevronRight, ShieldAlert, User } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronRight,
+  ShieldAlert,
+  User,
+  RefreshCw,
+  WifiOff,
+} from 'lucide-react'
 
 const RESOURCE_TYPES = [
   { value: '', label: 'Toutes les ressources' },
@@ -22,6 +34,8 @@ const RESOURCE_TYPES = [
 export function AuditPage() {
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
+  /** Un chargement échoué ne doit pas s'afficher comme un résultat vide. */
+  const [erreurChargement, setErreurChargement] = useState(false)
   const [, setTotalRecords] = useState(0)
 
   // Filtres
@@ -35,6 +49,7 @@ export function AuditPage() {
   const chargerLogs = async () => {
     try {
       setLoading(true)
+      setErreurChargement(false)
       const res = await auditApi.lister({
         resource_type: resourceType || undefined,
         resource_id: resourceId.trim() || undefined,
@@ -44,7 +59,8 @@ export function AuditPage() {
       setLogs(res.items)
       setTotalRecords(res.meta.total_records)
     } catch {
-      //
+      // Erreur déjà signalée par le toast global de l'API client.
+      setErreurChargement(true)
     } finally {
       setLoading(false)
     }
@@ -67,15 +83,11 @@ export function AuditPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2.5">
-          <ShieldAlert className="w-6 h-6 text-primary" />
-          Journal d'Audit & Traçabilité Médico-Légale
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Enregistrement inviolable de toutes les actions cliniques et administratives du cabinet.
-        </p>
-      </div>
+      <PageHeader
+        titre="Journal d'Audit & Traçabilité Médico-Légale"
+        sousTitre="Enregistrement inviolable de toutes les actions cliniques et administratives du cabinet."
+        onRefresh={() => void chargerLogs()}
+      />
 
       {/* Filtres */}
       <form
@@ -113,81 +125,95 @@ export function AuditPage() {
       {/* Table Audit */}
       <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
         {loading ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">
-            Chargement des traces d'audit...
+          <div className="space-y-3 p-6">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
           </div>
+        ) : erreurChargement ? (
+          <EmptyState
+            icon={WifiOff}
+            titre="Le journal d'audit indisponibles"
+            description="Ce module n'a pas pu être chargé. Vérifiez que le backend est démarré puis réessayez."
+          >
+            <Button variant="outline" size="sm" onClick={() => void chargerLogs()}>
+              <RefreshCw className="h-4 w-4" /> Réessayer
+            </Button>
+          </EmptyState>
         ) : logs.length === 0 ? (
-          <div className="p-12 text-center text-sm text-muted-foreground">
-            Aucun événement d'audit enregistré pour ces filtres.
-          </div>
+          <EmptyState
+            icon={ShieldAlert}
+            titre="Aucun événement d'audit"
+            description="Aucun événement d'audit enregistré pour ces filtres."
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-card-foreground">
-              <thead className="bg-muted text-muted-foreground uppercase tracking-wider font-semibold border-b border-border">
-                <tr>
-                  <th className="px-4 py-3 w-8"></th>
-                  <th className="px-4 py-3">Horodatage</th>
-                  <th className="px-4 py-3">Action</th>
-                  <th className="px-4 py-3">Ressource</th>
-                  <th className="px-4 py-3">Utilisateur</th>
-                  <th className="px-4 py-3">Adresse IP</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border font-mono">
-                {logs.map((log) => {
-                  const isExpanded = expandedLogId === log.id
-                  const aChanges = log.changes && Object.keys(log.changes).length > 0
+          <Table>
+            <THead>
+              <TRow>
+                <TH className="w-8"></TH>
+                <TH>Horodatage</TH>
+                <TH>Action</TH>
+                <TH>Ressource</TH>
+                <TH>Utilisateur</TH>
+                <TH>Adresse IP</TH>
+              </TRow>
+            </THead>
+            <TBody className="font-mono">
+              {logs.map((log) => {
+                const isExpanded = expandedLogId === log.id
+                const aChanges = log.changes && Object.keys(log.changes).length > 0
 
-                  return (
-                    <tr key={log.id} className="hover:bg-muted transition-colors">
-                      <td className="px-4 py-3 text-center">
-                        {aChanges && (
-                          <button
-                            type="button"
-                            onClick={() => toggleExpand(log.id)}
-                            className="text-muted-foreground hover:text-primary"
-                          >
-                            {isExpanded ? (
-                              <ChevronDown className="w-4 h-4" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4" />
-                            )}
-                          </button>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-card-foreground font-sans">
-                        {formatDateTimeFr(log.timestamp)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-0.5 rounded font-bold text-[10px] bg-muted text-primary border border-border">
-                          {log.action}
+                return (
+                  <TRow key={log.id}>
+                    <TD className="text-center">
+                      {aChanges && (
+                        <button
+                          type="button"
+                          onClick={() => toggleExpand(log.id)}
+                          aria-label={isExpanded ? 'Replier le détail' : 'Déployer le détail'}
+                          className="text-muted-foreground hover:text-primary"
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="w-4 h-4" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4" />
+                          )}
+                        </button>
+                      )}
+                    </TD>
+                    <TD className="font-sans">
+                      {formatDateTimeFr(log.timestamp)}
+                    </TD>
+                    <TD>
+                      <StatusBadge tone="info" className="font-mono uppercase">
+                        {log.action}
+                      </StatusBadge>
+                    </TD>
+                    <TD>
+                      <span className="text-foreground font-semibold">{log.resource_type}</span>{' '}
+                      <span className="text-muted-foreground text-[10px]">
+                        ({log.resource_id.slice(0, 8)}...)
+                      </span>
+                    </TD>
+                    <TD className="font-sans">
+                      {log.user_email ? (
+                        <span className="flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-muted-foreground" />
+                          {log.user_email}
                         </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-foreground font-semibold">{log.resource_type}</span>{' '}
-                        <span className="text-muted-foreground text-[10px]">
-                          ({log.resource_id.slice(0, 8)}...)
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-sans text-card-foreground">
-                        {log.user_email ? (
-                          <span className="flex items-center gap-1.5">
-                            <User className="w-3.5 h-3.5 text-muted-foreground" />
-                            {log.user_email}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground italic">Système</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground text-[11px]">
-                        {log.ip_address || '-'}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                      ) : (
+                        <span className="text-muted-foreground italic">Système</span>
+                      )}
+                    </TD>
+                    <TD className="text-muted-foreground text-[11px]">
+                      {log.ip_address || '-'}
+                    </TD>
+                  </TRow>
+                )
+              })}
+            </TBody>
+          </Table>
         )}
 
         {/* Détail JSON si déployé */}

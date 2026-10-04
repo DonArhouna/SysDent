@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { Table, TBody, TD, TH, THead, TRow } from '@/components/ui/table'
+import { PageHeader } from '@/components/ui/page-header'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Skeleton } from '@/components/ui/skeleton'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { useToastStore } from '@/stores/toast-store'
 import { ordonnancesApi } from '../services/ordonnances-api'
 import type { OrdonnanceResponse } from '../types'
@@ -18,12 +23,16 @@ import {
   Plus,
   Printer,
   Search,
+  RefreshCw,
+  WifiOff,
 } from 'lucide-react'
 
 export function OrdonnancesListPage() {
   const { addToast } = useToastStore()
   const [ordonnances, setOrdonnances] = useState<OrdonnanceResponse[]>([])
   const [loading, setLoading] = useState(true)
+  /** Un chargement échoué ne doit pas s'afficher comme un résultat vide. */
+  const [erreurChargement, setErreurChargement] = useState(false)
   const [filtreStatut, setFiltreStatut] = useState<'TOUS' | 'SIGNE' | 'NON_SIGNE'>('TOUS')
   const [recherche, setRecherche] = useState('')
 
@@ -40,10 +49,12 @@ export function OrdonnancesListPage() {
   const chargerOrdonnances = async () => {
     try {
       setLoading(true)
+      setErreurChargement(false)
       const res = await ordonnancesApi.lister({ limite: 100 })
       setOrdonnances(res.data)
     } catch {
       // toast géré par l'intercepteur API
+      setErreurChargement(true)
     } finally {
       setLoading(false)
     }
@@ -96,34 +107,26 @@ export function OrdonnancesListPage() {
   return (
     <div className="space-y-6">
       {/* En-tête de la page */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2.5">
-            <FileText className="w-6 h-6 text-primary" />
-            Ordonnances & Prescriptions
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Gestion des ordonnances médicales, contrôle des contre-indications et référentiel.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <Button
-            variant="outline"
-            className="flex items-center gap-1.5 text-xs text-foreground border-border"
-            onClick={() => setIsMedicamentOpen(true)}
-          >
-            <Pill className="w-4 h-4 text-primary" /> Référentiel Médicaments
-          </Button>
-          <Button
-            variant="primary"
-            className="flex items-center gap-1.5 text-xs"
-            onClick={() => setIsCreateOpen(true)}
-          >
-            <Plus className="w-4 h-4" /> Nouvelle ordonnance
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        titre="Ordonnances & Prescriptions"
+        sousTitre="Gestion des ordonnances médicales, contrôle des contre-indications et référentiel."
+        onRefresh={() => void chargerOrdonnances()}
+      >
+        <Button
+          variant="outline"
+          className="flex items-center gap-1.5 text-xs"
+          onClick={() => setIsMedicamentOpen(true)}
+        >
+          <Pill className="w-4 h-4 text-primary" /> Référentiel Médicaments
+        </Button>
+        <Button
+          variant="primary"
+          className="flex items-center gap-1.5 text-xs"
+          onClick={() => setIsCreateOpen(true)}
+        >
+          <Plus className="w-4 h-4" /> Nouvelle ordonnance
+        </Button>
+      </PageHeader>
 
       {/* Barre de filtres et recherche */}
       <div className="bg-card p-4 rounded-xl border border-border flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -177,88 +180,99 @@ export function OrdonnancesListPage() {
       {/* Tableau des ordonnances */}
       <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
         {loading ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">Chargement des ordonnances...</div>
+          <div className="space-y-3 p-6">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        ) : erreurChargement ? (
+          <EmptyState
+            icon={WifiOff}
+            titre="Les ordonnances indisponibles"
+            description="Ce module n'a pas pu être chargé. Vérifiez que le backend est démarré puis réessayez."
+          >
+            <Button variant="outline" size="sm" onClick={() => void chargerOrdonnances()}>
+              <RefreshCw className="h-4 w-4" /> Réessayer
+            </Button>
+          </EmptyState>
         ) : ordonnancesFiltrees.length === 0 ? (
-          <div className="p-12 text-center text-sm text-muted-foreground">
-            Aucune ordonnance trouvée pour ces critères.
-          </div>
+          <EmptyState
+            icon={FileText}
+            titre="Aucune ordonnance trouvée"
+            description="Aucune ordonnance ne correspond à ces critères."
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-card-foreground">
-              <thead className="bg-muted text-muted-foreground uppercase tracking-wider font-semibold border-b border-border">
-                <tr>
-                  <th className="px-4 py-3">Numéro</th>
-                  <th className="px-4 py-3">Date</th>
-                  <th className="px-4 py-3">Médicaments prescrits</th>
-                  <th className="px-4 py-3">Statut</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {ordonnancesFiltrees.map((ord) => (
-                  <tr key={ord.id} className="hover:bg-muted transition-colors">
-                    <td className="px-4 py-3 font-mono font-bold text-foreground">
-                      {ord.numero}
-                    </td>
-                    <td className="px-4 py-3 text-card-foreground">
-                      {formatDateFr(ord.date_ordonnance)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="space-y-0.5 max-w-md">
-                        {ord.lignes.slice(0, 2).map((l, i) => (
-                          <div key={i} className="truncate text-foreground">
-                            • {l.nom_commercial || l.medicament_texte}{' '}
-                            <span className="text-muted-foreground text-[11px]">({l.posologie})</span>
-                          </div>
-                        ))}
-                        {ord.lignes.length > 2 && (
-                          <div className="text-[11px] text-primary">
-                            +{ord.lignes.length - 2} autre(s) médicament(s)
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {ord.signe ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-success/15 border border-success/40 text-success">
-                          <Lock className="w-3 h-3" /> Signée
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-warning/15 border border-warning/40 text-warning">
-                          <AlertTriangle className="w-3 h-3" /> En attente de signature
-                        </span>
+          <Table>
+            <THead>
+              <TRow>
+                <TH>Numéro</TH>
+                <TH>Date</TH>
+                <TH>Médicaments prescrits</TH>
+                <TH>Statut</TH>
+                <TH className="text-right">Actions</TH>
+              </TRow>
+            </THead>
+            <TBody>
+              {ordonnancesFiltrees.map((ord) => (
+                <TRow key={ord.id}>
+                  <TD className="font-mono font-bold text-foreground text-xs">{ord.numero}</TD>
+                  <TD className="text-xs">{formatDateFr(ord.date_ordonnance)}</TD>
+                  <TD>
+                    <div className="space-y-0.5 max-w-md">
+                      {ord.lignes.slice(0, 2).map((l, i) => (
+                        <div key={i} className="truncate text-foreground text-xs">
+                          • {l.nom_commercial || l.medicament_texte}{' '}
+                          <span className="text-muted-foreground text-[11px]">({l.posologie})</span>
+                        </div>
+                      ))}
+                      {ord.lignes.length > 2 && (
+                        <div className="text-[11px] text-primary">
+                          +{ord.lignes.length - 2} autre(s) médicament(s)
+                        </div>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {!ord.signe && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-xs text-success border-success/40 hover:bg-success/15 h-8"
-                            onClick={() => setSignConfirmId(ord.id)}
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Signer
-                          </Button>
-                        )}
+                    </div>
+                  </TD>
+                  <TD>
+                    {ord.signe ? (
+                      <StatusBadge tone="success">
+                        <Lock className="w-3 h-3" /> Signée
+                      </StatusBadge>
+                    ) : (
+                      <StatusBadge tone="warning">
+                        <AlertTriangle className="w-3 h-3" /> En attente de signature
+                      </StatusBadge>
+                    )}
+                  </TD>
+                  <TD className="text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      {!ord.signe && (
                         <Button
-                          variant="secondary"
+                          variant="outline"
                           size="sm"
-                          className="text-xs h-8 flex items-center gap-1"
-                          onClick={() => {
-                            setSelectedOrdonnance(ord)
-                            setIsPrintOpen(true)
-                          }}
+                          className="text-xs text-success border-success/40 hover:bg-success/15 h-8"
+                          onClick={() => setSignConfirmId(ord.id)}
                         >
-                          <Printer className="w-3.5 h-3.5" /> Voir / Imprimer
+                          <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Signer
                         </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      )}
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="text-xs h-8 flex items-center gap-1"
+                        onClick={() => {
+                          setSelectedOrdonnance(ord)
+                          setIsPrintOpen(true)
+                        }}
+                      >
+                        <Printer className="w-3.5 h-3.5" /> Voir / Imprimer
+                      </Button>
+                    </div>
+                  </TD>
+                </TRow>
+              ))}
+            </TBody>
+          </Table>
         )}
       </div>
 

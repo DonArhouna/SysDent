@@ -3,8 +3,10 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Stethoscope,
-  ArrowLeft,
   CheckCircle2,
+  FileQuestion,
+  RefreshCw,
+  WifiOff,
   AlertTriangle,
   Plus,
   Trash2,
@@ -15,7 +17,9 @@ import {
   ClipboardList,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { PageHeader } from '@/components/ui/page-header'
+import { StatusBadge } from '@/components/ui/status-badge'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input, Label } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
@@ -57,7 +61,7 @@ export function ConsultationDetailPage() {
   const [modalTerminerOpen, setModalTerminerOpen] = useState(false)
   const [loadingTerminer, setLoadingTerminer] = useState(false)
 
-  const { data: resDetail, isLoading } = useQuery({
+  const { data: resDetail, isLoading, isError, refetch } = useQuery({
     queryKey: ['consultation-detail', id],
     queryFn: () => consultationsApi.obtenirDetail(id!),
     enabled: Boolean(id),
@@ -179,13 +183,30 @@ export function ConsultationDetailPage() {
     )
   }
 
-  if (!consultation) {
+  // Un échec réseau n'est pas une consultation absente : distinguer les deux,
+  // sinon l'utilisateur croit à une suppression alors que c'est un incident.
+  if (isError || !consultation) {
     return (
-      <div className="mx-auto max-w-lg text-center py-16">
-        <p className="text-muted-foreground">Consultation introuvable.</p>
-        <Button variant="outline" className="mt-4" onClick={() => navigate('/consultations')}>
-          Retour à la liste
-        </Button>
+      <div className="mx-auto max-w-lg rounded-xl2 border border-border bg-card shadow-float">
+        <EmptyState
+          icon={isError ? WifiOff : FileQuestion}
+          titre={isError ? 'Consultation indisponible' : 'Consultation introuvable'}
+          description={
+            isError
+              ? "La consultation n'a pas pu être chargée. Vérifiez que le backend est démarré puis réessayez."
+              : "Cette consultation n'existe plus ou n'a jamais existé."
+          }
+        >
+          {isError ? (
+            <Button variant="outline" onClick={() => void refetch()}>
+              <RefreshCw className="h-4 w-4" /> Réessayer
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={() => navigate('/consultations')}>
+              Retour à la liste
+            </Button>
+          )}
+        </EmptyState>
       </div>
     )
   }
@@ -196,37 +217,28 @@ export function ConsultationDetailPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       {/* En-tête */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Link
-            to="/consultations"
-            className="text-muted-foreground hover:text-foreground"
-            title="Retour à la liste"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">
-                Consultation Clinique
-              </h1>
-              <Badge
-                variant={
-                  estTerminee ? 'success' : estAnnulee ? 'danger' : 'purple'
-                }
-              >
-                {consultation.statut}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Motif : <strong className="text-foreground">{consultation.motif}</strong> • Date :{' '}
-              {formatDateTimeFr(consultation.date_consultation)}
-            </p>
-          </div>
-        </div>
-
+      <PageHeader
+        titre={
+          <span className="flex flex-wrap items-center gap-2">
+            Consultation Clinique
+            <StatusBadge
+              tone={estTerminee ? 'success' : estAnnulee ? 'danger' : 'purple'}
+            >
+              {consultation.statut}
+            </StatusBadge>
+          </span>
+        }
+        sousTitre={
+          <>
+            Motif :{' '}
+            <strong className="text-foreground">{consultation.motif}</strong> • Date :{' '}
+            {formatDateTimeFr(consultation.date_consultation)}
+          </>
+        }
+        retour={{ to: '/consultations', label: 'Retour à la liste' }}
+      >
         {/* Actions principales */}
-        <div className="flex flex-wrap items-center gap-2">
+        <>
           {consultation.patient_id && (
             <Link to={`/odontogramme?patient_id=${consultation.patient_id}`}>
               <Button variant="outline" size="sm">
@@ -270,8 +282,8 @@ export function ConsultationDetailPage() {
               </Button>
             </Can>
           )}
-        </div>
-      </div>
+        </>
+      </PageHeader>
 
       {/* Rappel RG02 si l'état général doit être vérifié */}
       {consultation.etat_general_a_verifier && (

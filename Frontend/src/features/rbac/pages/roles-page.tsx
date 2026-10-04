@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/page-header'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Skeleton } from '@/components/ui/skeleton'
 import { rbacApi } from '../services/rbac-api'
 import type { PermissionCatalogueItem, Role } from '../types'
 import { RoleModal } from '../components/role-modal'
 import { PermissionMatrix } from '../components/permission-matrix'
-import { Plus, Shield, Users } from 'lucide-react'
+import { Plus, RefreshCw, Shield, Users, ShieldAlert, WifiOff } from 'lucide-react'
 
 export function RolesPage() {
   const [roles, setRoles] = useState<Role[]>([])
@@ -12,10 +15,13 @@ export function RolesPage() {
   const [selectedRole, setSelectedRole] = useState<Role | null>(null)
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  /** Un chargement échoué ne doit pas s'afficher comme un cabinet sans rôle. */
+  const [erreurChargement, setErreurChargement] = useState(false)
 
   const chargerDonnees = async () => {
     try {
       setLoading(true)
+      setErreurChargement(false)
       const [resRoles, resCatalogue] = await Promise.all([
         rbacApi.listerRoles(),
         rbacApi.listerCataloguePermissions(),
@@ -26,7 +32,8 @@ export function RolesPage() {
         setSelectedRole(resRoles.data[0])
       }
     } catch {
-      //
+      // Erreurs déjà signalées par le toast global de l'API client.
+      setErreurChargement(true)
     } finally {
       setLoading(false)
     }
@@ -48,18 +55,17 @@ export function RolesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2.5">
-            <Shield className="w-6 h-6 text-primary" />
-            Gestion des Rôles & Habilitations (RBAC)
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Configuration granulaire des permissions d'accès aux modules pour chaque profil métier.
-          </p>
-        </div>
-
+      {/* En-tête */}
+      <PageHeader
+        titre={
+          <span className="flex items-center gap-2.5">
+            <Shield className="h-6 w-6 text-primary" aria-hidden />
+            Gestion des Rôles &amp; Habilitations (RBAC)
+          </span>
+        }
+        sousTitre="Configuration granulaire des permissions d'accès aux modules pour chaque profil métier."
+        onRefresh={() => void chargerDonnees()}
+      >
         <Button
           variant="primary"
           className="flex items-center gap-1.5 text-xs"
@@ -67,17 +73,47 @@ export function RolesPage() {
         >
           <Plus className="w-4 h-4" /> Créer un rôle
         </Button>
-      </div>
+      </PageHeader>
 
       {loading ? (
-        <div className="p-12 text-center text-sm text-muted-foreground">
-          Chargement des rôles et autorisations...
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          <div className="space-y-2.5 lg:col-span-4">
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-[5.5rem] rounded-xl2" />
+            ))}
+          </div>
+          <Skeleton className="h-80 rounded-xl2 lg:col-span-8" />
+        </div>
+      ) : erreurChargement ? (
+        /* Un échec de chargement n'est pas un cabinet sans rôle : le dire. */
+        <div className="rounded-xl2 border border-border bg-card shadow-float">
+          <EmptyState
+            icon={WifiOff}
+            titre="Rôles indisponibles"
+            description="Les rôles et habilitations n'ont pas pu être chargés. Vérifiez que le backend est démarré puis réessayez."
+          >
+            <Button variant="outline" onClick={() => void chargerDonnees()}>
+              <RefreshCw className="h-4 w-4" /> Réessayer
+            </Button>
+          </EmptyState>
+        </div>
+      ) : roles.length === 0 ? (
+        <div className="rounded-xl2 border border-border bg-card shadow-float">
+          <EmptyState
+            icon={ShieldAlert}
+            titre="Aucun rôle configuré"
+            description="Créez un premier rôle pour attribuer des permissions aux profils de votre cabinet."
+          >
+            <Button variant="primary" onClick={() => setIsModalOpen(true)}>
+              <Plus className="w-4 h-4" /> Créer un rôle
+            </Button>
+          </EmptyState>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           {/* Liste des rôles */}
-          <div className="lg:col-span-4 space-y-2.5">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
+          <div className="space-y-2.5 lg:col-span-4">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Rôles du cabinet ({roles.length})
             </span>
 
@@ -89,15 +125,15 @@ export function RolesPage() {
                 <div
                   key={r.id}
                   onClick={() => setSelectedRole(r)}
-                  className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                  className={`focus-ring cursor-pointer rounded-xl2 border p-3.5 transition-colors duration-150 ${
                     isSelected
-                      ? 'bg-primary/15 border-primary/40 shadow-sm'
-                      : 'bg-card border-border hover:border-border'
+                      ? 'border-primary/40 bg-primary/10 shadow-float'
+                      : 'border-border bg-card hover:bg-surface-hover'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-mono font-bold text-sm text-foreground">{r.nom}</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-mono">
+                    <span className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
                       Niv. {r.niveau_hierarchie}
                     </span>
                   </div>
@@ -106,7 +142,7 @@ export function RolesPage() {
                     <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{r.description}</p>
                   )}
 
-                  <div className="flex items-center justify-between text-[11px] text-muted-foreground mt-2.5 pt-2 border-t border-border">
+                  <div className="mt-2.5 flex items-center justify-between border-t border-border pt-2 text-[11px] text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Users className="w-3.5 h-3.5" /> {r.nb_utilisateurs} utilisateur(s)
                     </span>
@@ -120,7 +156,7 @@ export function RolesPage() {
           </div>
 
           {/* Matrice des droits du rôle sélectionné */}
-          <div className="lg:col-span-8 bg-card p-6 rounded-xl border border-border">
+          <div className="rounded-xl2 border border-border bg-card p-6 shadow-float lg:col-span-8">
             {selectedRole ? (
               <PermissionMatrix
                 role={selectedRole}
@@ -128,9 +164,11 @@ export function RolesPage() {
                 onRoleUpdated={handleRoleUpdated}
               />
             ) : (
-              <div className="p-8 text-center text-sm text-muted-foreground">
-                Sélectionnez un rôle pour configurer ses permissions.
-              </div>
+              <EmptyState
+                icon={Users}
+                titre="Sélectionnez un rôle"
+                description="Choisissez un rôle dans la liste pour configurer ses permissions."
+              />
             )}
           </div>
         </div>

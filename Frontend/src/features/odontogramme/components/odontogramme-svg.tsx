@@ -9,6 +9,23 @@ interface OdontogrammeSvgProps {
   typeOdontogramme: 'ADULTE' | 'ENFANT' | 'MIXTE'
 }
 
+/**
+ * Palette de repli des états cliniques.
+ *
+ * Ces teintes relèvent d'une convention du schéma dentaire, pas d'un choix
+ * décoratif : on les déclare donc via les tokens sémantiques du thème (un seul
+ * jeu clair/sombre, bascule instantaneous) plutôt que des hex en dur dans le
+ * JSX. La couleur de référence reste celle du backend
+ * (`EtatReferentiel.couleur`) ; ces valeurs ne servent que si elle manque.
+ */
+const COULEUR_CARIE = 'hsl(var(--danger))'
+const COULEUR_SOIGNEE = 'hsl(var(--accent-blue))'
+const COULEUR_COURONNE = 'hsl(var(--warning))'
+/** Dent saine : vert sémantique. */
+const COULEUR_SAINE = 'hsl(var(--success))'
+/** Croix de dent absente : gris neutre du thème. */
+const COULEUR_ABSENTE = 'hsl(var(--muted-foreground))'
+
 // Numéros FDI par quadrant
 const QUADRANTS_ADULTE = {
   q1: [18, 17, 16, 15, 14, 13, 12, 11], // Supérieur Droit
@@ -52,9 +69,9 @@ function DentItem({
       (fc) => fc.face === faceNom || fc.face_courte === faceNom.charAt(0),
     )
     if (f && f.etat !== 'SAINE') {
-      if (f.etat.includes('CARIE')) return '#EF4444'
-      if (f.etat.includes('SOIGNEE') || f.etat.includes('OBTUR')) return '#3B82F6'
-      if (f.etat.includes('COURONNE')) return '#EAB308'
+      if (f.etat.includes('CARIE')) return COULEUR_CARIE
+      if (f.etat.includes('SOIGNEE') || f.etat.includes('OBTUR')) return COULEUR_SOIGNEE
+      if (f.etat.includes('COURONNE')) return COULEUR_COURONNE
     }
     return couleurGlobale
   }
@@ -153,7 +170,7 @@ function DentItem({
             y1="5"
             x2="45"
             y2="45"
-            stroke="#6B7280"
+            stroke={COULEUR_ABSENTE}
             strokeWidth="3"
             strokeLinecap="round"
           />
@@ -188,7 +205,7 @@ export function OdontogrammeSvg({
   const dentParFdi = new Map<number, DentOdontogramme>()
   dents.forEach((d) => dentParFdi.set(d.numero_fdi, d))
 
-  const getCouleur = (etat: string) => couleurMap.get(etat) ?? '#22C55E'
+  const getCouleur = (etat: string) => couleurMap.get(etat) ?? COULEUR_SAINE
 
   const quadrants = typeOdontogramme === 'ENFANT' ? QUADRANTS_ENFANT : QUADRANTS_ADULTE
 
@@ -213,7 +230,7 @@ export function OdontogrammeSvg({
                   key={fdi}
                   dent={d}
                   isSelected={dentSelectionneeFdi === fdi}
-                  couleurGlobale={d ? getCouleur(d.etat_actuel) : '#22C55E'}
+                  couleurGlobale={d ? getCouleur(d.etat_actuel) : COULEUR_SAINE}
                   onClick={() => d && onSelectDent(d)}
                 />
               )
@@ -229,7 +246,7 @@ export function OdontogrammeSvg({
                   key={fdi}
                   dent={d}
                   isSelected={dentSelectionneeFdi === fdi}
-                  couleurGlobale={d ? getCouleur(d.etat_actuel) : '#22C55E'}
+                  couleurGlobale={d ? getCouleur(d.etat_actuel) : COULEUR_SAINE}
                   onClick={() => d && onSelectDent(d)}
                 />
               )
@@ -257,7 +274,7 @@ export function OdontogrammeSvg({
                   key={fdi}
                   dent={d}
                   isSelected={dentSelectionneeFdi === fdi}
-                  couleurGlobale={d ? getCouleur(d.etat_actuel) : '#22C55E'}
+                  couleurGlobale={d ? getCouleur(d.etat_actuel) : COULEUR_SAINE}
                   onClick={() => d && onSelectDent(d)}
                 />
               )
@@ -273,7 +290,7 @@ export function OdontogrammeSvg({
                   key={fdi}
                   dent={d}
                   isSelected={dentSelectionneeFdi === fdi}
-                  couleurGlobale={d ? getCouleur(d.etat_actuel) : '#22C55E'}
+                  couleurGlobale={d ? getCouleur(d.etat_actuel) : COULEUR_SAINE}
                   onClick={() => d && onSelectDent(d)}
                 />
               )

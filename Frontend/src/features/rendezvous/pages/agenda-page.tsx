@@ -9,16 +9,19 @@ import {
   Clock,
   Armchair,
   Stethoscope,
-  RefreshCw,
   AlertTriangle,
   CheckCircle,
   XCircle,
   Play,
+  RefreshCw,
+  WifiOff,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PageHeader } from '@/components/ui/page-header'
+import { EmptyState } from '@/components/ui/empty-state'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { Can } from '@/components/auth/can'
 import { formatDateFr } from '@/lib/format'
 import { toast } from '@/stores/toast-store'
@@ -33,10 +36,10 @@ const STATUT_STYLES: Record<
   StatutRdv,
   { label: string; badge: 'info' | 'success' | 'warning' | 'purple' | 'danger' | 'neutral'; border: string }
 > = {
-  PLANIFIE: { label: 'Planifié', badge: 'info', border: 'border-l-sky-500' },
+  PLANIFIE: { label: 'Planifié', badge: 'info', border: 'border-l-accent-blue' },
   CONFIRME: { label: 'Confirmé', badge: 'success', border: 'border-l-success' },
   EN_ATTENTE: { label: 'En salle d’attente', badge: 'warning', border: 'border-l-warning' },
-  EN_CONSULTATION: { label: 'En consultation', badge: 'purple', border: 'border-l-purple-500' },
+  EN_CONSULTATION: { label: 'En consultation', badge: 'purple', border: 'border-l-accent-purple' },
   TERMINEE: { label: 'Soins terminés', badge: 'neutral', border: 'border-l-muted-foreground' },
   ANNULE: { label: 'Annulé', badge: 'danger', border: 'border-l-danger' },
   ABSENT: { label: 'Patient absent', badge: 'danger', border: 'border-l-danger' },
@@ -64,7 +67,7 @@ export function AgendaPage() {
   const praticiens = resPraticiens?.data ?? []
 
   // Données de l'agenda
-  const { data: resAgenda, isLoading, refetch } = useQuery({
+  const { data: resAgenda, isLoading, isError, refetch } = useQuery({
     queryKey: ['agenda-jour', dateSelectionnee, cabinetActifId, praticienFiltreId],
     queryFn: () =>
       rendezvousApi.obtenirAgenda(
@@ -120,41 +123,30 @@ export function AgendaPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       {/* En-tête de l'Agenda */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">
-            Agenda & Planning des Soins
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Gestion du flux de rendez-vous, occupation des fauteuils et appels en salle d'attente
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => void refetch()}>
-            <RefreshCw className="h-4 w-4" />
+      <PageHeader
+        titre="Agenda & Planning des Soins"
+        sousTitre="Gestion du flux de rendez-vous, occupation des fauteuils et appels en salle d'attente"
+        onRefresh={() => void refetch()}
+      >
+        <Can permission="AGENDA:UPDATE">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setModalBlocageOpen(true)}
+            className="text-warning"
+          >
+            <AlertTriangle className="h-4 w-4" />
+            Bloquer fauteuil
           </Button>
+        </Can>
 
-          <Can permission="AGENDA:UPDATE">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setModalBlocageOpen(true)}
-              className="text-warning dark:text-warning"
-            >
-              <AlertTriangle className="h-4 w-4" />
-              Bloquer fauteuil
-            </Button>
-          </Can>
-
-          <Can permission="AGENDA:CREATE">
-            <Button variant="primary" size="sm" onClick={() => setModalRdvOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Nouveau RDV
-            </Button>
-          </Can>
-        </div>
-      </div>
+        <Can permission="AGENDA:CREATE">
+          <Button variant="primary" size="sm" onClick={() => setModalRdvOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Nouveau RDV
+          </Button>
+        </Can>
+      </PageHeader>
 
       {/* Barre de navigation temporelle et filtres */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-border bg-card p-4 shadow-xs">
@@ -259,19 +251,34 @@ export function AgendaPage() {
           )}
 
           {/* Liste des rendez-vous de la journée */}
-          {rendezVous.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center space-y-3">
-              <CalendarDays className="h-12 w-12 text-muted-foreground/40 mx-auto" />
-              <h3 className="font-bold text-base text-foreground">Aucun rendez-vous sur cette journée</h3>
-              <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto">
-                Le planning est libre pour le {formatDateFr(dateSelectionnee)}.
-              </p>
-              <Can permission="AGENDA:CREATE">
-                <Button variant="primary" size="sm" onClick={() => setModalRdvOpen(true)}>
-                  <Plus className="h-4 w-4" />
-                  Prendre un rendez-vous
+          {isError ? (
+            /* Une journée non chargée n'est pas une journée libre : ne pas
+               afficher « planning libre » si la requête a échoué. */
+            <div className="rounded-2xl border border-dashed border-border bg-card">
+              <EmptyState
+                icon={WifiOff}
+                titre="Agenda indisponible"
+                description="Le planning du jour n'a pas pu être chargé. Vérifiez que le backend est démarré puis réessayez."
+              >
+                <Button variant="outline" onClick={() => void refetch()}>
+                  <RefreshCw className="h-4 w-4" /> Réessayer
                 </Button>
-              </Can>
+              </EmptyState>
+            </div>
+          ) : rendezVous.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-card">
+              <EmptyState
+                icon={CalendarDays}
+                titre="Aucun rendez-vous sur cette journée"
+                description={`Le planning est libre pour le ${formatDateFr(dateSelectionnee)}.`}
+              >
+                <Can permission="AGENDA:CREATE">
+                  <Button variant="primary" size="sm" onClick={() => setModalRdvOpen(true)}>
+                    <Plus className="h-4 w-4" />
+                    Prendre un rendez-vous
+                  </Button>
+                </Can>
+              </EmptyState>
             </div>
           ) : (
             <div className="space-y-3">
@@ -305,11 +312,11 @@ export function AgendaPage() {
                             <h4 className="font-bold text-base text-foreground">
                               {rdv.patient_nom ?? 'Patient'}
                             </h4>
-                            <Badge variant={conf.badge}>{conf.label}</Badge>
+                            <StatusBadge tone={conf.badge}>{conf.label}</StatusBadge>
                             {rdv.hors_disponibilites && (
-                              <Badge variant="warning" className="text-[10px]">
+                              <StatusBadge tone="warning" className="text-[10px]">
                                 Hors plages
-                              </Badge>
+                              </StatusBadge>
                             )}
                           </div>
 

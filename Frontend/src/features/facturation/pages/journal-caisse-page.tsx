@@ -3,6 +3,11 @@ import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
+import { Table, TBody, TD, TH, THead, TRow } from '@/components/ui/table'
+import { PageHeader } from '@/components/ui/page-header'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Skeleton } from '@/components/ui/skeleton'
+import { StatCard } from '@/components/dashboard/stat-card'
 import { formatFcfa, formatDateTimeFr } from '@/lib/format'
 import { facturationApi } from '../services/facturation-api'
 import type { JournalCaisseItem } from '../types'
@@ -12,6 +17,8 @@ import {
   CreditCard,
   Printer,
   Smartphone,
+  RefreshCw,
+  WifiOff,
 } from 'lucide-react'
 
 const MODES_OPTIONS = [
@@ -27,6 +34,8 @@ const MODES_OPTIONS = [
 export function JournalCaissePage() {
   const [items, setItems] = useState<JournalCaisseItem[]>([])
   const [loading, setLoading] = useState(true)
+  /** Un chargement échoué ne doit pas s'afficher comme un résultat vide. */
+  const [erreurChargement, setErreurChargement] = useState(false)
   const [modeFiltre, setModeFiltre] = useState('')
   const [dateDebut, setDateDebut] = useState(new Date().toISOString().split('T')[0])
   const [dateFin, setDateFin] = useState(new Date().toISOString().split('T')[0])
@@ -35,6 +44,7 @@ export function JournalCaissePage() {
   const chargerJournal = async () => {
     try {
       setLoading(true)
+      setErreurChargement(false)
       const res = await facturationApi.journalCaisse({
         date_debut: dateDebut || undefined,
         date_fin: dateFin || undefined,
@@ -45,6 +55,7 @@ export function JournalCaissePage() {
       setItems(res.items)
     } catch {
       // toast géré par l'intercepteur API
+      setErreurChargement(true)
     } finally {
       setLoading(false)
     }
@@ -72,67 +83,66 @@ export function JournalCaissePage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 no-print">
-        <div className="flex items-center gap-3">
-          <Link to="/factures">
-            <Button variant="outline" size="sm" className="h-9 px-2.5">
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2.5">
-              <Banknote className="w-6 h-6 text-success" />
-              Journal de Caisse & Règlements
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Traçabilité chronologique de tous les encaissements effectués au cabinet.
-            </p>
-          </div>
-        </div>
+      {/* Retour */}
+      <Link
+        to="/factures"
+        className="no-print inline-flex w-fit items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Retour aux factures
+      </Link>
 
+      {/* Header */}
+      <PageHeader
+        className="no-print"
+        titre="Journal de Caisse & Règlements"
+        sousTitre="Traçabilité chronologique de tous les encaissements effectués au cabinet."
+        onRefresh={() => void chargerJournal()}
+      >
         <Button
           variant="secondary"
           size="sm"
           onClick={handlePrint}
-          className="flex items-center gap-1.5 text-xs self-start sm:self-auto"
+          className="flex items-center gap-1.5 text-xs"
         >
           <Printer className="w-4 h-4" /> Imprimer le journal (A4)
         </Button>
-      </div>
+      </PageHeader>
 
       {/* Cartes KPI */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="bg-card p-4 rounded-xl border border-border">
-          <span className="text-xs text-muted-foreground block font-medium">Recette Totale Période</span>
-          <span className="text-xl font-bold text-success font-mono">
-            {formatFcfa(totalGeneral)}
-          </span>
-        </div>
-        <div className="bg-card p-4 rounded-xl border border-border">
-          <span className="text-xs text-muted-foreground block font-medium flex items-center gap-1.5">
-            <Banknote className="w-3.5 h-3.5 text-card-foreground" /> Caisse Espèces
-          </span>
-          <span className="text-lg font-bold text-foreground font-mono">
-            {formatFcfa(totalEspeces)}
-          </span>
-        </div>
-        <div className="bg-card p-4 rounded-xl border border-border">
-          <span className="text-xs text-muted-foreground block font-medium flex items-center gap-1.5">
-            <Smartphone className="w-3.5 h-3.5 text-primary" /> Wave & Orange Money
-          </span>
-          <span className="text-lg font-bold text-primary font-mono">
-            {formatFcfa(totalMobile)}
-          </span>
-        </div>
-        <div className="bg-card p-4 rounded-xl border border-border">
-          <span className="text-xs text-muted-foreground block font-medium flex items-center gap-1.5">
-            <CreditCard className="w-3.5 h-3.5 text-accent-purple" /> Cartes Bancaires (TPE)
-          </span>
-          <span className="text-lg font-bold text-accent-purple font-mono">
-            {formatFcfa(totalCartes)}
-          </span>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          label="Recette totale période"
+          value={formatFcfa(totalGeneral)}
+          detail="Tous modes de règlement confondus"
+          icon={Banknote}
+          accent="green"
+          chargement={loading}
+        />
+        <StatCard
+          label="Caisse espèces"
+          value={formatFcfa(totalEspeces)}
+          detail="Encaissements en espèces"
+          icon={Banknote}
+          accent="blue"
+          chargement={loading}
+        />
+        <StatCard
+          label="Wave & Orange Money"
+          value={formatFcfa(totalMobile)}
+          detail="Paiements mobile money"
+          icon={Smartphone}
+          accent="purple"
+          chargement={loading}
+        />
+        <StatCard
+          label="Cartes bancaires (TPE)"
+          value={formatFcfa(totalCartes)}
+          detail="Encaissements par carte"
+          icon={CreditCard}
+          accent="orange"
+          chargement={loading}
+        />
       </div>
 
       {/* Filtres date & mode */}
@@ -160,61 +170,66 @@ export function JournalCaissePage() {
       {/* Tableau du journal */}
       <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
         {loading ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">
-            Chargement des écritures de caisse...
+          <div className="space-y-3 p-6">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
           </div>
+        ) : erreurChargement ? (
+          <EmptyState
+            icon={WifiOff}
+            titre="Le journal de caisse indisponibles"
+            description="Ce module n'a pas pu être chargé. Vérifiez que le backend est démarré puis réessayez."
+          >
+            <Button variant="outline" size="sm" onClick={() => void chargerJournal()}>
+              <RefreshCw className="h-4 w-4" /> Réessayer
+            </Button>
+          </EmptyState>
         ) : items.length === 0 ? (
-          <div className="p-12 text-center text-sm text-muted-foreground">
-            Aucun encaissement enregistré sur cette période.
-          </div>
+          <EmptyState
+            icon={Banknote}
+            titre="Aucun encaissement"
+            description="Aucun encaissement enregistré sur cette période."
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-card-foreground">
-              <thead className="bg-muted text-muted-foreground uppercase tracking-wider font-semibold border-b border-border">
-                <tr>
-                  <th className="px-4 py-3">Date & Heure</th>
-                  <th className="px-4 py-3">N° Reçu</th>
-                  <th className="px-4 py-3">Facture N°</th>
-                  <th className="px-4 py-3">Patient</th>
-                  <th className="px-4 py-3">Mode</th>
-                  <th className="px-4 py-3">Réf. transaction</th>
-                  <th className="px-4 py-3 text-right">Montant</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {items.map((it) => (
-                  <tr key={it.id} className="hover:bg-muted transition-colors">
-                    <td className="px-4 py-3 text-card-foreground">
-                      {formatDateTimeFr(it.date_paiement)}
-                    </td>
-                    <td className="px-4 py-3 font-mono font-bold text-primary">
-                      {it.recu_numero}
-                    </td>
-                    <td className="px-4 py-3 font-mono">
-                      <Link
-                        to={`/factures/${it.facture_id}`}
-                        className="text-foreground hover:text-primary"
-                      >
-                        {it.facture_numero}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 font-medium text-foreground">
-                      {it.patient_nom ? `${it.patient_nom.toUpperCase()} ${it.patient_prenom}` : '-'}
-                    </td>
-                    <td className="px-4 py-3 uppercase text-[10px] font-bold text-card-foreground">
-                      {it.mode}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-muted-foreground text-[11px]">
-                      {it.reference || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono font-bold text-success">
-                      {formatFcfa(it.montant)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table>
+            <THead>
+              <TRow>
+                <TH>Date & Heure</TH>
+                <TH>N° Reçu</TH>
+                <TH>Facture N°</TH>
+                <TH>Patient</TH>
+                <TH>Mode</TH>
+                <TH>Réf. transaction</TH>
+                <TH className="text-right">Montant</TH>
+              </TRow>
+            </THead>
+            <TBody>
+              {items.map((it) => (
+                <TRow key={it.id}>
+                  <TD className="text-xs">{formatDateTimeFr(it.date_paiement)}</TD>
+                  <TD className="font-mono font-bold text-primary text-xs">{it.recu_numero}</TD>
+                  <TD className="font-mono text-xs">
+                    <Link
+                      to={`/factures/${it.facture_id}`}
+                      className="text-foreground hover:text-primary"
+                    >
+                      {it.facture_numero}
+                    </Link>
+                  </TD>
+                  <TD className="font-medium text-foreground text-xs">
+                    {it.patient_nom ? `${it.patient_nom.toUpperCase()} ${it.patient_prenom}` : '-'}
+                  </TD>
+                  <TD className="uppercase text-[10px] font-bold text-card-foreground">{it.mode}</TD>
+                  <TD className="font-mono text-muted-foreground text-[11px]">{it.reference || '-'}</TD>
+                  <TD className="text-right font-mono font-bold text-success">
+                    {formatFcfa(it.montant)}
+                  </TD>
+                </TRow>
+              ))}
+            </TBody>
+          </Table>
         )}
       </div>
     </div>

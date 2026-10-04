@@ -4,6 +4,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { Table, TBody, TD, TH, THead, TRow } from '@/components/ui/table'
+import { PageHeader } from '@/components/ui/page-header'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Skeleton } from '@/components/ui/skeleton'
+import { StatusBadge, type StatusTone } from '@/components/ui/status-badge'
 import { useToastStore } from '@/stores/toast-store'
 import { formatFcfa, formatDateFr } from '@/lib/format'
 import { facturationApi } from '../services/facturation-api'
@@ -17,7 +22,23 @@ import {
   Plus,
   Send,
   XCircle,
+  RefreshCw,
+  WifiOff,
 } from 'lucide-react'
+
+/** Statut devis → badge sémantique. */
+function tonStatutDevis(statut: string): StatusTone {
+  switch (statut) {
+    case 'ACCEPTE':
+      return 'success'
+    case 'REFUSE':
+      return 'danger'
+    case 'ENVOYE':
+      return 'info'
+    default:
+      return 'neutral'
+  }
+}
 
 export function DevisListPage() {
   const navigate = useNavigate()
@@ -25,6 +46,8 @@ export function DevisListPage() {
 
   const [devisList, setDevisList] = useState<DevisResponse[]>([])
   const [loading, setLoading] = useState(true)
+  /** Un chargement échoué ne doit pas s'afficher comme un résultat vide. */
+  const [erreurChargement, setErreurChargement] = useState(false)
   const [statutFiltre, setStatutFiltre] = useState('')
   const [recherche, setRecherche] = useState('')
 
@@ -38,6 +61,7 @@ export function DevisListPage() {
   const chargerDevis = async () => {
     try {
       setLoading(true)
+      setErreurChargement(false)
       const res = await facturationApi.listerDevis({
         q: recherche.trim() || undefined,
         statut: statutFiltre || undefined,
@@ -46,6 +70,7 @@ export function DevisListPage() {
       setDevisList(res.items)
     } catch {
       // toast géré par l'intercepteur API
+      setErreurChargement(true)
     } finally {
       setLoading(false)
     }
@@ -96,32 +121,24 @@ export function DevisListPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2.5">
-            <FileSpreadsheet className="w-6 h-6 text-primary" />
-            Devis & Plans de Traitement
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Émission des devis chiffrés, signature patient et conversion automatique en facture.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <Link to="/factures">
-            <Button variant="outline" className="text-xs border-border">
-              Voir les factures
-            </Button>
-          </Link>
-          <Button
-            variant="primary"
-            className="flex items-center gap-1.5 text-xs"
-            onClick={() => setIsCreateOpen(true)}
-          >
-            <Plus className="w-4 h-4" /> Nouveau devis
+      <PageHeader
+        titre="Devis & Plans de Traitement"
+        sousTitre="Émission des devis chiffrés, signature patient et conversion automatique en facture."
+        onRefresh={() => void chargerDevis()}
+      >
+        <Link to="/factures">
+          <Button variant="outline" className="text-xs">
+            Voir les factures
           </Button>
-        </div>
-      </div>
+        </Link>
+        <Button
+          variant="primary"
+          className="flex items-center gap-1.5 text-xs"
+          onClick={() => setIsCreateOpen(true)}
+        >
+          <Plus className="w-4 h-4" /> Nouveau devis
+        </Button>
+      </PageHeader>
 
       {/* Filtres */}
       <div className="bg-card p-4 rounded-xl border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -145,77 +162,84 @@ export function DevisListPage() {
       {/* Tableau des devis */}
       <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
         {loading ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">Chargement des devis...</div>
+          <div className="space-y-3 p-6">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        ) : erreurChargement ? (
+          <EmptyState
+            icon={WifiOff}
+            titre="Devis indisponibles"
+            description="Ce module n'a pas pu être chargé. Vérifiez que le backend est démarré puis réessayez."
+          >
+            <Button variant="outline" size="sm" onClick={() => void chargerDevis()}>
+              <RefreshCw className="h-4 w-4" /> Réessayer
+            </Button>
+          </EmptyState>
         ) : devisList.length === 0 ? (
-          <div className="p-12 text-center text-sm text-muted-foreground">Aucun devis trouvé.</div>
+          <EmptyState
+            icon={FileSpreadsheet}
+            titre="Aucun devis trouvé"
+            description="Créez un devis chiffré depuis une consultation ou émettez-en un nouveau."
+          >
+            <Button variant="outline" size="sm" onClick={() => setIsCreateOpen(true)}>
+              <Plus className="w-4 h-4" /> Nouveau devis
+            </Button>
+          </EmptyState>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-card-foreground">
-              <thead className="bg-muted text-muted-foreground uppercase tracking-wider font-semibold border-b border-border">
-                <tr>
-                  <th className="px-4 py-3">N° Devis</th>
-                  <th className="px-4 py-3">Actes / Prestations</th>
-                  <th className="px-4 py-3 text-right">Montant Total</th>
-                  <th className="px-4 py-3">Validité</th>
-                  <th className="px-4 py-3 text-center">Statut</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {devisList.map((d) => {
-                  const estAccepte = d.statut === 'ACCEPTE'
-                  const estRefuse = d.statut === 'REFUSE'
-                  const estEnvoye = d.statut === 'ENVOYE'
-                  const estBrouillon = d.statut === 'BROUILLON'
-                  const estConverti = Boolean(d.facture_id)
+          <Table>
+            <THead>
+              <TRow>
+                <TH>N° Devis</TH>
+                <TH>Actes / Prestations</TH>
+                <TH className="text-right">Montant Total</TH>
+                <TH>Validité</TH>
+                <TH className="text-center">Statut</TH>
+                <TH className="text-right">Actions</TH>
+              </TRow>
+            </THead>
+            <TBody>
+              {devisList.map((d) => {
+                const estAccepte = d.statut === 'ACCEPTE'
+                const estEnvoye = d.statut === 'ENVOYE'
+                const estBrouillon = d.statut === 'BROUILLON'
+                const estConverti = Boolean(d.facture_id)
 
-                  return (
-                    <tr key={d.id} className="hover:bg-muted transition-colors">
-                      <td className="px-4 py-3 font-mono font-bold text-foreground">{d.numero}</td>
-                      <td className="px-4 py-3">
-                        <div className="space-y-0.5 max-w-sm">
-                          {d.lignes.slice(0, 2).map((l, i) => (
-                            <div key={i} className="truncate text-foreground">
-                              • {l.designation}{' '}
-                              {l.dent_numero && (
-                                <span className="text-primary font-mono">(d.{l.dent_numero})</span>
-                              )}
-                            </div>
-                          ))}
-                          {d.lignes.length > 2 && (
-                            <div className="text-[11px] text-primary">
-                              +{d.lignes.length - 2} autre(s) prestation(s)
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono font-bold text-foreground">
-                        {formatFcfa(d.montant_total)}
-                      </td>
-                      <td className="px-4 py-3 text-card-foreground">
-                        {d.date_validite ? formatDateFr(d.date_validite) : 'Indéterminée'}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span
-                          className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                            estAccepte
-                              ? 'bg-success/15 border border-success/40 text-success'
-                              : estRefuse
-                              ? 'bg-danger/15 border border-danger/40 text-danger'
-                              : estEnvoye
-                              ? 'bg-primary/15 border border-primary/40 text-primary'
-                              : 'bg-muted border border-border text-muted-foreground'
-                          }`}
-                        >
-                          {d.statut}
-                        </span>
-                        {estConverti && (
-                          <span className="block text-[9px] text-primary mt-0.5">
-                            Facturé ✓
-                          </span>
+                return (
+                  <TRow key={d.id}>
+                    <TD className="font-mono font-bold text-foreground">{d.numero}</TD>
+                    <TD>
+                      <div className="space-y-0.5 max-w-sm">
+                        {d.lignes.slice(0, 2).map((l, i) => (
+                          <div key={i} className="truncate text-foreground text-xs">
+                            • {l.designation}{' '}
+                            {l.dent_numero && (
+                              <span className="text-primary font-mono">(d.{l.dent_numero})</span>
+                            )}
+                          </div>
+                        ))}
+                        {d.lignes.length > 2 && (
+                          <div className="text-[11px] text-primary">
+                            +{d.lignes.length - 2} autre(s) prestation(s)
+                          </div>
                         )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
+                      </div>
+                    </TD>
+                    <TD className="text-right font-mono font-bold text-foreground">
+                      {formatFcfa(d.montant_total)}
+                    </TD>
+                    <TD className="text-xs">
+                      {d.date_validite ? formatDateFr(d.date_validite) : 'Indéterminée'}
+                    </TD>
+                    <TD className="text-center">
+                      <StatusBadge tone={tonStatutDevis(d.statut)}>{d.statut}</StatusBadge>
+                      {estConverti && (
+                        <span className="block text-[9px] text-primary mt-0.5">Facturé ✓</span>
+                      )}
+                    </TD>
+                    <TD className="text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           {estBrouillon && (
                             <Button
@@ -268,13 +292,12 @@ export function DevisListPage() {
                             </Link>
                           )}
                         </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                    </TD>
+                  </TRow>
+                )
+              })}
+            </TBody>
+          </Table>
         )}
       </div>
 

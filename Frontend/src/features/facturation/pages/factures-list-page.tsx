@@ -3,6 +3,19 @@ import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
+import { Table, TBody, TD, TH, THead, TRow } from '@/components/ui/table'
+import { PageHeader } from '@/components/ui/page-header'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Skeleton } from '@/components/ui/skeleton'
+import { StatusBadge, type StatusTone } from '@/components/ui/status-badge'
+import { StatCard } from '@/components/dashboard/stat-card'
+import {
+  FileText,
+  Clock,
+  CheckCircle2,
+  RefreshCw,
+  WifiOff,
+} from 'lucide-react'
 import { formatFcfa, formatDateFr } from '@/lib/format'
 import { facturationApi } from '../services/facturation-api'
 import type { FactureResponse } from '../types'
@@ -10,15 +23,25 @@ import { PaiementModal } from '../components/paiement-modal'
 import { FacturePrintModal } from '../components/facture-print-modal'
 import {
   Banknote,
-  CheckCircle2,
-  Clock,
-  CreditCard,
   Eye,
   FileSpreadsheet,
-  FileText,
   Printer,
   Search,
 } from 'lucide-react'
+
+/** Statut facture → badge sémantique (source unique pour liste et détail). */
+export function tonStatutFacture(statut: string): StatusTone {
+  switch (statut) {
+    case 'PAYEE':
+      return 'success'
+    case 'PARTIELLEMENT_PAYEE':
+      return 'info'
+    case 'ANNULEE':
+      return 'neutral'
+    default:
+      return 'warning'
+  }
+}
 
 const STATUT_OPTIONS = [
   { value: '', label: 'Tous les statuts' },
@@ -32,6 +55,8 @@ const STATUT_OPTIONS = [
 export function FacturesListPage() {
   const [factures, setFactures] = useState<FactureResponse[]>([])
   const [loading, setLoading] = useState(true)
+  /** Un chargement échoué ne doit pas s'afficher comme un résultat vide. */
+  const [erreurChargement, setErreurChargement] = useState(false)
   const [totalRecords, setTotalRecords] = useState(0)
 
   // Filtres
@@ -49,6 +74,7 @@ export function FacturesListPage() {
   const chargerFactures = async () => {
     try {
       setLoading(true)
+      setErreurChargement(false)
       const res = await facturationApi.listerFactures({
         q: recherche.trim() || undefined,
         statut: statutFiltre || undefined,
@@ -61,6 +87,7 @@ export function FacturesListPage() {
       setTotalRecords(res.meta.total_records)
     } catch {
       // toast géré par l'intercepteur API
+      setErreurChargement(true)
     } finally {
       setLoading(false)
     }
@@ -84,60 +111,50 @@ export function FacturesListPage() {
   return (
     <div className="space-y-6">
       {/* En-tête */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2.5">
-            <CreditCard className="w-6 h-6 text-primary" />
-            Facturation & Règlements ({totalRecords})
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Suivi des factures médicales, encaissements multi-modes (Wave, OM, Espèces) et restes dus.
-          </p>
-        </div>
+      <PageHeader
+        titre={`Facturation & Règlements (${totalRecords})`}
+        sousTitre="Suivi des factures médicales, encaissements multi-modes (Wave, OM, Espèces) et restes dus."
+        onRefresh={() => void chargerFactures()}
+      >
+        <Link to="/journal-caisse">
+          <Button variant="outline" className="flex items-center gap-1.5 text-xs">
+            <Banknote className="w-4 h-4 text-success" /> Journal de caisse
+          </Button>
+        </Link>
+        <Link to="/devis">
+          <Button variant="outline" className="flex items-center gap-1.5 text-xs">
+            <FileSpreadsheet className="w-4 h-4 text-primary" /> Devis & Traitements
+          </Button>
+        </Link>
+      </PageHeader>
 
-        <div className="flex items-center gap-2.5">
-          <Link to="/journal-caisse">
-            <Button variant="outline" className="flex items-center gap-1.5 text-xs border-border">
-              <Banknote className="w-4 h-4 text-success" /> Journal de caisse
-            </Button>
-          </Link>
-          <Link to="/devis">
-            <Button variant="outline" className="flex items-center gap-1.5 text-xs border-border">
-              <FileSpreadsheet className="w-4 h-4 text-primary" /> Devis & Traitements
-            </Button>
-          </Link>
-        </div>
-      </div>
-
-      {/* Cartes KPI */}
+      {/* Cartes KPI (totaux calculés sur la page courante — pas d'endpoint stats dédié) */}
+      {/* TODO(backend): endpoint dédié GET /facturation/stats pour des totaux globaux. */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-card p-4 rounded-xl border border-border flex items-center justify-between">
-          <div>
-            <span className="text-xs text-muted-foreground block font-medium">Total Facturé (Page)</span>
-            <span className="text-xl font-bold text-foreground">{formatFcfa(totalFacture)}</span>
-          </div>
-          <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-card-foreground">
-            <FileText className="w-5 h-5" />
-          </div>
-        </div>
-        <div className="bg-card p-4 rounded-xl border border-border flex items-center justify-between">
-          <div>
-            <span className="text-xs text-muted-foreground block font-medium">Total Encaissé</span>
-            <span className="text-xl font-bold text-success">{formatFcfa(totalPaye)}</span>
-          </div>
-          <div className="w-10 h-10 rounded-lg bg-success/15 border border-success/40 flex items-center justify-center text-success">
-            <CheckCircle2 className="w-5 h-5" />
-          </div>
-        </div>
-        <div className="bg-card p-4 rounded-xl border border-border flex items-center justify-between">
-          <div>
-            <span className="text-xs text-muted-foreground block font-medium">Solde Restant à Recouvrer</span>
-            <span className="text-xl font-bold text-primary">{formatFcfa(totalRestant)}</span>
-          </div>
-          <div className="w-10 h-10 rounded-lg bg-primary/15 border border-primary/40 flex items-center justify-center text-primary">
-            <Clock className="w-5 h-5" />
-          </div>
-        </div>
+        <StatCard
+          label="Total facturé (page)"
+          value={formatFcfa(totalFacture)}
+          detail="Somme des factures de la page courante"
+          icon={FileText}
+          accent="blue"
+          chargement={loading}
+        />
+        <StatCard
+          label="Total encaissé"
+          value={formatFcfa(totalPaye)}
+          detail="Règlements enregistrés sur la page"
+          icon={CheckCircle2}
+          accent="green"
+          chargement={loading}
+        />
+        <StatCard
+          label="Solde restant à recouvrer"
+          value={formatFcfa(totalRestant)}
+          detail="Restes dus des factures de la page"
+          icon={Clock}
+          accent="orange"
+          chargement={loading}
+        />
       </div>
 
       {/* Barre de recherche & filtres */}
@@ -191,107 +208,107 @@ export function FacturesListPage() {
       {/* Table des factures */}
       <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
         {loading ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">Chargement des factures...</div>
-        ) : factures.length === 0 ? (
-          <div className="p-12 text-center text-sm text-muted-foreground">
-            Aucune facture ne correspond aux critères de recherche.
+          <div className="space-y-3 p-6">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
           </div>
+        ) : erreurChargement ? (
+          <EmptyState
+            icon={WifiOff}
+            titre="Factures indisponibles"
+            description="Ce module n'a pas pu être chargé. Vérifiez que le backend est démarré puis réessayez."
+          >
+            <Button variant="outline" size="sm" onClick={() => void chargerFactures()}>
+              <RefreshCw className="h-4 w-4" /> Réessayer
+            </Button>
+          </EmptyState>
+        ) : factures.length === 0 ? (
+          <EmptyState
+            icon={Search}
+            titre="Aucune facture trouvée"
+            description="Aucune facture ne correspond aux critères de recherche."
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-card-foreground">
-              <thead className="bg-muted text-muted-foreground uppercase tracking-wider font-semibold border-b border-border">
-                <tr>
-                  <th className="px-4 py-3">Numéro</th>
-                  <th className="px-4 py-3">Émise le</th>
-                  <th className="px-4 py-3 text-right">Total</th>
-                  <th className="px-4 py-3 text-right">Payé</th>
-                  <th className="px-4 py-3 text-right">Reste dû</th>
-                  <th className="px-4 py-3 text-center">Statut</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {factures.map((f) => {
-                  const estPayee = f.statut === 'PAYEE'
-                  const estPartielle = f.statut === 'PARTIELLEMENT_PAYEE'
-                  const estAnnulee = f.statut === 'ANNULEE'
+          <Table>
+            <THead>
+              <TRow>
+                <TH>Numéro</TH>
+                <TH>Émise le</TH>
+                <TH className="text-right">Total</TH>
+                <TH className="text-right">Payé</TH>
+                <TH className="text-right">Reste dû</TH>
+                <TH className="text-center">Statut</TH>
+                <TH className="text-right">Actions</TH>
+              </TRow>
+            </THead>
+            <TBody>
+              {factures.map((f) => {
+                const estPayee = f.statut === 'PAYEE'
+                const estAnnulee = f.statut === 'ANNULEE'
 
-                  return (
-                    <tr key={f.id} className="hover:bg-muted transition-colors">
-                      <td className="px-4 py-3">
-                        <Link
-                          to={`/factures/${f.id}`}
-                          className="font-mono font-bold text-foreground hover:text-primary"
-                        >
-                          {f.numero}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-card-foreground">
-                        {formatDateFr(f.date_emission)}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono font-semibold text-foreground">
-                        {formatFcfa(f.montant_total)}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono text-success font-medium">
-                        {formatFcfa(f.montant_paye)}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono font-bold text-primary">
-                        {formatFcfa(f.montant_restant)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span
-                          className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                            estPayee
-                              ? 'bg-success/15 border border-success/40 text-success'
-                              : estPartielle
-                              ? 'bg-primary/15 border border-primary/40 text-primary'
-                              : estAnnulee
-                              ? 'bg-muted border border-border text-muted-foreground line-through'
-                              : 'bg-warning/15 border border-warning/40 text-warning'
-                          }`}
-                        >
-                          {f.statut}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {!estPayee && !estAnnulee && (
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              className="text-xs h-7 px-2.5"
-                              onClick={() => {
-                                setSelectedFacture(f)
-                                setIsPaiementOpen(true)
-                              }}
-                            >
-                              Encaisser
-                            </Button>
-                          )}
+                return (
+                  <TRow key={f.id}>
+                    <TD>
+                      <Link
+                        to={`/factures/${f.id}`}
+                        className="font-mono font-bold text-foreground hover:text-primary"
+                      >
+                        {f.numero}
+                      </Link>
+                    </TD>
+                    <TD className="text-xs">{formatDateFr(f.date_emission)}</TD>
+                    <TD className="text-right font-mono font-semibold text-foreground">
+                      {formatFcfa(f.montant_total)}
+                    </TD>
+                    <TD className="text-right font-mono text-success font-medium">
+                      {formatFcfa(f.montant_paye)}
+                    </TD>
+                    <TD className="text-right font-mono font-bold text-primary">
+                      {formatFcfa(f.montant_restant)}
+                    </TD>
+                    <TD className="text-center">
+                      <StatusBadge tone={tonStatutFacture(f.statut)}>{f.statut}</StatusBadge>
+                    </TD>
+                    <TD className="text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {!estPayee && !estAnnulee && (
                           <Button
-                            variant="secondary"
+                            variant="primary"
                             size="sm"
-                            className="text-xs h-7 px-2"
+                            className="text-xs h-7 px-2.5"
                             onClick={() => {
                               setSelectedFacture(f)
-                              setIsPrintOpen(true)
+                              setIsPaiementOpen(true)
                             }}
                           >
-                            <Printer className="w-3.5 h-3.5" />
+                            Encaisser
                           </Button>
-                          <Link to={`/factures/${f.id}`}>
-                            <Button variant="outline" size="sm" className="text-xs h-7 px-2">
-                              <Eye className="w-3.5 h-3.5" />
-                            </Button>
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                        )}
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="text-xs h-7 px-2"
+                          onClick={() => {
+                            setSelectedFacture(f)
+                            setIsPrintOpen(true)
+                          }}
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                        </Button>
+                        <Link to={`/factures/${f.id}`}>
+                          <Button variant="outline" size="sm" className="text-xs h-7 px-2">
+                            <Eye className="w-3.5 h-3.5" />
+                          </Button>
+                        </Link>
+                      </div>
+                    </TD>
+                  </TRow>
+                )
+              })}
+            </TBody>
+          </Table>
         )}
       </div>
 

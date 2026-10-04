@@ -38,9 +38,31 @@ export default {
           purple: 'hsl(var(--accent-purple))',
           orange: 'hsl(var(--accent-orange))',
         },
+        // Surfaces translucides des panneaux flottants (sidebar/navbar).
+        surface: {
+          DEFAULT: 'hsl(var(--surface))',
+          border: 'hsl(var(--surface-border))',
+          hover: 'hsl(var(--surface-hover))',
+        },
+        // Liserés verticaux des cartes KPI (un par indicateur).
+        kpi: {
+          blue: 'hsl(var(--kpi-blue))',
+          green: 'hsl(var(--kpi-green))',
+          purple: 'hsl(var(--kpi-purple))',
+          orange: 'hsl(var(--kpi-orange))',
+        },
+        // Teinte du focus ring global (accessibilité clavier).
+        ring: 'hsl(var(--ring))',
       },
       borderRadius: {
         card: '0.75rem',
+        xl2: '1.25rem',
+        xl3: '1.5rem',
+      },
+      boxShadow: {
+        // Ombre douce et diffuse des panneaux flottants.
+        float:
+          '0 8px 32px -8px rgb(0 0 0 / 0.18), 0 2px 8px -2px rgb(0 0 0 / 0.08)',
       },
     },
   },
