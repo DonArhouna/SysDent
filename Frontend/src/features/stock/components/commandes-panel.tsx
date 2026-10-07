@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -6,14 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Modal } from '@/components/ui/modal'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Pagination } from '@/components/ui/pagination'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Table, TBody, TD, TH, THead, TRow } from '@/components/ui/table'
 import { formatFcfa, formatDateFr } from '@/lib/format'
 import { useToastStore } from '@/stores/toast-store'
 import { stockApi } from '../services/stock-api'
 import { NouvelleCommandeModal } from './nouvelle-commande-modal'
-import { FournisseurModal } from './fournisseur-modal'
-import type { ArticleStock, CommandeFournisseur, Fournisseur, LigneCommande } from '../types'
+import type { ArticleStock, CommandeFournisseur, LigneCommande } from '../types'
 import { CheckCircle2, PackageCheck, Plus, Truck } from 'lucide-react'
 
 /**
@@ -30,6 +30,10 @@ import { CheckCircle2, PackageCheck, Plus, Truck } from 'lucide-react'
  *
  * Ce qui remplace le second regard, c'est la trace : qui, quand, quelle commande.
  */
+/** Taille de page des listes stock. Une seule valeur : deux tailles différentes
+ *  sur le même écran obligeraient l'utilisateur à les mémoriser. */
+const TAILLE_PAGE = 20
+
 export function CommandesPanel({
   cabinetId,
   articles = [],
@@ -38,23 +42,45 @@ export function CommandesPanel({
   /** Catalogue du site : une ligne de commande porte sur un article existant. */
   articles?: ArticleStock[]
 }) {
+  // Recherche différée : une requête par frappe saturerait l'API et le réseau
+  // pour un résultat qui n'intéresse que la dernière lettre.
+  const [terme, setTerme] = useState('')
+  const [recherche, setRecherche] = useState('')
+  useEffect(() => {
+    const minuteur = setTimeout(() => {
+      setRecherche(terme.trim())
+      setPageFournisseurs(1)
+    }, 300)
+    return () => clearTimeout(minuteur)
+  }, [terme])
+
   const client = useQueryClient()
   const { addToast } = useToastStore()
   const [commandeReceptionnee, setCommandeReceptionnee] = useState<CommandeFournisseur | null>(null)
 
+  const [page, setPage] = useState(1)
+  const [pageFournisseurs, setPageFournisseurs] = useState(1)
+
   const commandesQuery = useQuery({
-    queryKey: ['stock', 'commandes'],
-    queryFn: () => stockApi.listerCommandes(),
+    queryKey: ['stock', 'commandes', page],
+    queryFn: () => stockApi.listerCommandes({ page, limit: TAILLE_PAGE }),
   })
+  // Le select de saisie doit proposer **tous** les fournisseurs : les chercher
+  // parmi les 20 premiers serait pire qu'une liste non paginée, puisque le
+  // fournisseur manquant disparaît de l'écran sans un mot. La recherche prend le
+  // relais dès que la liste grossit.
   const fournisseursQuery = useQuery({
-    queryKey: ['stock', 'fournisseurs'],
-    queryFn: () => stockApi.listerFournisseurs(),
+    queryKey: ['stock', 'fournisseurs', pageFournisseurs, recherche],
+    queryFn: () =>
+      stockApi.listerFournisseurs({
+        page: pageFournisseurs,
+        limit: TAILLE_PAGE,
+        q: recherche || undefined,
+      }),
   })
 
-  const commandes = commandesQuery.data?.data ?? []
+  const commandes = commandesQuery.data?.items ?? []
   const [creationOuverte, setCreationOuverte] = useState(false)
-  const [fournisseurEdite, setFournisseurEdite] = useState<Fournisseur | null>(null)
-  const [fournisseurEditeOuvert, setFournisseurEditeOuvert] = useState(false)
 
   const envoyer = useMutation({
     mutationFn: ({ id, statut }: { id: string; statut: string }) =>
@@ -69,10 +95,8 @@ export function CommandesPanel({
     void commandesQuery.refetch()
   }
 
-  const listeFournisseurs = fournisseursQuery.data?.data ?? []
-  const fournisseurs = new Map(
-    (fournisseursQuery.data?.data ?? []).map((f) => [f.id, f.nom])
-  )
+  const listeFournisseurs = fournisseursQuery.data?.items ?? []
+  const fournisseurs = new Map(listeFournisseurs.map((f) => [f.id, f.nom]))
 
   if (commandesQuery.isPending) {
     return <Skeleton className="h-64 w-full" />
@@ -94,7 +118,14 @@ export function CommandesPanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Input
+          value={terme}
+          onChange={(e) => setTerme(e.target.value)}
+          placeholder="Rechercher un fournisseur…"
+          className="sm:max-w-xs"
+          aria-label="Rechercher un fournisseur"
+        />
         <Button onClick={() => setCreationOuverte(true)}>
           <Plus className="h-4 w-4" /> Nouvelle commande
         </Button>
@@ -164,51 +195,14 @@ export function CommandesPanel({
             </TBody>
           </Table>
         </CardContent>
+        <Pagination
+          meta={commandesQuery.data?.meta}
+          page={page}
+          limit={TAILLE_PAGE}
+          onPageChange={setPage}
+          libelle="commandes"
+        />
       </Card>
-
-      {/* Fournisseurs : ils changent, on doit pouvoir les gérer sur place. */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between gap-3">
-            <span>Fournisseurs</span>
-            <Button size="sm" variant="outline" onClick={() => setFournisseurEditeOuvert(true)}>
-              <Plus className="h-3.5 w-3.5" /> Ajouter
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {listeFournisseurs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Aucun fournisseur. Ajoutez-le ici, ou directement depuis une nouvelle commande.
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {listeFournisseurs.map((f) => (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => {
-                    setFournisseurEdite(f)
-                    setFournisseurEditeOuvert(true)
-                  }}
-                  className="rounded-lg border bg-card/70 px-2.5 py-1.5 text-xs transition-colors hover:bg-muted"
-                >
-                  <span className="font-medium">{f.nom}</span>
-                  {f.telephone && (
-                    <span className="ml-2 text-muted-foreground">{f.telephone}</span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <FournisseurModal
-        isOpen={fournisseurEditeOuvert}
-        fournisseur={fournisseurEdite}
-        onClose={() => setFournisseurEditeOuvert(false)}
-      />
 
       <NouvelleCommandeModal
         isOpen={creationOuverte}

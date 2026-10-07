@@ -13,6 +13,7 @@ import type { ArticleStock } from '../types'
 import { ArticleModal } from '../components/article-modal'
 import { MouvementModal } from '../components/mouvement-modal'
 import { CommandesPanel } from '../components/commandes-panel'
+import { FournisseursPanel } from '@/features/stock/components/fournisseurs-panel'
 import {
   AlertTriangle,
   ArrowDownRight,
@@ -27,6 +28,7 @@ import {
   Truck,
   SlidersHorizontal,
   WifiOff,
+  Users,
 } from 'lucide-react'
 
 /**
@@ -43,9 +45,11 @@ export function StockPage({
   ongletInitial = 'CATALOGUE',
 }: {
   /** Le menu pointe vers `/stock/commandes` : ouvrir sur le catalogue serait trompeur. */
-  ongletInitial?: 'CATALOGUE' | 'MOUVEMENTS' | 'COMMANDES'
+  ongletInitial?: 'CATALOGUE' | 'MOUVEMENTS' | 'COMMANDES' | 'FOURNISSEURS'
 } = {}) {
-  const [onglet, setOnglet] = useState<'CATALOGUE' | 'MOUVEMENTS' | 'COMMANDES'>(ongletInitial)
+  const [onglet, setOnglet] = useState<
+    'CATALOGUE' | 'MOUVEMENTS' | 'COMMANDES' | 'FOURNISSEURS'
+  >(ongletInitial)
   const [recherche, setRecherche] = useState('')
   const [categorieFiltre, setCategorieFiltre] = useState('')
   const [alerteSeul, setAlerteSeul] = useState(false)
@@ -249,6 +253,9 @@ export function StockPage({
             // les commandes tant qu'on ne les consulte pas. Un badge « 0 » affiche avant
             // chargement serait un mensonge.
             { id: 'COMMANDES', label: 'Commandes', icon: Truck, count: undefined },
+    // Un gros cabinet a plusieurs dizaines de fournisseurs : un compteur
+    // demanderait une requête de plus au simple affichage de l'onglet.
+    { id: 'FOURNISSEURS', label: 'Fournisseurs', icon: Users, count: undefined },
           ] as const
         ).map((ongletDef) => {
           const Icone = ongletDef.icon
@@ -534,6 +541,8 @@ export function StockPage({
         onSuccess={() => recharger()}
       />
       {onglet === 'COMMANDES' && sitePret && <CommandesPanel cabinetId={cabinetActifId as string} articles={articles} />}
+      {onglet === 'FOURNISSEURS' && <FournisseursPanel />}
     </div>
+
   )
 }

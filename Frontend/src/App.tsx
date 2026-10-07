@@ -199,6 +199,14 @@ export default function App() {
         }
       />
       <Route
+        path="/stock/fournisseurs"
+        element={
+          <ProtectedRoute permission="STOCK:READ">
+            <StockPage ongletInitial="FOURNISSEURS" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/stock/commandes"
         element={
           <AppShell>

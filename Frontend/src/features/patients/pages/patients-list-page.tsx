@@ -9,12 +9,11 @@ import {
   Archive,
   RotateCcw,
   Pencil,
-  ChevronLeft,
-  ChevronRight,
   Phone,
   FileText,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Pagination } from '@/components/ui/pagination'
 import { Input } from '@/components/ui/input'
 import { Table, TBody, TD, TH, THead, TRow } from '@/components/ui/table'
 import { PageHeader } from '@/components/ui/page-header'
@@ -351,48 +350,13 @@ export function PatientsListPage() {
           </div>
         )}
 
-        {/* Pagination */}
-        {meta && meta.total_pages > 1 && (
-          <div className="flex items-center justify-between border-t border-border px-4 py-3 sm:px-6">
-            <p className="text-xs text-muted-foreground">
-              Affichage de{' '}
-              <span className="font-semibold text-foreground">
-                {(page - 1) * limit + 1}
-              </span>{' '}
-              à{' '}
-              <span className="font-semibold text-foreground">
-                {Math.min(page * limit, meta.total_records)}
-              </span>{' '}
-              sur{' '}
-              <span className="font-semibold text-foreground">{meta.total_records}</span>{' '}
-              dossiers
-            </p>
-
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={!meta.has_previous}
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Précédent
-              </Button>
-              <span className="px-3 text-xs font-semibold text-foreground">
-                Page {page} / {meta.total_pages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => p + 1)}
-                disabled={!meta.has_next}
-              >
-                Suivant
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        )}
+        <Pagination
+          meta={meta}
+          page={page}
+          limit={limit}
+          onPageChange={setPage}
+          libelle="dossiers"
+        />
       </div>
 
       {/* Modale de création / modification */}

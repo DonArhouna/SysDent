@@ -88,10 +88,19 @@ export const stockApi = {
 
   // ------------------------------------------------------------ Fournisseurs
 
-  listerFournisseurs: (q?: string) => {
-    const query = q ? `?q=${encodeURIComponent(q)}` : ''
-    return api.get<ApiReponse<Fournisseur[]>>(`/stock/fournisseurs${query}`)
-  },
+    /**
+     * Fournisseurs, paginés.
+     *
+     * L'API renvoie `{ items, meta }` et non plus `{ data }`. Lire `.data`
+     * renvoyait `undefined` — d'où des listes vides sans message d'erreur.
+     */
+    listerFournisseurs: (params: { q?: string; page?: number; limit?: number } = {}) => {
+      const query = new URLSearchParams()
+      if (params.q) query.set('q', params.q)
+      if (params.page) query.set('page', String(params.page))
+      if (params.limit) query.set('limit', String(params.limit))
+      return api.get<PageReponse<Fournisseur>>(`/stock/fournisseurs?${query.toString()}`)
+    },
 
   creerFournisseur: (data: Partial<Fournisseur>) => {
     return api.post<Fournisseur>('/stock/fournisseurs', data)
@@ -103,10 +112,14 @@ export const stockApi = {
 
   // -------------------------------------------------------------- Commandes
 
-  listerCommandes: (statut?: string) => {
-    const query = statut ? `?statut=${statut}` : ''
-    return api.get<ApiReponse<CommandeFournisseur[]>>(`/stock/commandes${query}`)
-  },
+    /** Commandes, paginées — voir `listerFournisseurs` pour le contrat. */
+    listerCommandes: (params: { statut?: string; page?: number; limit?: number } = {}) => {
+      const query = new URLSearchParams()
+      if (params.statut) query.set('statut', params.statut)
+      if (params.page) query.set('page', String(params.page))
+      if (params.limit) query.set('limit', String(params.limit))
+      return api.get<PageReponse<CommandeFournisseur>>(`/stock/commandes?${query.toString()}`)
+    },
 
   creerCommande: (data: {
     fournisseur_id: string

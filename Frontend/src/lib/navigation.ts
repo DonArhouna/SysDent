@@ -71,6 +71,12 @@ export const NAVIGATION: SectionNavigation[] = [
     items: [
       { label: 'Produits', href: '/stock', icon: Package, permission: 'STOCK:READ' },
       { label: 'Commandes', href: '/stock/commandes', icon: Truck, permission: 'STOCK:READ' },
+      {
+        label: 'Fournisseurs',
+        href: '/stock/fournisseurs',
+        icon: Users,
+        permission: 'STOCK:READ',
+      },
     ],
   },
   {

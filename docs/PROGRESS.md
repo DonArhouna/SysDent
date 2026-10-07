@@ -13,6 +13,69 @@
 
 ---
 
+## Étape 1 bis — écran Fournisseurs et pagination des listes
+
+Signalé par le propriétaire : pas d'écran Fournisseurs dans le menu Stock, et
+pagination absente des listes. L'audit a donné plus large que la demande.
+
+### Trois défauts trouvés en_route
+
+| # | Défaut | Effet |
+|---|---|---|
+| 1 | **`/stock/commandes` plafonné à 50 lignes sans `page` ni `offset`** | au-delà de 50 commandes, la liste était **tronquée en silence**. Exactement la famille « donnée absente présentée comme un zéro » : l'utilisateur croyait qu'il n'y avait rien d'autre. |
+| 2 | **`/stock/fournisseurs` renvoyait la liste entière** | pas bornée |
+| 3 | **Une seule liste sur six était paginée**, écrite à la main sur `patients-list-page` | cinq listes renvoyaient tout, ou se bornaient à un plafond invisible |
+
+Listes **non** paginées, et c'est correct : `/cabinets`, `/roles`, `/permissions`,
+`/praticiens` — des listes de référence de quelques éléments, la pagination n'y
+apporterait rien.
+
+### Ce qui est fait
+
+**Backend** — `/stock/fournisseurs` et `/stock/commandes` passent en
+`PaginatedResponse`, services modifiés pour renvoyer `(lignes, total)`. Le total
+partage les mêmes filtres que les lignes : les calculer séparément inviterait à
+les faire diverger.
+
+> **Piège rencontré** : `params: PaginationParams = Depends()` sur un modèle
+> Pydantic **ne lie pas les query params** — `page` et `limit` seraient restés à
+> 1/20 et la pagination inopérante depuis le client, sans erreur visible. Suivi du
+> motif explicite déjà employé lignes 153-154 du même fichier.
+
+**Frontend**
+- `components/ui/pagination.tsx` — composant **partagé** (compte toujours visible,
+  boutons seulement si plusieurs pages, récupération si la page demandée a
+  disparu). Remplace le bloc dupliqué de `patients-list-page`.
+- `fournisseurs-panel.tsx` — **écran Fournisseurs** : recherche, tableau
+  (raison sociale, contact, téléphone, email), modification, retrait. Onglet,
+  route `/stock/fournisseurs`, entrée de menu.
+- Panneau Commandes : pagination commandes **et** recherche fournisseurs avec
+  différé de 300 ms ; suppression de la carte « Fournisseurs » doublon.
+- La création en ligne depuis la saisie de commande **est conservée** — c'est là
+  qu'on découvre qu'un fournisseur manque.
+
+### Preuve
+
+Exécution réelle sur la base de démo :
+
+| Contrôle | Résultat |
+|---|---|
+| Fournisseurs page 1, limit 3 | 3 lignes sur 8, 3 pages |
+| Recherche par nom | 1 résultat |
+| Enveloppe `{ items, meta }` sans `data` | conforme au contrat du panneau |
+| Retrait d'un fournisseur | 200, `actif=false` |
+| Commandes page 2 distincte de la page 1 | oui, total 8 |
+| `npm test` | **12/12** (4 nouveaux tests sur `Pagination`) |
+| `tsc -b` / `oxlint` / `build` | propres, 0 erreur |
+
+### Reste sur ce sujet
+
+Les listes **consultations, devis, ordonnances et factures** n'ont toujours pas de
+pagination côté interface. À traiter avec le composant partagé — le backend
+`/factures` est déjà paginé, `/consultations` et `/ordonnances` sont à vérifier.
+
+---
+
 ## Étape 2 — File d'attente : migration prête, application en attente
 
 ### Ce qui est fait

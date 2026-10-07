@@ -432,12 +432,36 @@ class MouvementStockService:
 
 class FournisseurService:
     @staticmethod
-    async def lister(db: AsyncSession, *, q: Optional[str] = None) -> List[Fournisseur]:
+    async def lister(
+        db: AsyncSession,
+        *,
+        q: Optional[str] = None,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> Tuple[List[Fournisseur], int]:
+        """
+        Liste paginée des fournisseurs, avec le nombre total correspondant.
+
+        Le total est renvoyé **avec** les lignes et non calculé à part : les deux
+        requêtes portent les mêmes filtres, et les exécuter séparément
+        Inviterait à les faire diverger — la pagination afficherait alors un
+        compte que la liste ne contient pas.
+        """
         stmt = select(Fournisseur)
         if q:
             motif = f"%{q.strip()}%"
             stmt = stmt.where(Fournisseur.nom.ilike(motif))
-        return list((await db.execute(stmt.order_by(Fournisseur.nom))).scalars().all())
+        total = int(await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
+        lignes = list(
+            (
+                await db.execute(
+                    stmt.order_by(Fournisseur.nom).offset(offset).limit(limit)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return lignes, total
 
     @staticmethod
     async def obtenir(db: AsyncSession, fournisseur_id: uuid.UUID) -> Fournisseur:
@@ -506,8 +530,17 @@ class CommandeFournisseurService:
         *,
         statut: Optional[StatutCommandeEnum] = None,
         fournisseur_id: Optional[uuid.UUID] = None,
+        offset: int = 0,
         limit: int = 50,
-    ) -> List[CommandeFournisseur]:
+    ) -> Tuple[List[CommandeFournisseur], int]:
+        """
+        Liste paginée des commandes.
+
+        Auparavant la route plafonnait le résultat a 50 lignes **sans**[offset ni
+        page] : au-dela, la liste etait tronquee en silence, sans aucun signe
+        indique a l'utilisateur qu'il manquait des commandes. Une donnee absente
+        presentee comme une liste complete est plus dangereuse qu'une erreur.
+        """
         stmt = select(CommandeFournisseur).options(
             selectinload(CommandeFournisseur.fournisseur),
             selectinload(CommandeFournisseur.lignes).selectinload(LigneCommande.article),
@@ -516,14 +549,20 @@ class CommandeFournisseurService:
             stmt = stmt.where(CommandeFournisseur.statut == statut)
         if fournisseur_id:
             stmt = stmt.where(CommandeFournisseur.fournisseur_id == fournisseur_id)
-        return list(
+        total = int(await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
+        lignes = list(
             (
-                await db.execute(stmt.order_by(CommandeFournisseur.date_commande.desc()).limit(limit))
+                await db.execute(
+                    stmt.order_by(CommandeFournisseur.date_commande.desc())
+                    .offset(offset)
+                    .limit(limit)
+                )
             )
             .unique()
             .scalars()
             .all()
         )
+        return lignes, total
 
     @staticmethod
     async def obtenir(db: AsyncSession, commande_id: uuid.UUID) -> CommandeFournisseur:

@@ -298,15 +298,29 @@ async def lister_alertes(
 # ==============================================================================
 
 
-@router.get("/fournisseurs", response_model=APIResponse[List[FournisseurResponse]])
+@router.get("/fournisseurs", response_model=PaginatedResponse[FournisseurResponse])
 async def lister_fournisseurs(
     q: str | None = None,
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_tenant_db),
     _: bool = Depends(require_permissions("STOCK:READ")),
 ):
-    fournisseurs = await FournisseurService.lister(db, q=q)
-    return APIResponse(
-        data=[FournisseurResponse.model_validate(f, from_attributes=True) for f in fournisseurs]
+    """
+    Fournisseurs du cabinet, paginés.
+
+    La liste était renvoyée en entier. Un cabinet qui travaille avec un
+    grossiste, un laboratoire et un fournisseur d'urgence en a quelques
+    dizaines : la liste entière reste gérable, mais la réponse ne doit pas
+    grossir indéfiniment alors qu'une borne est disponible.
+    """
+    fournisseurs, total = await FournisseurService.lister(
+        db, q=q, offset=(page - 1) * limit, limit=limit
+    )
+    return paginate(
+        [FournisseurResponse.model_validate(f, from_attributes=True) for f in fournisseurs],
+        total,
+        PaginationParams(page=page, limit=limit),
     )
 
 
@@ -349,18 +363,36 @@ async def modifier_fournisseur(
 # ==============================================================================
 
 
-@router.get("/commandes", response_model=APIResponse[List[CommandeResponse]])
+@router.get("/commandes", response_model=PaginatedResponse[CommandeResponse])
 async def lister_commandes(
     statut: StatutCommandeEnum | None = None,
     fournisseur_id: uuid.UUID | None = None,
+    page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_tenant_db),
     _: bool = Depends(require_permissions("STOCK:READ")),
 ):
-    commandes = await CommandeFournisseurService.lister(
-        db, statut=statut, fournisseur_id=fournisseur_id, limit=limit
+    """
+    Commandes fournisseur, paginées.
+
+    **Correction d'un silence** : la route plafonnait à 50 lignes sans `page` ni
+    `offset`. Au-delà, les commandes existantes disparaissaient de l'écran sans
+    aucun message — l'utilisateur croyait qu'il n'y avait rien d'autre. Une liste
+    tronquée sans le dire est la même famille de défaut que le « aucune donnée »
+    affiché comme un zéro.
+    """
+    commandes, total = await CommandeFournisseurService.lister(
+        db,
+        statut=statut,
+        fournisseur_id=fournisseur_id,
+        offset=(page - 1) * limit,
+        limit=limit,
     )
-    return APIResponse(data=[_serialiser_commande(c) for c in commandes])
+    return paginate(
+        [_serialiser_commande(c) for c in commandes],
+        total,
+        PaginationParams(page=page, limit=limit),
+    )
 
 
 @router.post(
