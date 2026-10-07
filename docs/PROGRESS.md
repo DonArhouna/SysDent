@@ -8,8 +8,77 @@
 
 ## État à date : 2026-10-07 (session 2)
 
-**Étape en cours : 1 — preuve du correctif de session expirée.** Terminée et
-prouvée par tests automatisés. Étape 2 (file d'attente) non commencée.
+**Étape en cours : 2 — file d'attente.** Migration **écrite et testée sur copie**,
+**pas encore appliquée** à la base de démo. Étape 1 close et prouvée.
+
+---
+
+## Étape 2 — File d'attente : migration prête, application en attente
+
+### Ce qui est fait
+
+| Livrable | État |
+|---|---|
+| `docs/corrections/06_FILE_ATTENTE.md` — plan d'exécution | écrit avant toute modification |
+| Sauvegarde de la base de démo | `%LOCALAPPDATA%\Temp\opencode\sysdent_demo_avant_file_attente_20261007_2104.dump` (0,25 Mo) |
+| Copie de test `sysdent_copie_file_attente` | créée, 8 rdv / 32 patients / 30 consultations restaurés |
+| `e8b2c4a7d1e5_file_attente.py` | écrite, appliquée sur la copie, **aller-retour vérifié 2 fois** |
+
+### Preuve sur copie
+
+| Contrôle | Résultat |
+|---|---|
+| Table `file_attente` créée | oui |
+| 11 index, dont les 3 uniques partiels | oui |
+| **Deuxième arrivée du même patient** | **REFUSÉE** — `duplicate key value violates unique constraint "uq_file_attente_actif"` |
+| Nouvelle arrivée après clôture du passage | acceptée |
+| `downgrade` | table supprimée |
+| Ré-application après `downgrade` | **échouait** — voir ci-dessous |
+| Données préexistantes après aller-retour | 8 rdv / 32 patients / 30 consultations, intactes |
+
+### Un défaut de réversibilité trouvé et corrigé
+
+Le premier aller-retour a **échoué** : `op.drop_table` ne supprime pas le type énuméré
+créé par `create_table`. La ré-application levait
+`DuplicateObject: type "statutfileattenteenum" already exists`.
+
+Une migration « réversible » sur le papier ne l'est pas si son aller-retour échoue :
+c'est précisément ce que le test sur copie sert à attraper, et un `downgrade` qui
+fonctionne une seule fois ne prouve rien. Corrigé par un `DROP TYPE IF EXISTS` dans
+`downgrade()`, puis vérifié sur deux cycles complets.
+
+> **À surveiller** : aucune autre migration de ce dépôt ne comporte de `DROP TYPE`
+> (`grep` sur `alembic_tenant/versions/` : zéro occurrence). La même latence
+> existe probablement ailleurs. À auditer à l'étape 7.
+
+### Pourquoi la migration n'est pas encore appliquée
+
+La suite complète backend tournait encore (20 % au moment de l'arrêt) : la règle
+« non-régression verte avant de passer à l'étape suivante » n'est pas satisfaite.
+La migration étant **purement additive** — elle crée une table et ne touche aucune
+table ni aucune ligne existante — le risque de régression est faible, mais « faible »
+n'est pas « prouvé », et la règle l'interdit.
+
+### Reprise — ordre exact
+
+1. `docker ps` → `sysdent_s0b` doit être `Up`
+2. Reprendre la suite : `cd Backend`, poser `MASTER_DB_PORT=55435` et
+   `TENANT_DB_PORT=55435`, puis `.\.venv\Scripts\python.exe -m pytest -q --tb=short`
+   → doit être **verte**
+3. Appliquer : poser
+   `ALEMBIC_TENANT_DB_URL='postgresql+psycopg2://postgres:<pw>@127.0.0.1:55435/sysdent_tenant_clinique_cabinet_sn_5bd215'`
+   puis `.\.venv\Scripts\python.exe -m alembic -c alembic_tenant.ini upgrade head`
+4. Modèle ORM `FileAttente` + `StatutFileAttenteEnum` dans `src/modules/tenants/models.py`
+5. Permissions `ATTENTE:READ/CREATE/UPDATE/CALL` dans `src/common/permissions.py`
+   (matrice dans `06_FILE_ATTENTE.md` §4)
+6. Module `src/modules/attente/` : services, router, schemas — 7 endpoints (§5 du plan)
+7. Tests `tests/test_file_attente.py` — dont **concurrence** (§8 du plan)
+8. Écrans `/attente` secrétaire + dentiste
+9. Rejouer la suite complète
+
+Le mot de passe de la base se lit dans `Backend/.env`, clé `TENANT_DB_PASSWORD`
+(il n'est pas dans `.env.example` en clair). La copie `sysdent_copie_file_attente`
+peut être supprimée : `docker exec sysdent_s0b psql -U postgres -c 'DROP DATABASE sysdent_copie_file_attente'`.
 
 ---
 
