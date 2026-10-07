@@ -15,7 +15,7 @@ seule route `/audit` protégée.
 
 from typing import Dict, List, Optional
 import structlog
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from src.common.permissions import (
@@ -27,7 +27,7 @@ from src.common.permissions import (
     permissions_for_role,
 )
 from src.core.exceptions import BusinessRuleViolationException, EntityNotFoundException
-from src.modules.tenants.models import Permission, PermissionRole, Role
+from src.modules.tenants.models import Permission, PermissionRole, Role, Utilisateur
 
 logger = structlog.get_logger(__name__)
 
@@ -184,6 +184,21 @@ class RbacService:
         )
         roles = (await db.execute(stmt)).scalars().all()
 
+        # Comptage des utilisateurs par rôle en UNE requête groupée.
+        # La version précédente lisait `role.utilisateurs` : cette collection n'est
+        # pas dans le `selectinload` ci-dessus, donc SQLAlchemy tentait un lazy-load
+        # hors du greenlet asynchrone → MissingGreenlet → 500 sur GET /rbac/roles.
+        # Un `selectinload(Role.utilisateurs)` aurait chargé tous les utilisateurs
+        # de tous les rôles (et leurs mots de passe hachés) pour n'en garder que le
+        # compte : le COUNT groupé ne transporte que des entiers.
+        stmt_comptage = (
+            select(Utilisateur.role_id, func.count(Utilisateur.id))
+            .group_by(Utilisateur.role_id)
+        )
+        comptages: Dict[str, int] = {
+            str(role_id): nb for role_id, nb in (await db.execute(stmt_comptage)).all() if role_id
+        }
+
         resultat: List[Dict] = []
         for role in roles:
             permissions = sorted(
@@ -198,7 +213,7 @@ class RbacService:
                     "description": role.description,
                     "niveau_hierarchie": role.niveau_hierarchie,
                     "permissions": permissions,
-                    "nb_utilisateurs": len(role.utilisateurs or []),
+                    "nb_utilisateurs": comptages.get(str(role.id), 0),
                 }
             )
         return resultat

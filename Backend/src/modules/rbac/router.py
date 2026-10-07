@@ -12,7 +12,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.common.schemas import APIResponse
 from src.core.exceptions import BusinessRuleViolationException
-from src.modules.auth.dependencies import get_current_user, get_tenant_db, require_permissions
+from src.modules.auth.dependencies import (
+    get_actor,
+    get_current_user,
+    get_tenant_db,
+    require_permissions,
+)
 from src.modules.rbac.schemas import PermissionGrant, RoleCreate, RoleResponse
 from src.modules.rbac.services import RbacService
 from src.modules.tenants.models import Permission, Role, Utilisateur
@@ -23,10 +28,16 @@ router = APIRouter(prefix="/rbac", tags=["RBAC & Rôles"])
 @router.get("/roles", response_model=APIResponse[List[RoleResponse]])
 async def list_roles(
     db: AsyncSession = Depends(get_tenant_db),
-    current_user: Utilisateur = Depends(get_current_user),
+    current_user: Utilisateur = Depends(get_actor),
     _: bool = Depends(require_permissions("ADMIN:READ")),
 ):
-    """Liste les rôles du cabinet avec leurs permissions effectives."""
+    """
+    Liste les rôles du cabinet avec leurs permissions effectives.
+
+    Route de diagnostic la plus utile du produit pour le support : « le compte
+    du praticien a le bon rôle ? » se répond ici, sans toucher à une donnée
+    patient. Elle accepte donc un jeton support (lecture seule).
+    """
     roles = await RbacService.lister_roles(db)
     return APIResponse(data=roles)
 
@@ -127,7 +138,7 @@ async def revoke_permission(
 @router.get("/permissions", response_model=APIResponse[List[dict]])
 async def list_permissions(
     db: AsyncSession = Depends(get_tenant_db),
-    current_user: Utilisateur = Depends(get_current_user),
+    current_user: Utilisateur = Depends(get_actor),
     _: bool = Depends(require_permissions("ADMIN:READ")),
 ):
     """Catalogue des permissions disponibles, pour construire l'écran d'attribution."""

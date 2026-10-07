@@ -78,7 +78,6 @@ export const NAVIGATION: SectionNavigation[] = [
     items: [
       { label: 'Utilisateurs', href: '/utilisateurs', icon: UserRound, permission: 'ADMIN:READ' },
       { label: 'Rôles & Permissions', href: '/rbac', icon: ShieldCheck, permission: 'ADMIN:READ' },
-      { label: "Journal d'audit", href: '/audit', icon: ClipboardList, permission: 'AUDIT:READ' },
     ],
   },
 ]

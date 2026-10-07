@@ -1,59 +1,143 @@
-// TODO(backend): endpoint manquant – module Stock inexistant côté API
-// (aucune route /stock dans Backend/src/api/v1/router.py). Le service est
-// isolé ici : la page affiche un état « Non disponible » tant que le backend
-// n'expose pas /stock/articles et /stock/mouvements. AUCUNE donnée fictive :
-// ni localStorage, ni tableau de démo. Cf. PLAN_RESTE_A_FAIRE.md (P0 Stock).
-import { api, ApiError } from '@/lib/api'
+import { api, type ApiReponse, type PageReponse } from '@/lib/api'
 import type {
+  AlerteStock,
   ArticleStock,
   ArticleStockCreate,
+  CommandeFournisseur,
+  Fournisseur,
   MouvementStock,
   MouvementStockCreate,
+  ReceptionFournisseur,
 } from '../types'
 
 /**
- * Contrats alignés sur le modèle métier (cf. types.ts) — à faire valider par
- * les schémas Pydantic quand le module backend sera écrit.
+ * Module Stock — branché sur l'API réelle.
+ *
+ * Le stock est réparti par site : presque tous les appels portent donc
+ * `cabinet_id`, le site dont on veut la quantité. C'est ce qui permet de savoir
+ * où chercher une ampoule en urgence, et pas seulement combien il en reste.
+ *
+ * Aucune donnée de repli n'est fournie : un endpoint en erreur remonte une
+ * erreur, jamais un jeu de données fictif.
  */
+
+/** Extrait `meta.total_records` d'une réponse paginée. */
+function total(pagination: PageReponse<unknown>): number {
+  return pagination.meta?.total_records ?? 0
+}
+
 export const stockApi = {
-  // Tous les appels passent en `silencieux` : l'absence du module est un état
-  // ATTENDU, affiché proprement par la page. Sans cela, chaque lecture levait
-  // un toast rouge « HTTP_404 / Not Found » qui masquait le vrai message
-  // « Module Stock non disponible » et exposait un détail technique à l'écran.
-  listerArticles: (params?: {
+  // ---------------------------------------------------------------- Articles
+
+  listerArticles: (params: {
+    cabinetId: string
     q?: string
     categorie?: string
-    alerte_seuil?: boolean
+    alerteSeuil?: boolean
+    peremptionProche?: boolean
     page?: number
     limit?: number
   }) => {
-    return api.get<{ items: ArticleStock[]; total: number }>('/stock/articles', {
-      params,
-      silencieux: true,
-    })
+    const query = new URLSearchParams({ cabinet_id: params.cabinetId })
+    if (params.q) query.set('q', params.q)
+    if (params.categorie) query.set('categorie', params.categorie)
+    if (params.alerteSeuil) query.set('alerte_seuil', 'true')
+    if (params.peremptionProche) query.set('peremption_proche', 'true')
+    query.set('page', String(params.page ?? 1))
+    query.set('limit', String(params.limit ?? 50))
+
+    return api
+      .get<PageReponse<ArticleStock>>(`/stock/articles?${query.toString()}`)
+      .then((reponse) => ({
+        items: reponse.items ?? [],
+        total: total(reponse),
+      }))
   },
 
-  creerArticle: (data: ArticleStockCreate) => {
-    return api.post<ArticleStock>('/stock/articles', data, { silencieux: true })
+  creerArticle: (cabinetId: string, data: ArticleStockCreate) => {
+    return api.post<ArticleStock>(`/stock/articles?cabinet_id=${cabinetId}`, data)
   },
 
   modifierArticle: (id: string, data: Partial<ArticleStockCreate>) => {
-    return api.patch<ArticleStock>(`/stock/articles/${id}`, data, { silencieux: true })
+    return api.patch<ArticleStock>(`/stock/articles/${id}`, data)
   },
+
+  // -------------------------------------------------------------- Mouvements
 
   enregistrerMouvement: (data: MouvementStockCreate) => {
-    return api.post<MouvementStock>('/stock/mouvements', data, { silencieux: true })
+    return api.post<MouvementStock>('/stock/mouvements', data)
   },
 
-  listerMouvements: (limit = 50) => {
-    return api.get<{ items: MouvementStock[] }>('/stock/mouvements', {
-      params: { limit },
-      silencieux: true,
-    })
+  listerMouvements: (params: { articleId?: string; cabinetId?: string; limit?: number }) => {
+    const query = new URLSearchParams()
+    if (params.articleId) query.set('article_id', params.articleId)
+    if (params.cabinetId) query.set('cabinet_id', params.cabinetId)
+    query.set('limit', String(params.limit ?? 50))
+    return api
+      .get<PageReponse<MouvementStock>>(`/stock/mouvements?${query.toString()}`)
+      .then((reponse) => ({ items: reponse.items ?? [], total: total(reponse) }))
   },
-}
 
-/** Erreur normalisée quand le endpoint manque encore (404/501 côté API). */
-export function estEndpointManquant(e: unknown): boolean {
-  return e instanceof ApiError && (e.status === 404 || e.status === 501)
+  // ---------------------------------------------------------------- Alertes
+
+  listerAlertes: (cabinetId: string) => {
+    // La reponse est une enveloppe `APIResponse` : sans le `.data`, le compteur
+    // d'alertes vaut 0 sans lever la moindre erreur.
+    return api.get<ApiReponse<AlerteStock[]>>(`/stock/alertes?cabinet_id=${cabinetId}`)
+  },
+
+  // ------------------------------------------------------------ Fournisseurs
+
+  listerFournisseurs: (q?: string) => {
+    const query = q ? `?q=${encodeURIComponent(q)}` : ''
+    return api.get<ApiReponse<Fournisseur[]>>(`/stock/fournisseurs${query}`)
+  },
+
+  creerFournisseur: (data: Partial<Fournisseur>) => {
+    return api.post<Fournisseur>('/stock/fournisseurs', data)
+  },
+
+  modifierFournisseur: (id: string, data: Partial<Fournisseur>) => {
+    return api.patch<Fournisseur>(`/stock/fournisseurs/${id}`, data)
+  },
+
+  // -------------------------------------------------------------- Commandes
+
+  listerCommandes: (statut?: string) => {
+    const query = statut ? `?statut=${statut}` : ''
+    return api.get<ApiReponse<CommandeFournisseur[]>>(`/stock/commandes${query}`)
+  },
+
+  creerCommande: (data: {
+    fournisseur_id: string
+    notes?: string
+    lignes: Array<{ article_id: string; quantite: number; prix_unitaire?: number }>
+  }) => {
+    return api.post<CommandeFournisseur>('/stock/commandes', data)
+  },
+
+  changerStatutCommande: (id: string, statut: string) => {
+    return api.patch<CommandeFournisseur>(`/stock/commandes/${id}`, { statut })
+  },
+
+  // ------------------------------------------------------------- Réceptions
+
+  /**
+   * Enregistre une réception. Le stock est crédité immédiatement, sans
+   * validation à deux mains : la traçabilité (qui, quand, quelle commande)
+   * remplace le second regard, qui dans un cabinet d'une ou deux personnes
+   * empêcherait la réception et rendrait le stock faux.
+   */
+  enregistrerReception: (commandeId: string, siteId: string, data: {
+    notes?: string
+    lignes: Array<{
+      ligne_commande_id: string
+      quantite_recue: number
+      lot_code?: string
+      date_peremption?: string
+    }>
+  }) => {
+    const query = new URLSearchParams({ commande_id: commandeId, site_id: siteId })
+    return api.post<ReceptionFournisseur>(`/stock/receptions?${query.toString()}`, data)
+  },
 }

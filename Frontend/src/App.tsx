@@ -17,16 +17,17 @@ import { OrdonnancesListPage } from '@/features/ordonnances/pages/ordonnances-li
 import { FacturesListPage } from '@/features/facturation/pages/factures-list-page'
 import { FactureDetailPage } from '@/features/facturation/pages/facture-detail-page'
 import { DevisListPage } from '@/features/facturation/pages/devis-list-page'
+import { ErrorBoundary } from '@/components/layout/error-boundary'
 import { JournalCaissePage } from '@/features/facturation/pages/journal-caisse-page'
 import { StockPage } from '@/features/stock/pages/stock-page'
 import { RolesPage } from '@/features/rbac/pages/roles-page'
-import { AuditPage } from '@/features/audit/pages/audit-page'
 import { MonComptePage } from '@/features/compte/pages/mon-compte-page'
 import { ParametresPage } from '@/features/compte/pages/parametres-page'
 import { UtilisateursPage } from '@/features/utilisateurs/pages/utilisateurs-page'
 
 export default function App() {
   return (
+    <ErrorBoundary zone="Application">
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route
@@ -41,7 +42,9 @@ export default function App() {
         path="/dashboard"
         element={
           <AppShell>
-            <DashboardPage />
+            <ErrorBoundary zone="Tableau de bord">
+              <DashboardPage />
+            </ErrorBoundary>
           </AppShell>
         }
       />
@@ -200,7 +203,7 @@ export default function App() {
         element={
           <AppShell>
             <ProtectedRoute permission="STOCK:READ">
-              <StockPage />
+              <StockPage ongletInitial="COMMANDES" />
             </ProtectedRoute>
           </AppShell>
         }
@@ -211,16 +214,6 @@ export default function App() {
           <AppShell>
             <ProtectedRoute permission="ADMIN:READ">
               <RolesPage />
-            </ProtectedRoute>
-          </AppShell>
-        }
-      />
-      <Route
-        path="/audit"
-        element={
-          <AppShell>
-            <ProtectedRoute permission="AUDIT:READ">
-              <AuditPage />
             </ProtectedRoute>
           </AppShell>
         }
@@ -262,5 +255,6 @@ export default function App() {
       />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
+    </ErrorBoundary>
   )
 }

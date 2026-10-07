@@ -29,6 +29,19 @@ class TenantBase(DeclarativeBase):
     metadata = MetaData(naming_convention=POSTGRES_NAMING_CONVENTION)
 
 
+class PlatformBase(DeclarativeBase):
+    """
+    Classe de base déclarative des modèles de la PLATEFORME (backoffice éditeur).
+
+    Troisième registre de métadonnées, après `Base` (master) et `TenantBase`
+    (bases clients). Le même raisonnement que `TenantBase` s'applique, avec une
+    contrainte supplémentaire : ces modèles vivent dans une base à part
+    (`sysdent_platform`, décision D1), et aucune migration de la base master ou
+    d'une base client ne doit pouvoir les voir.
+    """
+    metadata = MetaData(naming_convention=POSTGRES_NAMING_CONVENTION)
+
+
 class UUIDMixin:
     """Mixin ajoutant une clé primaire UUID v4."""
     id: Mapped[uuid.UUID] = mapped_column(

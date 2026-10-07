@@ -66,7 +66,7 @@ export function DentDrawer({
       // 1. Sauvegarder l'état global
       await odontogrammeApi.modifierDent(patientId, {
         numero_fdi: dent.numero_fdi,
-        etat_actuel: etatActuel,
+        etat: etatActuel,
         mobilite: parseInt(mobilite, 10),
         notes: notes.trim() || undefined,
       })

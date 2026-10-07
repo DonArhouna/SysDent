@@ -454,7 +454,19 @@ class FactureService:
 
         count_stmt = select(func.count(Facture.id))
         data_stmt = (
-            select(Facture).options(selectinload(Facture.lignes), selectinload(Facture.paiements))
+            select(Facture)
+            .options(
+                selectinload(Facture.lignes),
+                # `Paiement.echeance` doit être chargé : `_paiement_vers_reponse`
+                # lit `paiement.echeance.id`, et une relation non préchargée
+                # déclenche un lazy-load asynchrone interdit (MissingGreenlet).
+                # Sans ce chargement, la liste entière renvoie 500 dès qu'une
+                # facture est réglée — c'est-à-dire en usage normal. Il n'existe
+                # pas de colonne `echeance_id` sur `Paiement` : la clé étrangère
+                # vit sur `Echeance.paiement_id`, d'où le chargement et non un
+                # simple remplacement de colonne.
+                selectinload(Facture.paiements).selectinload(Paiement.echeance),
+            )
         )
         if conditions:
             count_stmt = count_stmt.where(*conditions)
@@ -543,7 +555,12 @@ class PaiementService:
         user_agent: Optional[str] = None,
     ) -> Paiement:
         """
-        Encaisse un paiement sur une facture.
+        Encaisse un paiement sur une facture, rattaché à la session de caisse.
+
+        Le rattachement à une session ouverte est **obligatoire** : une caisse
+        qui accepte de l'argent hors de toute borne temporelle produit un
+        rapport journalier faux, et rien à l'écran ne le signale. Le refus est
+        explicite (« ouvrez la caisse »), pas une erreur technique.
 
         Sans `echeance_id` : paiement libre dans la limite du reste à payer.
         Avec `echeance_id` : le paiement règle EXACTEMENT le reste dû de
@@ -588,14 +605,26 @@ class PaiementService:
                     details={"attendu": float(reste_echeance), "fourni": float(montant)},
                 )
 
+        # La session doit exister AVANT l'écriture : sans elle, ce paiement ne
+        # rentrera dans aucune clôture et personne n'en répondra le soir.
+        from src.modules.caisse.services import CaisseService
+
+        cabinet_encaissement = facture.cabinet_id or (
+            await FactureService._resoudre_cabinet(db, None)
+        ).id
+        session = await CaisseService.exiger_session_ouverte(db, cabinet_encaissement)
+
         paiement = Paiement(
             facture_id=facture.id,
             patient_id=facture.patient_id,
             montant=montant,
             mode=data.mode,
+            session_caisse_id=session.id,
             reference=(data.reference or "").strip() or None,
             recu_numero=await generer_numero_recu_paiement(db),
             enregistre_par_id=auteur.id if auteur else None,
+            # Email fige : l'encaissement reste attribuable meme apres suppression du compte.
+            enregistre_par_email=auteur.email if auteur else None,
         )
         db.add(paiement)
         await db.flush()

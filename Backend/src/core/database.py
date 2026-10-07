@@ -1,6 +1,8 @@
+import uuid
 from collections import OrderedDict
 from typing import AsyncGenerator, Dict, Optional
 import structlog
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -106,10 +108,41 @@ class TenantDatabaseManager:
             raise TenantConnectionException(tenant_id=tenant_id, original_error=str(e))
 
     async def get_session_factory(self, tenant_id: str) -> async_sessionmaker[AsyncSession]:
+        """
+        Session factory d'un cabinet, en créant le moteur si besoin.
+
+        Le nom de la base est lu dans `tenants_db` (base master), et NON deviné
+        par convention. L'ancien repli `f"sysdent_tenant_{tenant_id}"" ne
+        fonctionnait que parce que les anciennes bases ont ete creees avec cette
+        convention : le provisionnement actuel (`sanitize_db_name`) genere un nom
+        lisible (`sysdent_tenant_cabinet_dupont_1a2b3c`). Un cabinet cree par la
+        console etait donc inaccessible a tout appelant qui n'avait pas encore
+        passe par `get_tenant_db` — erreur « base does not exist » au lieu d'une
+        session. Deviner un nom de base est de toute façon une faute : le
+        véritable nom est une donnee, pas une convention.
+        """
         if tenant_id not in self._session_factories:
-            # Si non préchargé, on tente avec le nom de base conventionnel
-            default_db_name = f"sysdent_tenant_{tenant_id}"
-            await self.get_or_create_engine(tenant_id=tenant_id, db_name=default_db_name)
+            from src.core.security import decrypt_secret
+            from src.modules.master.models import TenantDB
+
+            from src.core.database import MasterAsyncSessionFactory
+
+            async with MasterAsyncSessionFactory() as master:
+                config = (
+                    await master.execute(
+                        select(TenantDB).where(TenantDB.societe_id == uuid.UUID(tenant_id))
+                    )
+                ).scalar_one_or_none()
+            if config is None:
+                raise TenantConnectionException(tenant_id=tenant_id, original_error="Dossier de base introuvable.")
+            await self.get_or_create_engine(
+                tenant_id=tenant_id,
+                db_name=config.db_name,
+                host=config.db_host,
+                port=config.db_port,
+                user=config.db_user,
+                password=decrypt_secret(config.db_password),
+            )
         return self._session_factories[tenant_id]
 
     async def close_all(self) -> None:

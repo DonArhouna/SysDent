@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.common.disponibilite import DUREE_CRENEAU_MINUTES
 from src.common.schemas import APIResponse
 from src.modules.auth.dependencies import get_current_user, get_tenant_db, require_permissions
+from src.modules.platform.quota_guards import quota
 from src.modules.cabinets.schemas import (
     CabinetResponse,
     CabinetUpdate,
@@ -366,6 +367,7 @@ async def creer_praticien(
     db: AsyncSession = Depends(get_tenant_db),
     current_user: Utilisateur = Depends(get_current_user),
     _: bool = Depends(require_permissions("PRATICIENS:CREATE")),
+    __quota: None = Depends(quota("praticiens")),
 ):
     """
     Rattache un compte existant au métier de praticien.

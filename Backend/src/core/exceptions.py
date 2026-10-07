@@ -56,11 +56,17 @@ class AuthenticationException(AppException):
 class PermissionDeniedException(AppException):
     """Levée lorsque l'utilisateur n'a pas les droits requis pour effectuer l'action."""
 
-    def __init__(self, message: str = "Vous n'avez pas les permissions nécessaires pour accéder à cette ressource."):
+    def __init__(
+        self,
+        message: str = "Vous n'avez pas les permissions nécessaires pour accéder à cette ressource.",
+        code: str = "PERMISSION_DENIED",
+        details: Optional[Dict[str, Any]] = None,
+    ):
         super().__init__(
             message=message,
-            code="PERMISSION_DENIED",
+            code=code,
             status_code=403,
+            details=details,
         )
 
 
@@ -121,3 +127,76 @@ class InvalidStateException(AuthenticationException):
 
     def __init__(self, message: str, code: str = "INVALID_STATE"):
         super().__init__(message=message, code=code)
+
+
+class QuotaExceededException(AppException):
+    """
+    Levée lorsqu'une ressource du plan est épuisée (Phase C.3).
+
+    Le code d'erreur est STABLE et PUBLIC (`QUOTA_EXCEEDED`) et la réponse
+    contient la ressource concernée et les deux nombres : c'est ce qui permet à
+    l'interface cliente d'afficher « Vous avez atteint la limite de 5
+    utilisateurs de votre formule » au lieu d'un message technique. Le message
+    reste en français lisible, jamais un identifiant interne.
+    """
+
+    def __init__(self, ressource: str, limite: int, utilise: int, plan_code: str = ""):
+        super().__init__(
+            message=f"Limite du plan atteinte pour « {ressource} » ({utilise}/{limite}).",
+            code="QUOTA_EXCEEDED",
+            status_code=403,
+            details={
+                "ressource": ressource,
+                "limite": limite,
+                "utilise": utilise,
+                "plan": plan_code,
+            },
+        )
+
+
+class InvalidTransitionException(BusinessRuleViolationException):
+    """
+    Levée lorsqu'une transition de statut tenant n'est pas autorisée (Phase B.2).
+
+    Le message nomme l'état courant, l'état demandé et la raison du refus : un
+    opérateur qui reçoit « transition ESSAI → RÉSOLIE non autorisée » sait quoi
+    corriger, contrairement à un « 422 » nu.
+    """
+
+    def __init__(
+        self,
+        statut_actuel: str,
+        statut_cible: str,
+        raison: str,
+        transitions_possibles: Optional[list] = None,
+    ):
+        details: Dict[str, Any] = {
+            "statut_actuel": statut_actuel,
+            "statut_cible": statut_cible,
+            "raison": raison,
+        }
+        if transitions_possibles is not None:
+            details["transitions_possibles"] = list(transitions_possibles)
+        super().__init__(
+            message=f"Transition {statut_actuel} → {statut_cible} non autorisée : {raison}.",
+            code="TRANSITION_STATUT_NON_AUTORISEE",
+            details=details,
+        )
+
+
+class PlatformFeatureException(AppException):
+    """
+    Levée lorsqu'une fonctionnalité est désactivée pour le plan du tenant
+    (Phase C.4, drapeaux de fonctionnalités).
+
+    403 et non 404 : la ressource existe, c'est l'abonnement qui ne la couvre pas.
+    Le frontend peut ainsi proposer une mise à niveau au lieu d'un écran vide.
+    """
+
+    def __init__(self, feature: str, plan_code: str = ""):
+        super().__init__(
+            message=f"La fonctionnalité '{feature}' n'est pas incluse dans votre formule.",
+            code="FEATURE_NON_ACTIVEE",
+            status_code=403,
+            details={"feature": feature, "plan": plan_code},
+        )

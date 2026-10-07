@@ -119,5 +119,10 @@ def cle_login(email: str, ip: str) -> str:
 
 
 # Limiteurs par surface d'authentification.
+# Une instance PAR surface : partager le compteur entre le client et la console
+# permettrait de verrouiller le compte d'un praticien en s'acharnant sur la console
+# (et l'inverse). `Cle` est préfixée par la surface dans chaque service.
 login_tenant_limiter = RateLimiter()
 login_master_limiter = RateLimiter()
+login_platform_limiter = RateLimiter(max_tentatives=5, fenetre_secondes=300, duree_blocage_secondes=900)
+onboarding_limiter = RateLimiter(max_tentatives=5, fenetre_secondes=3600, duree_blocage_secondes=3600)

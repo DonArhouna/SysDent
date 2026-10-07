@@ -31,7 +31,9 @@ export const odontogrammeApi = {
     patientId: string,
     data: {
       numero_fdi: number
-      etat_actuel: string
+      /** Le champ s'appelle `etat` cote serveur : `etat_actuel` etait ignore. */
+      etat: string
+      face?: string
       mobilite?: number
       notes?: string
     },
@@ -43,8 +45,7 @@ export const odontogrammeApi = {
   modifierDentsLot: async (
     patientId: string,
     data: {
-      dents: number[]
-      etat_actuel: string
+      dents: Array<{ numero_fdi: number; etat: string; face?: string }>
       notes?: string
     },
   ) => {

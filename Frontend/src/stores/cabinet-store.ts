@@ -15,7 +15,15 @@ export interface CabinetItem {
 }
 
 interface CabinetState {
-  cabinetActifId: string | null // null = "Tous les cabinets" (pour rôles globaux)
+  /**
+   * Site courant. `null` signifie « pas encore résolu » — le chargement des
+   * sites est en cours, ou a échoué.
+   *
+   * Ce n'est **pas** « tous les cabinets » : un cabinet appartient à un seul
+   * tenant, et afficher un agrégat inter-sites reviendrait à montrer à
+   * l'utilisateur la comptabilité d'un autre site.
+   */
+  cabinetActifId: string | null
   cabinets: CabinetItem[]
   chargement: boolean
   setCabinetActifId: (id: string | null) => void
@@ -38,9 +46,14 @@ export const useCabinetStore = create<CabinetState>()(
           const liste = res.data ?? []
           set({ cabinets: liste })
 
-          // Si aucun cabinet sélectionné ou cabinet sélectionné inexistant, sélectionner le 1er cabinet actif
+          // Le site mémorisé peut ne plus exister : désactivé entre deux sessions,
+          // ou supprimé. Sans cette vérification, `cabinetActifId` garderait un
+          // identifiant mort et toutes les requêtes du cabinet partiraient vers
+          // un site qui n'est plus là.
           const actifId = get().cabinetActifId
-          if (!actifId && liste.length > 0) {
+          const toujoursValide =
+            !!actifId && liste.some((c) => c.id === actifId && c.actif !== false)
+          if (!toujoursValide && liste.length > 0) {
             const premierActif = liste.find((c) => c.actif) ?? liste[0]
             if (premierActif) {
               set({ cabinetActifId: premierActif.id })

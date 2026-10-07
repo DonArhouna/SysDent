@@ -53,7 +53,9 @@ def _vers_reponse(consultation: Consultation) -> ConsultationResponse:
         dossier_medical_id=consultation.dossier_medical_id,
         patient_id=patient.id if patient else None,
         patient_numero_dossier=patient.numero_dossier if patient else None,
-        praticien_id=consultation.praticien_id,
+        auteur_id=consultation.auteur_id,
+    auteur_email=consultation.auteur_email,
+    praticien_id=consultation.praticien_id,
         cabinet_id=consultation.cabinet_id,
         motif=consultation.motif,
         type_motif=consultation.type_motif,
@@ -115,7 +117,10 @@ async def demarrer_consultation(
 @router.get("", response_model=PaginatedResponse[ConsultationResponse])
 async def list_consultations(
     patient_id: Optional[uuid.UUID] = Query(None, description="Filtrer par patient"),
-    praticien_id: Optional[uuid.UUID] = Query(None, description="Filtrer par praticien"),
+    praticien_id: Optional[uuid.UUID] = Query(None, description="Filtrer par profil praticien"),
+    auteur_id: Optional[uuid.UUID] = Query(
+        None, description="Filtrer par auteur du soin (compte authentifie)"
+    ),
     statut: Optional[str] = Query(None, description="PLANIFIEE | EN_ATTENTE | EN_COURS | TERMINEE | ANNULEE"),
     date_debut: Optional[datetime] = Query(None, description="Début de la période (ISO 8601)"),
     date_fin: Optional[datetime] = Query(None, description="Fin de la période (ISO 8601)"),
@@ -131,6 +136,7 @@ async def list_consultations(
     filtres = RechercheConsultations(
         patient_id=patient_id,
         praticien_id=praticien_id,
+        auteur_id=auteur_id,
         statut=StatutConsultationEnum(statut) if statut else None,
         date_debut=date_debut,
         date_fin=date_fin,

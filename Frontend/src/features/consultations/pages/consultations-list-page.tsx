@@ -76,17 +76,22 @@ export function ConsultationsListPage() {
   const ouvrirDemarrage = () => {
     void patientsApi.lister({ limit: 50 }).then((res) => setPatients(res.items ?? []))
     void praticiensApi.lister().then((res) => {
-      const list = res.data ?? []
-      setPraticiens(list)
-      if (list.length > 0 && !praticienId) setPraticienId(list[0].id)
+      // On ne présélectionne plus le premier praticien de la liste : cela
+      // attribuait la consultation à quelqu'un d'autre que l'utilisateur
+      // connecté, sans le dire. Le choix est désormais explicite, ou absent.
+      setPraticiens(res.data ?? [])
     })
     setModalDemarrerOpen(true)
   }
 
   const handleDemarrer = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!patientId || !praticienId) {
-      toast.error('Veuillez sélectionner un patient et un praticien.')
+    // Le praticien n'est plus obligatoire : l'auteur de la consultation est le
+    // compte connecté. Choisir un praticien, c'est attribuer la séance à un
+    // profil inscrit à l'Ordre — utile quand une secrétaire ouvre la séance
+    // pour le praticien qui va la prendre.
+    if (!patientId) {
+      toast.error('Veuillez sélectionner un patient.')
       return
     }
 
@@ -95,7 +100,9 @@ export function ConsultationsListPage() {
       const cabCible = cabinetId || cabinetActifId || (cabinets[0]?.id ?? '')
       const res = await consultationsApi.demarrer({
         patient_id: patientId,
-        praticien_id: praticienId,
+        // Chaîne vide = aucun profil attribué. L'envoyer telle quelle ferait
+        // échouer la validation UUID côté serveur.
+        praticien_id: praticienId || undefined,
         cabinet_id: cabCible,
         motif,
       })
@@ -203,6 +210,7 @@ export function ConsultationsListPage() {
               <TRow>
                 <TH>Date & Heure</TH>
                 <TH>Patient</TH>
+                <TH>Auteur</TH>
                 <TH>Motif de consultation</TH>
                 <TH>Diagnostic principal</TH>
                 <TH>Statut</TH>
@@ -233,6 +241,16 @@ export function ConsultationsListPage() {
                     </TD>
                     <TD className="text-xs text-muted-foreground max-w-xs truncate">
                       {c.diagnostic_principal ?? '—'}
+                    </TD>
+                    <TD className="text-xs">
+                      {/* L'auteur est le compte qui a fait l'acte ; le profil
+                          praticien est l'attribution reglementaire, facultative. */}
+                      <span className="block truncate">{c.auteur_email ?? '—'}</span>
+                      {!c.praticien_id && (
+                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                          sans profil Order
+                        </span>
+                      )}
                     </TD>
                     <TD>
                       <StatusBadge tone={conf.tone}>{conf.label}</StatusBadge>
@@ -286,15 +304,13 @@ export function ConsultationsListPage() {
           </div>
 
           <div>
-            <Label htmlFor="cons-prat" required>
-              Praticien
-            </Label>
+            <Label htmlFor="cons-prat">Praticien (facultatif)</Label>
             <Select
               id="cons-prat"
               value={praticienId}
               onChange={(e) => setPraticienId(e.target.value)}
-              required
             >
+              <option value="">Aucun praticien attribué</option>
               {praticiens.map((pr) => (
                 <option key={pr.id} value={pr.id}>
                   {pr.titre ? `${pr.titre} ` : 'Dr '}

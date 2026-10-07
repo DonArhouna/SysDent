@@ -151,7 +151,25 @@ _MEDICAL_COMPLET = [
 MATRICE_ROLES: Dict[str, List[Permission]] = {
     # Administrateur du cabinet : tout sauf le RBAC global (réservé au Super Admin).
     "ADMIN_CABINET": [
-        *(permission for permission in CATALOGUE_PERMISSIONS if permission != p(MODULE_ADMIN, ACTION_UPDATE))
+        # Deux exclusions, et deux raisons distinctes.
+        # `ADMIN:UPDATE` : un administrateur delegate ne doit pas pouvoir
+        # reecrire la matrice des roles — c'est le seul droit qu'on lui retire
+        # pour garantir qu'un cabinet ne se verrouille pas hors de sa base.
+        # `AUDIT:READ` : le journal d'audit est reserve a la plateforme.
+        # `AUDIT:EXPORT` suit `AUDIT:READ` : il n'a aucun endpoint cote cabinet,
+        # l'export du journal d'audit est une fonction de la plateforme
+        # (`/platform/audit/export`). Le conserver ici serait une permission
+        # morte.
+        *(
+            permission
+            for permission in CATALOGUE_PERMISSIONS
+            if permission
+            not in (
+                p(MODULE_ADMIN, ACTION_UPDATE),
+                p(MODULE_AUDIT, ACTION_READ),
+                p(MODULE_AUDIT, ACTION_EXPORT),
+            )
+        ),
     ],
     # Chirurgien-dentiste : cœur clinique.
     "PRATICIEN": _MEDICAL_COMPLET,
@@ -197,7 +215,10 @@ MATRICE_ROLES: Dict[str, List[Permission]] = {
         p(MODULE_FACTURATION, ACTION_EXPORT),
         p(MODULE_STOCK, ACTION_READ),
         p(MODULE_STOCK, ACTION_UPDATE),
-        p(MODULE_AUDIT, ACTION_READ),
+        # Aucune permission AUDIT : le journal d'audit est une tracabilite de
+        # plateforme. Il reste ecrit en base et consultable par le support et le
+        # backoffice, mais aucun role du cabinet n'y accede — pas meme par URL
+        # directe. Cf. docs/corrections/04_PLATEFORME_UI.md.
     ],
     # Gestionnaire de stock.
     "GESTIONNAIRE_STOCK": [

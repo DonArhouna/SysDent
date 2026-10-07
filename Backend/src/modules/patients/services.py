@@ -618,6 +618,12 @@ class PatientService:
 class EtatGeneralService:
     """État général (Étape 2 du CDC, RG02)."""
 
+    #: Indicateurs cliniques stockés en colonnes NOT NULL. Un `null` transmis
+    #: vaut « non concerné » et est ramené à `False` (voir `modifier`).
+    CHAMPS_BOOLEENS_NON_NULLABLES = frozenset(
+        {"grossesse", "allaitement", "diabete", "hta", "tabac", "alcool"}
+    )
+
     @staticmethod
     async def _obtenir_dossier(db: AsyncSession, patient_id: uuid.UUID) -> Tuple[Patient, DossierMedical]:
         stmt = (
@@ -633,9 +639,16 @@ class EtatGeneralService:
 
     @staticmethod
     async def obtenir(db: AsyncSession, patient_id: uuid.UUID) -> Optional[EtatGeneral]:
+        """
+        État général du patient, ou `None` s'il n'a jamais été saisi.
+
+        La lecture passe par une requête explicite sur `EtatGeneral` et non par
+        `dossier.etat_general` : `_obtenir_dossier` ne charge pas cette relation,
+        et la lire déclencherait un lazy-load interdit (`MissingGreenlet` →
+        500 sur `GET /patients/{id}/etat-general`). La requête explicite était
+        déjà présente plus bas comme repli : elle suffit dans tous les cas.
+        """
         _, dossier = await EtatGeneralService._obtenir_dossier(db, patient_id)
-        if dossier.etat_general:
-            return dossier.etat_general
         stmt = select(EtatGeneral).where(EtatGeneral.dossier_medical_id == dossier.id)
         return (await db.execute(stmt)).scalar_one_or_none()
 
@@ -711,11 +724,62 @@ class EtatGeneralService:
         client_ip: Optional[str] = None,
         user_agent: Optional[str] = None,
     ) -> EtatGeneral:
-        """Mise à jour partielle de l'état général (vérification à la consultation)."""
+        """
+        Mise à jour partielle de l'état général (vérification à la consultation).
+
+        Les champs reçus sont fusionnés avec l'état **courant** avant validation,
+        et non revalidés seuls. La raison est le validateur croisé
+        `grossesse_terme` / `grossesse` : appliqué au seul fragment reçu, il
+        rejetait `PATCH {"grossesse_terme": "..."}` parce que `grossesse` n'y
+        figurait pas — alors que la patiente est bien enceinte en base. Le
+        praticien devait renvoyer `grossesse` à chaque correction du terme, ce
+        qui est contre-intuitive et, en pratique, impossible à découvrir.
+
+        Fusionner d'abord rend la règle de cohérence vérifiable sur l'état réel,
+        et la laisse s'appliquer là où elle a du sens.
+        """
+        courant = await EtatGeneralService.obtenir(db, patient_id)
+
+        if courant is None:
+            # Rien à modifier : on confie à l'upsert, qui crée l'état.
+            return await EtatGeneralService.enregistrer(
+                db,
+                patient_id,
+                EtatGeneralCreate(**data.model_dump(exclude_unset=True, exclude_none=True)),
+                auteur,
+                client_ip=client_ip,
+                user_agent=user_agent,
+            )
+
+        etat_courant = {
+            champ: getattr(courant, champ)
+            for champ in EtatGeneralCreate.model_fields
+            if hasattr(courant, champ)
+        }
+        etat_courant.pop("dossier_medical_id", None)
+
+        demande = data.model_dump(exclude_unset=True)
+        # Un champ explicitement envoyé à `null` efface la valeur : c'est le
+        # contrat du PATCH. `exclude_none` masquerait cette intention.
+        fusion = {**etat_courant, **demande}
+
+        # Les indicateurs cliniques (grossesse, diabète, HTA…) sont des colonnes
+        # NOT NULL : « effacer » y est un acte clinique, pas une mise à blanc.
+        # `PATCH {"diabete": null}` signifie donc « le patient n'est pas
+        # diabétique », ce que l'interface exprime déjà par `false`. On traduit
+        # plutôt que de rejeter, pour que le formulaire reste tolérant. Les
+        # champs réellement nullables (terme, type de diabète, allergies) sont,
+        # eux, effaçables par `null`. — décision à valider : un troisième état
+        # « inconnu » serait cliniquement utile, mais il exige de rendre ces
+        # colonnes nullables (migration).
+        for champ, valeur in list(fusion.items()):
+            if valeur is None and champ in EtatGeneralService.CHAMPS_BOOLEENS_NON_NULLABLES:
+                fusion[champ] = False
+
         return await EtatGeneralService.enregistrer(
             db,
             patient_id,
-            EtatGeneralCreate(**data.model_dump(exclude_unset=True, exclude_none=True)),
+            EtatGeneralCreate(**fusion),
             auteur,
             client_ip=client_ip,
             user_agent=user_agent,

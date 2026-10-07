@@ -100,6 +100,31 @@ class TypeMouvementStockEnum(str, enum.Enum):
     AJUSTEMENT_INVENTAIRE = "AJUSTEMENT_INVENTAIRE"
 
 
+class StatutCommandeEnum(str, enum.Enum):
+    """
+    Cycle de vie d'un bon de commande fournisseur.
+
+    `PARTIELLEMENT_REÇUE` est un état calculé, pas saisi : il existe dès qu'au
+    moins une ligne a été livrée sans que la commande soit soldée. Le stocks
+    n'est crédité qu'à la réception, jamais à l'envoi — émettre une commande
+    n'ajoute pas de matière au cabinet.
+    """
+
+    BROUILLON = "BROUILLON"
+    ENVOYEE = "ENVOYEE"
+    PARTIELLEMENT_REÇUE = "PARTIELLEMENT_REÇUE"
+    RECUE = "RECUE"
+    ANNULEE = "ANNULEE"
+
+
+class TypeAlerteStockEnum(str, enum.Enum):
+    """Ce qui déclenche une alerte sur un article."""
+
+    SEUIL_MINIMUM = "SEUIL_MINIMUM"
+    PEREMPTION_PROCHE = "PEREMPTION_PROCHE"
+    PERIM_E = "PERIM_E"
+
+
 # ==============================================================================
 # UTILISATEURS, GROUPES & RBAC
 # ==============================================================================
@@ -150,6 +175,13 @@ class Utilisateur(TenantBase, UUIDMixin, TimestampMixin):
     telephone: Mapped[str | None] = mapped_column(String(30), nullable=True)
     photo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     actif: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Site de rattachement principal. Distinct de `cabinet_praticiens`, qui
+    # porte l'historique des periodes d'activite d'un praticien : ici on
+    # repond a « ou travaille cet employe », la ou la table de rattachement
+    # repond a « ou a-t-il travaille, et jusqu a quand ».
+    cabinet_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cabinets.id"), nullable=True, index=True
+    )
     deux_facteurs: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     secret_2fa: Mapped[str | None] = mapped_column(String(100), nullable=True)
     dernier_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -371,6 +403,15 @@ class EtatGeneral(TenantBase, UUIDMixin, TimestampMixin):
     diabete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     diabete_type: Mapped[str | None] = mapped_column(String(50), nullable=True) # type1 | type2 | gestationnel (RG04)
     hta: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False) # Hypertension
+    # Champs ajoutés par la migration d7e4a1b2c9f3. Ils étaient acceptés par
+    # l'API puis jetés en silence, faute de colonne : le praticien saisissait son
+    # traitement de diabète, la réponse était 200, et la valeur disparaissait.
+    # Nullable et sans valeur par défaut, pour qu'un état général jamais saisi
+    # ne se lise pas comme « renseigné et inconnu ».
+    diabete_traitement: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    hta_traitement: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    groupe_sanguin: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    antecedents_familiaux: Mapped[str | None] = mapped_column(Text, nullable=True)
     allergies: Mapped[list | None] = mapped_column(JSONB, nullable=True) # [{"substance", "reaction", "severite"}]
     tabac: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     alcool: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -565,7 +606,20 @@ class Consultation(TenantBase, UUIDMixin, TimestampMixin):
     __tablename__ = "consultations"
 
     dossier_medical_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("dossiers_medicaux.id"), nullable=False, index=True)
-    praticien_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("praticiens.id"), nullable=False, index=True)
+    # Auteur de l'episode de soin : le COMPTE authentifie, pas un profil d'Ordre.
+    # Il vient du JWT : il est horodate et ne peut pas etre invente. C'est lui qui
+    # porte la tracabilite medico-legale.
+    auteur_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("utilisateurs.id"), nullable=False, index=True
+    )
+    # Email fige au moment de l'ecriture : supprimer un compte ne doit pas
+    # emporter la preuve de qui a fait l'acte (meme raison que sur `paiements`
+    # et `sessions_caisse`).
+    auteur_email: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    # Profil `Praticien` OPTIONNEL : attribution reglementaire (numero d'Ordre,
+    # specialite, signature). Etre inscrit a l'Ordre n'est pas une condition
+    # pour avoir realise un soin.
+    praticien_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("praticiens.id"), nullable=True, index=True)
     cabinet_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("cabinets.id"), nullable=False)
     # Fauteuil occupé par le soin. Facultatif : une consultation saisie en
     # urgence ou une reprise de dossier ancienne peut n'avoir pas de fauteuil
@@ -950,9 +1004,122 @@ class Paiement(TenantBase, UUIDMixin, TimestampMixin):
     date_paiement: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     # Agent de caisse qui a encaissé (MLD §4.8 : #enregistre_par).
     enregistre_par_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("utilisateurs.id"), nullable=True)
+    # Email fige au moment de l'encaissement : un compte supprime doit pas
+    # emporter la preuve de qui a pris l'argent (meme raison que sur
+    # `sessions_caisse.ouverte_par_email`).
+    enregistre_par_email: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    # Session de caisse a laquelle ce paiement est rattache. Nullable : les
+    # paiements anterieurs a la mise en place des sessions restent rattaches a
+    # rien, et la cloture les signale plutot que de les inventer ailleurs.
+    session_caisse_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sessions_caisse.id"), nullable=True, index=True
+    )
 
     facture: Mapped[Facture] = relationship("Facture", back_populates="paiements")
     echeance: Mapped["Echeance | None"] = relationship("Echeance", back_populates="paiement")
+
+    session_caisse: Mapped["SessionCaisse | None"] = relationship(
+        "SessionCaisse", back_populates="paiements"
+    )
+
+
+# -----------------------------------------------------------------------------
+# Session de caisse (cloture Z)
+# -----------------------------------------------------------------------------
+# Une session de caisse est la journee de travail d'un caissier : il ouvre le
+# tiroir en annonçant les especes dont il dispose, encaisse, puis cloture en
+# annonçant ce qu'il a compte.
+#
+# **Les totaux sont figures a la cloture**, pas recalcules. Un paiement saisi
+# apres coup sur une journee close ne doit pas en reecrire le rapport : sinon le
+# chiffre du mois change sous les yeux du comptable, et personne ne sait plus ce
+# qui a ete constate le jour de la cloture.
+
+
+class StatutSessionCaisseEnum(str, enum.Enum):
+    """Cycle de vie d'une session de caisse."""
+
+    OUVERTE = "OUVERTE"
+    CLOSE = "CLOSE"
+
+
+class SessionCaisse(TenantBase, UUIDMixin, TimestampMixin):
+    __tablename__ = "sessions_caisse"
+
+    numero: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    cabinet_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cabinets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    statut: Mapped[StatutSessionCaisseEnum] = mapped_column(
+        Enum(StatutSessionCaisseEnum),
+        default=StatutSessionCaisseEnum.OUVERTE,
+        nullable=False,
+        index=True,
+    )
+
+    # Ouverture
+    ouverte_le: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True
+    )
+    ouverte_par_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("utilisateurs.id"), nullable=True
+    )
+    ouverte_par_email: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    # Especes presentes dans le tiroir a l'ouverture : c'est la fondo de caisse du
+    # caissier, pas de l'argent du cabinet.
+    ouverture_especes: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, nullable=False)
+
+    # Cloture
+    close_le: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    close_par_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("utilisateurs.id"), nullable=True
+    )
+    close_par_email: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    # Ce que le caissier declare avoir compte dans le tiroir.
+    especes_comptees: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    # L'ecart est calcule puis stocke : il est la signature de la cloture.
+    # Especes attendues = ouverture + encaissements en especes.
+    ecart_especes: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+
+    # Totaux par mode, FIGES a la cloture. Un paiement posterieur ne les
+    # modifie plus.
+    total_especes: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, nullable=False)
+    total_carte: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, nullable=False)
+    total_virement: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, nullable=False)
+    total_mobile_money: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, nullable=False)
+    total_cheque: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, nullable=False)
+    total_assurance: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, nullable=False)
+    nb_paiements: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    motif_ecart: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    paiements: Mapped[list["Paiement"]] = relationship("Paiement", back_populates="session_caisse")
+    cabinet: Mapped["Cabinet"] = relationship("Cabinet")
+    ouvert_par: Mapped["Utilisateur | None"] = relationship(
+        "Utilisateur", foreign_keys=[ouverte_par_id]
+    )
+    close_par: Mapped["Utilisateur | None"] = relationship(
+        "Utilisateur", foreign_keys=[close_par_id]
+    )
+
+    @property
+    def total_encaisse(self) -> Decimal:
+        """Total tous modes confondus, tel que constate a la cloture."""
+        return (
+            self.total_especes
+            + self.total_carte
+            + self.total_virement
+            + self.total_mobile_money
+            + self.total_cheque
+            + self.total_assurance
+        )
+
+    @property
+    def especes_attendues(self) -> Decimal:
+        """Ce qui devrait etre dans le tiroir au moment de la cloture."""
+        return self.ouverture_especes + self.total_especes
+
 
 
 # -----------------------------------------------------------------------------
@@ -1046,6 +1213,252 @@ class Echeance(TenantBase, UUIDMixin):
 
     plan: Mapped[PlanEchelonnement] = relationship("PlanEchelonnement", back_populates="echeances")
     paiement: Mapped["Paiement | None"] = relationship("Paiement", back_populates="echeance")
+
+
+# ==============================================================================
+# STOCK (catalogue, mouvements, commandes fournisseurs)
+# ==============================================================================
+
+
+class Fournisseur(TenantBase, UUIDMixin, TimestampMixin):
+    """Répertoire des fournisseurs de matériel et de produits consommables."""
+
+    __tablename__ = "fournisseurs"
+
+    nom: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    contact: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    telephone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    adresse: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actif: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    commandes: Mapped[list["CommandeFournisseur"]] = relationship(
+        "CommandeFournisseur", back_populates="fournisseur"
+    )
+
+
+class ArticleStock(TenantBase, UUIDMixin, TimestampMixin):
+    """
+    Catalogue d'un article de stock.
+
+    La quantité n'est PAS stockée ici : elle est répartie par site dans
+    `StockSite`. Un cabinet multi-sites n'a pas « 40 compresses », il en a 40
+    répartis entre ses fauteuils, et c'est cette répartition qui permet de
+    savoir où chercher une ampoule en urgence. `ArticleStock` décrit l'article,
+    `StockSite` dit combien il y en a et où.
+
+    `date_peremption` est une propriété de l'article seulement pour les
+    produits à durée de vie courte. Dès qu'un article porte des lots, c'est le
+    lot qui fait foi : voir `LotStock`.
+    """
+
+    __tablename__ = "articles_stock"
+
+    code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    designation: Mapped[str] = mapped_column(String(200), nullable=False)
+    categorie: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    unite: Mapped[str] = mapped_column(String(30), nullable=False) # BOITE, CARTOUCHE, FLACON
+    seuil_alerte: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    prix_achat: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, nullable=False)
+    date_peremption: Mapped[date | None] = mapped_column(Date, nullable=True)
+    emplacement: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    gere_par_lot: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    actif: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
+
+    __table_args__ = (UniqueConstraint("code", name="uq_article_stock_code"),)
+
+    stocks_sites: Mapped[list["StockSite"]] = relationship(
+        "StockSite", back_populates="article", cascade="all, delete-orphan"
+    )
+    lots: Mapped[list["LotStock"]] = relationship("LotStock", back_populates="article")
+    mouvements: Mapped[list["MouvementStock"]] = relationship("MouvementStock", back_populates="article")
+
+
+class StockSite(TenantBase, UUIDMixin, TimestampMixin):
+    """Quantité d'un article détenue par un site (fauteuil, salle, cabinet)."""
+
+    __tablename__ = "stocks_sites"
+
+    article_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("articles_stock.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    cabinet_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cabinets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    quantite: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    article: Mapped[ArticleStock] = relationship("ArticleStock", back_populates="stocks_sites")
+
+    __table_args__ = (
+        UniqueConstraint("article_id", "cabinet_id", name="uq_stock_site_article_cabinet"),
+    )
+
+
+class LotStock(TenantBase, UUIDMixin, TimestampMixin):
+    """
+    Lot d'un article périssable : traçabilité par lot.
+
+    Le cabinet doit pouvoir répondre à « quelles ampoules étaient périmées, et
+    qui les a sorties ». Sans lot, la seule réponse est « on ne sait pas » — ce
+    qui est incompatible avec la traçabilité demandée sur le matériel et sur les
+    produits périssables.
+    """
+
+    __tablename__ = "lots_stock"
+
+    article_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("articles_stock.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    cabinet_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cabinets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    code_lot: Mapped[str] = mapped_column(String(100), nullable=False)
+    date_peremption: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    quantite_initiale: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    quantite_restante: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    article: Mapped[ArticleStock] = relationship("ArticleStock", back_populates="lots")
+
+
+class MouvementStock(TenantBase, UUIDMixin):
+    """
+    Entrée ou sortie de matière. Table d'écriture : un mouvement n'est jamais
+    modifié ni supprimé.
+
+    `quantite` est toujours POSITIVE : le sens est donné par `type_mouvement`.
+    Un stock qui exige de lire le signe pour être compris est un stock qui sera
+    un jour lu de travers.
+
+    `auteur_id` ET `auteur_email` sont conservés : le premier identifie le compte
+    dans la base, le second reste lisible après suppression du compte, et la
+    traçabilité du matériel ne doit pas disparaître avec l'utilisateur.
+    """
+
+    __tablename__ = "mouvements_stock"
+
+    article_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("articles_stock.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    cabinet_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cabinets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    lot_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("lots_stock.id"), nullable=True, index=True
+    )
+    type_mouvement: Mapped[TypeMouvementStockEnum] = mapped_column(
+        Enum(TypeMouvementStockEnum), nullable=False, index=True
+    )
+    quantite: Mapped[int] = mapped_column(Integer, nullable=False)
+    stock_avant: Mapped[int] = mapped_column(Integer, nullable=False)
+    stock_apres: Mapped[int] = mapped_column(Integer, nullable=False)
+    motif: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    auteur_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("utilisateurs.id"), nullable=True, index=True
+    )
+    auteur_email: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    commande_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
+    date_mouvement: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True
+    )
+
+    # Relations inverses : `ArticleStock.mouvements` et `Utilisateur` pointent
+    # ici par `back_populates`. Sans elles, le mappage SQLAlchemy échoue au
+    # démarrage de la première requête qui configure les mappers.
+    article: Mapped[ArticleStock] = relationship("ArticleStock", back_populates="mouvements")
+    lot: Mapped["LotStock | None"] = relationship("LotStock")
+    auteur: Mapped["Utilisateur | None"] = relationship("Utilisateur")
+
+
+class CommandeFournisseur(TenantBase, UUIDMixin, TimestampMixin):
+    """Bon de commande adresse a un fournisseur."""
+
+    __tablename__ = "commandes_fournisseur"
+
+    numero: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
+    fournisseur_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("fournisseurs.id"), nullable=False, index=True
+    )
+    statut: Mapped[StatutCommandeEnum] = mapped_column(
+        Enum(StatutCommandeEnum), default=StatutCommandeEnum.BROUILLON, nullable=False, index=True
+    )
+    date_commande: Mapped[date] = mapped_column(Date, default=lambda: datetime.now(timezone.utc).date(), nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    auteur_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("utilisateurs.id"), nullable=True)
+    auteur_email: Mapped[str | None] = mapped_column(String(150), nullable=True)
+
+    fournisseur: Mapped[Fournisseur] = relationship("Fournisseur", back_populates="commandes")
+    lignes: Mapped[list["LigneCommande"]] = relationship(
+        "LigneCommande", back_populates="commande", cascade="all, delete-orphan"
+    )
+
+
+class LigneCommande(TenantBase, UUIDMixin):
+    """Ligne d'un bon de commande, avec la quantite deja livree."""
+
+    __tablename__ = "lignes_commande"
+
+    commande_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("commandes_fournisseur.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    article_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("articles_stock.id"), nullable=False, index=True
+    )
+    quantite_commandee: Mapped[int] = mapped_column(Integer, nullable=False)
+    quantite_recue: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    prix_unitaire: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, nullable=False)
+
+    commande: Mapped[CommandeFournisseur] = relationship("CommandeFournisseur", back_populates="lignes")
+    article: Mapped[ArticleStock] = relationship("ArticleStock")
+
+
+class ReceptionFournisseur(TenantBase, UUIDMixin, TimestampMixin):
+    """
+    Réception d'une commande : elle crédite le stock automatiquement.
+
+    Le crédit est automatique et immédiat. La validation à deux mains a été
+    écartée : dans un cabinet d'une ou deux personnes, elle empêche la
+    réception, donc le stock devient faux — et un stock faux, parce qu'il est
+    faux, est croy. On ne retarde pas l'écriture de la matière.
+
+    La sécurité est assurée par la traçabilité, pas par l'arrêt : chaque ligne
+    réceptionnée conserve qui, quand et depuis quelle commande.
+    """
+
+    __tablename__ = "receptions_fournisseur"
+
+    numero: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
+    commande_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("commandes_fournisseur.id"), nullable=False, index=True
+    )
+    date_reception: Mapped[date] = mapped_column(Date, default=lambda: datetime.now(timezone.utc).date(), nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    auteur_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("utilisateurs.id"), nullable=True)
+    auteur_email: Mapped[str | None] = mapped_column(String(150), nullable=True)
+
+    commande: Mapped[CommandeFournisseur] = relationship("CommandeFournisseur")
+    lignes: Mapped[list["LigneReception"]] = relationship(
+        "LigneReception", back_populates="reception", cascade="all, delete-orphan"
+    )
+
+
+class LigneReception(TenantBase, UUIDMixin):
+    """Quantite reellement livree pour une ligne de commande."""
+
+    __tablename__ = "lignes_reception"
+
+    reception_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("receptions_fournisseur.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    ligne_commande_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("lignes_commande.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    quantite_recue: Mapped[int] = mapped_column(Integer, nullable=False)
+    lot_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    date_peremption: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+    reception: Mapped[ReceptionFournisseur] = relationship("ReceptionFournisseur", back_populates="lignes")
+    ligne_commande: Mapped[LigneCommande] = relationship("LigneCommande")
 
 
 # ==============================================================================

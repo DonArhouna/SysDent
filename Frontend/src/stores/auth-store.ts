@@ -42,6 +42,10 @@ export interface ProfilUtilisateur {
   telephone?: string | null
   photo_url?: string | null
   tenant_id?: string | null
+  /** Nom du cabinet, pour la barre du haut — disponible meme sans `CABINETS:READ`. */
+  cabinet_nom?: string | null
+  /** Site de rattachement de l'utilisateur, s'il en a un. */
+  cabinet_id?: string | null
 }
 
 interface TokenReponse {
@@ -103,7 +107,7 @@ export const useAuthStore = create<AuthState>()(
             .post('/auth/logout', { refresh_token: refreshToken }, { silencieux: true })
             .catch(() => undefined)
         }
-        set({ token: null, refreshToken: null, profil: null })
+        purgerSession()
       },
     }),
     {
@@ -116,6 +120,51 @@ export const useAuthStore = create<AuthState>()(
     },
   ),
 )
+
+/** Purgeur enregistre par l'application : vide le cache et renvoie a la connexion. */
+type PurgeurSession = () => void
+let purgeurSession: PurgeurSession | null = null
+let sessionEnCoursDePurge = false
+
+/**
+ * Enregistre le purgeur de session.
+ *
+ * Le store ne peut pas importer le client React Query — cela créerait un cycle
+ * avec `lib/api`. On enregistre donc lprocedure depuis le provider, comme pour le
+ * renouvellement du jeton.
+ */
+export function setPurgeurSession(fn: PurgeurSession | null): void {
+  purgeurSession = fn
+}
+
+/**
+ * Vide le cache applicatif et renvoie à l'écran de connexion.
+ *
+ * Sans ce nettoyage, deux choses se produisent :
+ *
+ * - les requêtes déjà en vol continuent d'être lancées avec un jeton mort, ce
+ *   qui produit une cascade de 401 puis de 403 **sans rapport avec les
+ *   permissions réelles** : l'utilisateur cherche un problème de droits qui
+ *   n'existe pas ;
+ * - les réponses en cache restent en mémoire. Sur un poste partagé, la personne
+ *   qui se connecte ensuite voit les données de la précédente avant même que la
+ *   première requête ne revienne.
+ */
+function purgerSession(): void {
+  // Six requêtes en vol reçoivent 401 en même temps et appellent chacune ce
+  // gestionnaire. Vider six fois ni coûte cher ni fait scintiller la navigation,
+  // mais on évite le travail inutile.
+  if (sessionEnCoursDePurge) return
+  sessionEnCoursDePurge = true
+  useAuthStore.setState({ token: null, refreshToken: null, profil: null })
+  try {
+    purgeurSession?.()
+  } catch {
+    // Un cache non vidé ne doit jamais empêcher la déconnexion.
+  } finally {
+    sessionEnCoursDePurge = false
+  }
+}
 
 // Le client HTTP lit le jeton via ce fournisseur (pas de capture à l'import).
 setTokenProvider(() => useAuthStore.getState().token)
@@ -155,7 +204,9 @@ setRafraichisseur(async () => {
 
 // Session morte (refresh refusé ou absent) : on purge, `AppShell` redirigera.
 setGestionnaireSessionMorte(() => {
-  useAuthStore.getState().deconnexion()
+  // Une session morte doit vider le cache comme une deconnexion : les
+  // requetes en vol repartiraient sinon avec un jeton invalide.
+  purgerSession()
 })
 
 /** `true` si l'utilisateur possède la permission `"MODULE:ACTION"`. */

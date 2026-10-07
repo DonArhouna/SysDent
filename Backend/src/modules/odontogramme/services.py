@@ -151,11 +151,12 @@ class OdontogrammeService:
         db: AsyncSession, auteur: Optional[Utilisateur], praticien_id: Optional[uuid.UUID]
     ) -> Optional[uuid.UUID]:
         """
-        Détermine le praticien auteur d'un constat (RG10).
+        Profil `Praticien` de l'auteur d'un constat, s'il en a un (RG10).
 
-        L'identifiant est obligatoire pour attribuer la modification à un
-        praticien nommé. On tente d'abord le profil rattaché au compte
-        connecté, puis un praticien explicitement fourni.
+        Renvoie `None` quand le compte connecté n'a pas de profil : le compte
+        reste l'auteur du constat, seul le numéro d'Ordre manque. Exiger un
+        profil pour consigner un constat revenait à créer une entité
+        réglementaire pour la seule raison de savoir qui a regardé.
         """
         if auteur is not None:
             stmt = select(Praticien.id).where(Praticien.utilisateur_id == auteur.id)
@@ -171,11 +172,11 @@ class OdontogrammeService:
                 raise EntityNotFoundException("Praticien", praticien_id)
             return praticien_id
 
-        raise BusinessRuleViolationException(
-            "Impossible d'attribuer ce constat : votre compte n'est rattaché à aucun "
-            "profil praticien, et aucun praticien n'est précisé.",
-            code="PRATICIEN_NON_IDENTIFIE",
-        )
+        # Découplage : le compte connecté EST l'auteur du constat. L'absence de
+        # profil praticien n'empêche pas de consigner ce qu'on a vu : elle
+        # empêche seulement d'attribuer un numéro d'Ordre, ce qui n'est pas la
+        # même chose.
+        return None
 
     @staticmethod
     async def _verifier_consultation(

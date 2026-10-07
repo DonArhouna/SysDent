@@ -11,6 +11,8 @@ interface ArticleModalProps {
   isOpen: boolean
   onClose: () => void
   article?: ArticleStock | null
+  /** Site qui recoit le stock initial : le stock est reparti par site. */
+  cabinetId: string
   onSuccess: (article: ArticleStock) => void
 }
 
@@ -34,7 +36,7 @@ const UNITES = [
   { value: 'Unité', label: 'Unité' },
 ]
 
-export function ArticleModal({ isOpen, onClose, article, onSuccess }: ArticleModalProps) {
+export function ArticleModal({ isOpen, onClose, article, cabinetId, onSuccess }: ArticleModalProps) {
   const { addToast } = useToastStore()
   const [submitting, setSubmitting] = useState(false)
 
@@ -98,7 +100,7 @@ export function ArticleModal({ isOpen, onClose, article, onSuccess }: ArticleMod
         res = await stockApi.modifierArticle(article.id, payload)
         addToast({ type: 'success', message: 'Article mis à jour.' })
       } else {
-        res = await stockApi.creerArticle(payload)
+        res = await stockApi.creerArticle(cabinetId, payload)
         addToast({ type: 'success', message: 'Article ajouté au catalogue.' })
       }
       onSuccess(res)

@@ -219,7 +219,7 @@ async def test_facture_libre_refusee_sans_lignes(client_authenticated, patient_f
 
 @pytest.mark.asyncio
 async def test_encaissement_partiel_passe_en_partiellement_payee(
-    client_authenticated, patient_factory
+    client_authenticated, patient_factory, session_caisse
 ):
     facture = await _facture_libre(client_authenticated, patient_factory)
 
@@ -240,7 +240,9 @@ async def test_encaissement_partiel_passe_en_partiellement_payee(
 
 
 @pytest.mark.asyncio
-async def test_soldage_complet_passe_en_payee(client_authenticated, patient_factory):
+async def test_soldage_complet_passe_en_payee(
+    client_authenticated, patient_factory, session_caisse
+):
     facture = await _facture_libre(client_authenticated, patient_factory)
     await client_authenticated.post(
         f"/api/v1/factures/{facture['id']}/paiements",
@@ -289,7 +291,9 @@ async def test_encaissement_impossible_sur_facture_annulee(client_authenticated,
 
 
 @pytest.mark.asyncio
-async def test_annulation_interdite_avec_encaissement(client_authenticated, patient_factory):
+async def test_annulation_interdite_avec_encaissement(
+    client_authenticated, patient_factory, session_caisse
+):
     facture = await _facture_libre(client_authenticated, patient_factory)
     await client_authenticated.post(
         f"/api/v1/factures/{facture['id']}/paiements",
@@ -331,7 +335,7 @@ async def test_annulation_sans_encaissement_est_trabee(
 
 @pytest.mark.asyncio
 async def test_paiements_enregistrent_leur_tracabilite(
-    client_authenticated, patient_factory, tenant_db
+    client_authenticated, patient_factory, tenant_db, session_caisse
 ):
     facture = await _facture_libre(client_authenticated, patient_factory)
     encaissement = await client_authenticated.post(
@@ -408,7 +412,9 @@ async def test_deuxieme_plan_refuse(client_authenticated, patient_factory):
 
 
 @pytest.mark.asyncio
-async def test_paiement_dune_echeance_exact(client_authenticated, patient_factory):
+async def test_paiement_dune_echeance_exact(
+    client_authenticated, patient_factory, session_caisse
+):
     facture = await _facture_libre(client_authenticated, patient_factory)
     plan = (
         await client_authenticated.post(
@@ -449,7 +455,9 @@ async def test_paiement_dune_echeance_exact(client_authenticated, patient_factor
 # ==============================================================================
 
 @pytest.mark.asyncio
-async def test_journal_caisse_liste_les_encaissements(client_authenticated, patient_factory):
+async def test_journal_caisse_liste_les_encaissements(
+    client_authenticated, patient_factory, session_caisse
+):
     facture = await _facture_libre(client_authenticated, patient_factory)
     await client_authenticated.post(
         f"/api/v1/factures/{facture['id']}/paiements",

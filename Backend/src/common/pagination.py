@@ -7,9 +7,17 @@ from .schemas import PaginatedResponse, PaginationMeta
 T = TypeVar("T")
 
 
+#: Plafond unique de pagination, reutilise par les routes qui annoncent
+#: leur `limit`. Une route qui annonce un plafond different du modele
+#: accepte en query une valeur que la construction de page refuse ensuite.
+LIMITE_PAGE_MAX: int = 100
+
+
 class PaginationParams(BaseModel):
     page: int = Field(default=1, ge=1, description="Numéro de la page (commence à 1)")
-    limit: int = Field(default=20, ge=1, le=100, description="Nombre d'éléments par page")
+    limit: int = Field(
+        default=20, ge=1, le=LIMITE_PAGE_MAX, description="Nombre d'éléments par page"
+    )
 
     @property
     def offset(self) -> int:

@@ -40,6 +40,18 @@ import { PatientFormModal } from '../components/patient-form-modal'
 import { AntecedentModal } from '../components/antecedent-modal'
 import type { AntecedentMedical, EtatGeneral } from '../types'
 
+/**
+ * Groupes sanguins du système ABO × Rhésus.
+ *
+ * Référentiel de nomenclature sanguine, pas une donnée d'un tenant : il ne
+ * dépend pas du cabinet et ne se paramètre pas. Une liste déroulante évite
+ * au praticien une saisie libre qui serait refusée par le serveur, et évite
+ * d'introduire des valeurs illisibles dans un dossier médical.
+ */
+const GROUPES_SANGUINS = [
+  'O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-',
+] as const
+
 export function PatientDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -114,6 +126,10 @@ export function PatientDetailPage() {
       hta: patient.etat_general?.hta ?? false,
       tabac: patient.etat_general?.tabac ?? false,
       alcool: patient.etat_general?.alcool ?? false,
+      diabete_traitement: patient.etat_general?.diabete_traitement ?? '',
+      hta_traitement: patient.etat_general?.hta_traitement ?? '',
+      groupe_sanguin: patient.etat_general?.groupe_sanguin ?? '',
+      antecedents_familiaux: patient.etat_general?.antecedents_familiaux ?? '',
       allergies: patient.etat_general?.allergies ? [...patient.etat_general.allergies] : [],
     })
     setModeEditionEtat(true)
@@ -572,7 +588,23 @@ export function PatientDetailPage() {
                       <input
                         type="checkbox"
                         checked={etatForm.diabete ?? false}
-                        onChange={(e) => setEtatForm({ ...etatForm, diabete: e.target.checked })}
+                        onChange={(e) =>
+                          setEtatForm(
+                            e.target.checked
+                              ? { ...etatForm, diabete: true }
+                              : // Décocher « Diabète » efface ce qui n'a de sens
+                                // que pour un diabétique : un dossier indiquant
+                                // « non diabétique · type 2 · Metformine » est
+                                // contradictoire, et le praticien le relirait
+                                // sans y voir d'erreur.
+                                {
+                                  ...etatForm,
+                                  diabete: false,
+                                  diabete_type: '',
+                                  diabete_traitement: '',
+                                },
+                          )
+                        }
                         className="rounded border-border text-primary focus:ring-primary"
                       />
                       <span className="text-xs font-semibold text-foreground">Diabète</span>
@@ -582,7 +614,13 @@ export function PatientDetailPage() {
                       <input
                         type="checkbox"
                         checked={etatForm.hta ?? false}
-                        onChange={(e) => setEtatForm({ ...etatForm, hta: e.target.checked })}
+                        onChange={(e) =>
+                          setEtatForm(
+                            e.target.checked
+                              ? { ...etatForm, hta: true }
+                              : { ...etatForm, hta: false, hta_traitement: '' },
+                          )
+                        }
                         className="rounded border-border text-primary focus:ring-primary"
                       />
                       <span className="text-xs font-semibold text-foreground">Hypertension (HTA)</span>
@@ -623,6 +661,97 @@ export function PatientDetailPage() {
                       />
                     </div>
                   )}
+
+                  {etatForm.diabete && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                      <div>
+                        <label className="block text-xs font-semibold text-foreground mb-1">
+                          Type de diabète
+                        </label>
+                        <select
+                          value={etatForm.diabete_type ?? ''}
+                          onChange={(e) =>
+                            setEtatForm({ ...etatForm, diabete_type: e.target.value })
+                          }
+                          className="w-full rounded-lg border border-input bg-card px-3 py-1.5 text-xs text-foreground"
+                        >
+                          <option value="">Non précisé</option>
+                          <option value="type1">Type 1</option>
+                          <option value="type2">Type 2</option>
+                          <option value="gestationnel">Gestationnel</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-foreground mb-1">
+                          Traitement en cours
+                        </label>
+                        <input
+                          type="text"
+                          value={etatForm.diabete_traitement ?? ''}
+                          onChange={(e) =>
+                            setEtatForm({ ...etatForm, diabete_traitement: e.target.value })
+                          }
+                          className="w-full rounded-lg border border-input bg-card px-3 py-1.5 text-xs text-foreground"
+                          placeholder="Ex: Metformine 850 mg, 2 prises par jour"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {etatForm.hta && (
+                    <div className="max-w-xs">
+                      <label className="block text-xs font-semibold text-foreground mb-1">
+                        Traitement de l'hypertension
+                      </label>
+                      <input
+                        type="text"
+                        value={etatForm.hta_traitement ?? ''}
+                        onChange={(e) =>
+                          setEtatForm({ ...etatForm, hta_traitement: e.target.value })
+                        }
+                        className="w-full rounded-lg border border-input bg-card px-3 py-1.5 text-xs text-foreground"
+                        placeholder="Ex: Amlodipine 5 mg"
+                      />
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-foreground mb-1">
+                        Groupe sanguin
+                      </label>
+                      <select
+                        value={etatForm.groupe_sanguin ?? ''}
+                        onChange={(e) =>
+                          setEtatForm({ ...etatForm, groupe_sanguin: e.target.value })
+                        }
+                        className="w-full rounded-lg border border-input bg-card px-3 py-1.5 text-xs text-foreground"
+                      >
+                        <option value="">Non connu</option>
+                        {GROUPES_SANGUINS.map((groupe) => (
+                          <option key={groupe} value={groupe}>
+                            {groupe}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-foreground mb-1">
+                        Antécédents familiaux
+                      </label>
+                      <input
+                        type="text"
+                        value={etatForm.antecedents_familiaux ?? ''}
+                        onChange={(e) =>
+                          setEtatForm({ ...etatForm, antecedents_familiaux: e.target.value })
+                        }
+                        className="w-full rounded-lg border border-input bg-card px-3 py-1.5 text-xs text-foreground"
+                        placeholder="Ex: père hypertendu, mère diabétique"
+                      />
+                    </div>
+                  </div>
 
                   {/* Gestion dynamique des allergies */}
                   <div className="space-y-3 pt-3 border-t border-border">

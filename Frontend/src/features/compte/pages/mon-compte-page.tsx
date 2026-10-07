@@ -26,6 +26,9 @@ interface Profil {
   permissions: string[]
   telephone?: string | null
   tenant_id?: string | null
+  /** Nom du cabinet et site de rattachement : exposes par `/auth/me`. */
+  cabinet_nom?: string | null
+  cabinet_id?: string | null
 }
 
 interface Cabinet {
@@ -64,7 +67,10 @@ export function MonComptePage() {
   const nomComplet = p ? `${p.prenom} ${p.nom}`.trim() : '—'
   const role = p?.role ?? '—'
   const permissions = p?.permissions ?? []
-  const cabinet = cabinets?.data?.find((c) => c.id === p?.tenant_id) ?? cabinets?.data?.[0]
+  // `tenant_id` identifie le tenant, pas un site : s'en servir pour retrouver un
+  // cabinet pouvait afficher le mauvais nom. On part du site de rattachement,
+  // avec le nom du cabinet déjà fourni par `/auth/me` en repli.
+  const cabinet = cabinets?.data?.find((c) => c.id === p?.cabinet_id) ?? cabinets?.data?.[0]
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -109,7 +115,7 @@ export function MonComptePage() {
             <Ligne
               icone={Building2}
               label="Cabinet"
-              valeur={cabinet?.nom ?? (p?.tenant_id ? 'Non résolu' : 'Plateforme SysDent')}
+              valeur={cabinet?.nom ?? p?.cabinet_nom ?? '-'}
             />
             <Ligne icone={Building2} label="Ville" valeur={cabinet?.ville ?? '—'} />
             <Ligne

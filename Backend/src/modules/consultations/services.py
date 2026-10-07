@@ -228,13 +228,25 @@ class ConsultationService:
     @staticmethod
     async def _praticien_du_user(
         db: AsyncSession, auteur: Optional[Utilisateur], praticien_id: Optional[uuid.UUID]
-    ) -> Praticien:
+    ) -> Optional[Praticien]:
         """
-        Détermine le praticien responsable de la consultation.
+        Profil `Praticien` de l'auteur, **s'il en a un**.
 
-        Un compte non-praticien (secrétaire, comptable) ne peut pas porter une
-        consultation : le praticien est l'auteur clinique du acte, la traçabilité
-        médico-légale l'exige. On tente d'abord le praticien rattaché au compte.
+        Découplage : l'auteur d'une consultation est le **compte authentifié**,
+        connu et non inventable. Le profil `Praticien` n'est plus qu'une
+        attribution réglementaire facultative — numéro d'Ordre, spécialité,
+        signature. Exiger ce profil pour ouvrir une consultation revenait à
+        créer une entité réglementaire pour la seule raison de savoir qui a fait
+        un geste.
+
+        On renvoie `None` quand le compte n'a pas de profil. C'est un état
+        normal, pas une erreur : un assistant réalisant un détartrage sous
+        supervision, ou un praticien dont le numéro d'Ordre n'est pas encore
+        saisi, restent des auteurs légitimes d'une consultation.
+
+        Si un `praticien_id` explicite est fourni, on le résout et on le
+        signale s'il n'existe pas : une demande explicite et fausse est une
+        erreur, l'absence de profil ne l'est pas.
         """
         if auteur is not None:
             stmt = select(Praticien).where(Praticien.utilisateur_id == auteur.id)
@@ -243,10 +255,7 @@ class ConsultationService:
                 return profil
 
         if praticien_id is None:
-            raise BusinessRuleViolationException(
-                "Votre compte n'est rattaché à aucun profil praticien : impossible d'attribuer la consultation.",
-                code="PRATICIEN_NON_IDENTIFIE",
-            )
+            return None
 
         profil = (await db.execute(select(Praticien).where(Praticien.id == praticien_id))).scalar_one_or_none()
         if profil is None:
@@ -311,9 +320,21 @@ class ConsultationService:
         praticien = await ConsultationService._praticien_du_user(db, auteur, praticien_id)
         cabinet = await ConsultationService._resoudre_cabinet(db, data.cabinet_id)
 
+        if auteur is None:
+            # Sans compte authentifié, il n'y a personne à attribuer. C'est le
+            # seul cas où l'on refuse : on n'invente jamais un auteur.
+            raise BusinessRuleViolationException(
+                "Impossible d'attribuer la consultation : auteur inconnu.",
+                code="AUTEUR_INCONNU",
+            )
+
         consultation = Consultation(
             dossier_medical_id=dossier.id,
-            praticien_id=praticien.id,
+            # L'auteur est le compte authentifie ; le profil praticien, s'il
+            # existe, est une attribution reglementaire facultative.
+            auteur_id=auteur.id,
+            auteur_email=auteur.email,
+            praticien_id=praticien.id if praticien else None,
             cabinet_id=cabinet.id,
             motif=data.motif.strip(),
             type_motif=data.type_motif,
@@ -525,6 +546,8 @@ class ConsultationService:
 
         if filtres.patient_id:
             conditions.append(DossierMedical.patient_id == filtres.patient_id)
+        if filtres.auteur_id:
+            conditions.append(Consultation.auteur_id == filtres.auteur_id)
         if filtres.praticien_id:
             conditions.append(Consultation.praticien_id == filtres.praticien_id)
         if filtres.statut:

@@ -143,12 +143,14 @@ site/
 
 # Fichiers temporaires de développement local (scripts de check hors tests)
 /Backend/_verify_*.py
+/Backend/_verif_*.py
 /Backend/_repro_*.py
 /Backend/_check_*.py
 /Backend/_env.*.ps1
 /Backend/_*.log
 /Backend/_*.txt
 /Backend/_*.err
+/Backend/_*.json
 /Backend/check_db.py
 /Backend/run_dev.py
 /Backend/run_backend.sh

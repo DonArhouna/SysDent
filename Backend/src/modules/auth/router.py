@@ -1,4 +1,8 @@
+from typing import Optional
+
+import structlog
 from fastapi import APIRouter, Depends, Request, Response, status
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.common.schemas import APIResponse
 from sqlalchemy import select
@@ -14,6 +18,37 @@ from src.modules.master.models import TenantDB
 from src.modules.tenants.models import Utilisateur
 
 router = APIRouter(prefix="/auth", tags=["Authentification"])
+
+logger = structlog.get_logger(__name__)
+
+
+async def _contrat_du_cabinet(tenant_id: Optional[str]) -> dict:
+    """
+    Plan, quotas et fonctionnalités du cabinet (Phase C.4).
+
+    Une panne de la base plateforme ne doit PAS EMPêcher un praticien de
+    consulter son profil : on renvoie un contrat vide, ce qui vaut
+    « illimité / toutes les fonctions », et l'application se comporte comme
+    avant la mission. Une coupure du backoffice ne doit pas arrêter un cabinet.
+    """
+    if not tenant_id:
+        return {}
+    from src.core.platform_database import PlatformSessionFactory
+    from src.modules.platform.services.quotas import QuotaService
+
+    session = PlatformSessionFactory()
+    try:
+        contexte = await QuotaService.quotas(session, tenant_id)
+    except SQLAlchemyError:
+        logger.warning("contrat_indisponible", tenant_id=tenant_id)
+        return {}
+    finally:
+        await session.close()
+    return {
+        "plan_code": contexte.get("plan"),
+        "quotas": contexte.get("quotas") or {},
+        "features": contexte.get("features") or {},
+    }
 
 
 def _deposer_cookie(response: Response, token: str) -> None:
@@ -157,6 +192,7 @@ async def logout(
 async def get_me(
     user: Utilisateur = Depends(get_current_user),
     payload: dict = Depends(get_token_payload),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     """
     Profil de l'utilisateur connecté.
@@ -178,5 +214,38 @@ async def get_me(
             telephone=user.telephone,
             photo_url=user.photo_url,
             tenant_id=payload.get("tenant_id"),
+            **await _repere_cabinet(db, user),
+            **await _contrat_du_cabinet(payload.get("tenant_id")),
         )
     )
+
+
+async def _repere_cabinet(db: AsyncSession, user: Utilisateur) -> dict:
+    """
+    Nom du cabinet et site de rattachement, lus en base.
+
+    Un cabinet a un nom, un utilisateur a une belongance : les deux permettent
+    a la barre du haut d'afficher « ou suis-je » sans un second appel, et sans
+    exiger `CABINETS:READ` — que le caissier n'a pas, et ne doit pas avoir.
+
+    Le premier cabinet actif sert de repli quand l'utilisateur n'est rattache a
+    aucun site : mieux vaut un nom juste que pas de repere du tout.
+    """
+    from sqlalchemy import select
+
+    from src.modules.tenants.models import Cabinet
+
+    cabinet_id = user.cabinet_id
+    nom = None
+    if cabinet_id is not None:
+        nom = (
+            await db.execute(select(Cabinet.nom).where(Cabinet.id == cabinet_id))
+        ).scalar_one_or_none()
+    if nom is None:
+        nom = (
+            await db.execute(
+                select(Cabinet.nom).where(Cabinet.actif == True).limit(1)  # noqa: E712
+            )
+        ).scalar_one_or_none()
+        cabinet_id = None if nom is not None else cabinet_id
+    return {"cabinet_nom": nom, "cabinet_id": cabinet_id}

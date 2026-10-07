@@ -23,3 +23,16 @@ def upgrade_tenant_to_head(tenant_db_sync_url: str) -> None:
     # pour un usage programmatique, par opposition aux arguments -x réservés à la CLI).
     cfg.attributes["tenant_db_url"] = tenant_db_sync_url
     command.upgrade(cfg, "head")
+
+
+def upgrade_platform_to_head() -> None:
+    """
+    Applique les migrations Alembic de la base PLATEFORME (`sysdent_platform`).
+
+    Troisième contexte, après la base master et les bases clients. Isolé de son
+    côté : une migration plateforme ne peut pas voir les tables d'un cabinet, ni
+    être appliquée par erreur sur une base client.
+    """
+    cfg = Config(os.path.join(BACKEND_DIR, "alembic_platform.ini"))
+    cfg.set_main_option("script_location", os.path.join(BACKEND_DIR, "alembic_platform"))
+    command.upgrade(cfg, "head")

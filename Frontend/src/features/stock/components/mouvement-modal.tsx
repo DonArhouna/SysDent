@@ -12,6 +12,8 @@ interface MouvementModalProps {
   onClose: () => void
   articles: ArticleStock[]
   articleInitial?: ArticleStock | null
+  /** Site dont on sort la matiere : un mouvement porte toujours sur un site. */
+  cabinetId: string
   onSuccess: (mouvement: MouvementStock) => void
 }
 
@@ -27,6 +29,7 @@ export function MouvementModal({
   onClose,
   articles,
   articleInitial,
+  cabinetId,
   onSuccess,
 }: MouvementModalProps) {
   const { addToast } = useToastStore()
@@ -54,7 +57,8 @@ export function MouvementModal({
       setSubmitting(true)
       const res = await stockApi.enregistrerMouvement({
         article_id: articleId,
-        type_mouvement: typeMouvement,
+        cabinet_id: cabinetId,
+      type_mouvement: typeMouvement,
         quantite,
         motif: motif.trim() || undefined,
       })

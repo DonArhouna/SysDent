@@ -63,8 +63,10 @@ export function AppSidebar({
 
   const nomComplet = profil ? `${profil.prenom} ${profil.nom}`.trim() : '—'
   const roleLibelle = libelleRole(profil?.role)
-  // Libellé structure : le cabinet est géré par le sélecteur de la navbar.
-  const structure = profil?.tenant_id ? 'Cabinet rattaché' : 'Plateforme SysDent'
+  // Le repère est le cabinet, tel que `/auth/me` le donne. Le mot « Plateforme »
+  // n'a rien à faire dans l'application d'un cabinet : un utilisateur client
+  // n'est pas sur une plateforme, il est dans le sien.
+  const structure = profil?.cabinet_nom ?? 'Cabinet'
 
   return (
     <aside

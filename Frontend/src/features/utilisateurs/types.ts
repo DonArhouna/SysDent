@@ -1,14 +1,9 @@
-/**
- * Types du module Utilisateurs.
- *
- * ⚠️ Contrat PROPOSÉ, aligné sur les conventions déjà en place dans le backend
- * (`Utilisateur` existe comme modèle ; il n'est simplement exposé par aucune
- * route). Voir `services/utilisateurs-api.ts` et PLAN_RESTE_A_FAIRE.md.
- *
- * `role` reprend l'énumération du RBAC — un compte sans rôle n'a aucun accès,
- * et c'est le rôle qui porte les permissions.
- */
+/** Types du module Utilisateurs. */
 
+/**
+ * Un compte du cabinet. `role` reprend le nom du rôle RBAC : c'est **le rôle**
+ * qui porte les permissions, pas le compte.
+ */
 export interface Utilisateur {
   id: string
   email: string
@@ -17,9 +12,18 @@ export interface Utilisateur {
   role: string
   actif: boolean
   telephone?: string | null
-  /** Cabinet de rattachement. `null` pour un compte de plateforme. */
+  /** Site de rattachement principal. */
   cabinet_id?: string | null
-  derniere_connexion?: string | null
+  cabinet_nom?: string | null
+  deux_facteurs: boolean
+  dernier_login?: string | null
+  /**
+   * Vrai si le compte porte un profil professionnel (titre, spécialité, numéro
+   * d'Ordre). Depuis le découplage, ce profil est **facultatif** : être inscrit à
+   * l'Ordre n'est pas une condition pour exercer au cabinet.
+   */
+  a_profil_professionnel: boolean
+  numero_ordre?: string | null
   created_at?: string | null
 }
 
@@ -33,4 +37,11 @@ export interface UtilisateurCreate {
   cabinet_id?: string | null
 }
 
-export type UtilisateurUpdate = Partial<Omit<UtilisateurCreate, 'mot_de_passe'>>
+export type UtilisateurUpdate = Partial<Omit<UtilisateurCreate, 'mot_de_passe'>> & {
+  actif?: boolean
+}
+
+export interface MotDePasseTemporaire {
+  temporaire: string
+  avertissement: string
+}

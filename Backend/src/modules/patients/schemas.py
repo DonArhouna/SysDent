@@ -2,7 +2,7 @@ import re
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 import uuid
-from pydantic import EmailStr, Field, field_validator, model_validator
+from pydantic import ConfigDict, EmailStr, Field, field_validator, model_validator
 from src.common.schemas import BaseSchema
 from src.modules.tenants.models import SexeEnum, TypePieceIdentiteEnum
 
@@ -29,6 +29,22 @@ class ExamenComplementaire(BaseSchema):
 
 
 class EtatGeneralBase(BaseSchema):
+    """
+    Champs de l'état général (dictionnaire §5.2).
+
+    `extra="forbid"` est délibéré, et restreint à cet écran. Sans lui, un champ
+    clinique absent du schéma — `groupe_sanguin`, `hta_traitement`… — était
+    accepté puis jeté sans un mot : l'API répondait 200 alors que la saisie
+    disparaissait. Interdire l'inconnu transforme cette perte silencieuse en
+    422 explicite, ce qui est la seule façon pour l'interface de_typer son bug.
+
+    On ne l'applique pas à `BaseSchema` : elle sert à tous les schémas de
+    l'application, et un rendu strict y casserait des formulaires qui envoient
+    des champs de lecture.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
     grossesse: bool = Field(False, description="Patiente enceinte (RG04 : bloque certains médicaments)")
     grossesse_terme: Optional[str] = Field(
         None, max_length=50, description="Terme de grossesse (ex: 32 SA / 8 mois)"
@@ -39,16 +55,59 @@ class EtatGeneralBase(BaseSchema):
         None, max_length=50, description="type1 | type2 | gestationnel"
     )
     hta: bool = Field(False, description="Hypertension artérielle")
+    # Ajoutés par la migration d7e4a1b2c9f3. Une chaîne vide vaut « non
+    # renseigné » et devient `None` : même règle que `diabete_type`, sans quoi
+    # un champ texte laissé vide ferait échouer la sauvegarde.
+    diabete_traitement: Optional[str] = Field(
+        None, max_length=200, description="Traitement en cours (ex: Metformine 850 mg)"
+    )
+    hta_traitement: Optional[str] = Field(
+        None, max_length=200, description="Traitement en cours (ex: Amlodipine 5 mg)"
+    )
+    groupe_sanguin: Optional[str] = Field(
+        None, max_length=10, description="Groupe sanguin (ex: O+, AB-)"
+    )
+    antecedents_familiaux: Optional[str] = Field(
+        None, description="Antécédents familiaux, texte libre"
+    )
     tabac: bool = Field(False)
     alcool: bool = Field(False)
     allergies: Optional[List[Allergie]] = None
     autres_conditions: Optional[List[str]] = None
     examens_complementaires: Optional[List[ExamenComplementaire]] = None
 
+    @field_validator(
+        "diabete_traitement",
+        "hta_traitement",
+        "groupe_sanguin",
+        "antecedents_familiaux",
+    )
+    @classmethod
+    def vide_means_non_renseigne(cls, v: Optional[str]) -> Optional[str]:
+        """
+        Une zone de texte laissée vide est « non renseigné », pas « valeur vide ».
+
+        Ces quatre champs sont des saisies libres. Le navigateur envoie `''` pour
+        un champ effacé ; le stocker tel quel afficherait ensuite une ligne vide
+        dans le dossier, qui se lirait comme une information manquante. On
+        uniformise à `None`, qui veut dire « non renseigné » partout ailleurs.
+        """
+        if v is None:
+            return None
+        return v.strip() or None
+
     @field_validator("diabete_type")
     @classmethod
     def valider_type_diabete(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
+            return None
+        # Une chaîne vide ou composée d'espaces signifie « non renseigné », pas
+        # « valeur invalide ». C'est exactement ce que l'interface envoie : le
+        # champ est une zone de texte, et `patient.etat_general?.diabete_type ?? ''`
+        # produit `''` pour un patient non diabétique. Sans ce cas, *toute*
+        # sauvegarde d'état général depuis l'interface était rejetée en 422 :
+        # le formulaire refusait de s'enregistrer, quel que soit le contenu.
+        if not v.strip():
             return None
         # On accepte les libellés métier que le praticien saisit réellement
         # (« diabète gestationnel », « TYPE 1 », « type_2 ») et on les ramène à
@@ -74,6 +133,10 @@ class EtatGeneralCreate(EtatGeneralBase):
 class EtatGeneralUpdate(BaseSchema):
     """Mise à jour partielle : uniquement les champs explicitement transmis sont modifiés."""
 
+    # Même règle que `EtatGeneralBase` : un champ inconnu doit être refusé, pas
+    # accepté puis jeté en silence.
+    model_config = ConfigDict(extra="forbid")
+
     grossesse: Optional[bool] = None
     grossesse_terme: Optional[str] = Field(None, max_length=50)
     allaitement: Optional[bool] = None
@@ -82,6 +145,10 @@ class EtatGeneralUpdate(BaseSchema):
     hta: Optional[bool] = None
     tabac: Optional[bool] = None
     alcool: Optional[bool] = None
+    diabete_traitement: Optional[str] = Field(None, max_length=200)
+    hta_traitement: Optional[str] = Field(None, max_length=200)
+    groupe_sanguin: Optional[str] = Field(None, max_length=10)
+    antecedents_familiaux: Optional[str] = None
     allergies: Optional[List[Allergie]] = None
     autres_conditions: Optional[List[str]] = None
     examens_complementaires: Optional[List[ExamenComplementaire]] = None
@@ -98,6 +165,10 @@ class EtatGeneralResponse(BaseSchema):
     hta: bool
     tabac: bool
     alcool: bool
+    diabete_traitement: Optional[str] = None
+    hta_traitement: Optional[str] = None
+    groupe_sanguin: Optional[str] = None
+    antecedents_familiaux: Optional[str] = None
     allergies: Optional[List[Dict[str, Any]]] = None
     autres_conditions: Optional[List[str]] = None
     examens_complementaires: Optional[List[Dict[str, Any]]] = None

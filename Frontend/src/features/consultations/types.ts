@@ -26,7 +26,11 @@ export interface Consultation {
   dossier_medical_id: string
   patient_id?: string | null
   patient_numero_dossier?: string | null
-  praticien_id: string
+  /** Compte authentifie qui a realise l'episode de soin. Toujours present. */
+  auteur_id: string
+  auteur_email?: string | null
+  /** Profil `Praticien` : attribution reglementaire FACULTATIVE. */
+  praticien_id: string | null
   cabinet_id: string
   motif: string
   type_motif?: string | null
@@ -69,7 +73,13 @@ export interface ActeNomenclature {
 
 export interface ConsultationCreateInput {
   patient_id: string
-  praticien_id: string
+  /**
+   * Profil `Praticien` attribué : facultatif. L'auteur de la consultation est
+   * le compte connecté ; ce champ ne sert qu'à rattacher la séance à un profil
+   * inscrit à l'Ordre, par exemple quand une secrétaire ouvre la séance pour le
+   * praticien qui va la prendre.
+   */
+  praticien_id?: string
   cabinet_id?: string
   motif: string
   type_motif?: string

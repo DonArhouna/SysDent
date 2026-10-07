@@ -7,10 +7,12 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ApiError } from '@/lib/api'
-import { estEndpointManquant, stockApi } from '../services/stock-api'
+import { useCabinetStore } from '@/stores/cabinet-store'
+import { stockApi } from '../services/stock-api'
 import type { ArticleStock } from '../types'
 import { ArticleModal } from '../components/article-modal'
 import { MouvementModal } from '../components/mouvement-modal'
+import { CommandesPanel } from '../components/commandes-panel'
 import {
   AlertTriangle,
   ArrowDownRight,
@@ -22,22 +24,28 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Truck,
   SlidersHorizontal,
   WifiOff,
 } from 'lucide-react'
 
 /**
- * Page Stock — module EN ATTENTE côté backend.
+ * Page Stock — catalogue, mouvements et alertes du site actif.
  *
- * Aucune route `/stock/*` n'existe dans l'API (cf. Backend/src/api/v1/router.py).
- * Conformément à la règle « pas de mock silencieux » :
- * - le service (`stock-api.ts`) est déjà écrit sur les contrats cibles ;
- * - cette page tente l'appel réel et affiche un état « Non disponible » propre
- *   dès que l'API répond 404/501 — aucune donnée fictive n'est montrée ;
- * - le bandeau d'avertissement explicite la situation et renvoie au plan.
+ * Le stock est réparti par site : la page travaille toujours sur le site
+ * sélectionné en haut de l'écran, et n'affiche rien tant qu'il n'y en a pas.
+ * Sans site, il n'y a pas de quantité à montrer — ce n'est pas une panne.
+ *
+ * Aucun repli fictif n'est fourni : une erreur d'API remonte une erreur, jamais
+ * un jeu de données inventé.
  */
-export function StockPage() {
-  const [onglet, setOnglet] = useState<'CATALOGUE' | 'MOUVEMENTS'>('CATALOGUE')
+export function StockPage({
+  ongletInitial = 'CATALOGUE',
+}: {
+  /** Le menu pointe vers `/stock/commandes` : ouvrir sur le catalogue serait trompeur. */
+  ongletInitial?: 'CATALOGUE' | 'MOUVEMENTS' | 'COMMANDES'
+} = {}) {
+  const [onglet, setOnglet] = useState<'CATALOGUE' | 'MOUVEMENTS' | 'COMMANDES'>(ongletInitial)
   const [recherche, setRecherche] = useState('')
   const [categorieFiltre, setCategorieFiltre] = useState('')
   const [alerteSeul, setAlerteSeul] = useState(false)
@@ -47,36 +55,46 @@ export function StockPage() {
   const [selectedArticle, setSelectedArticle] = useState<ArticleStock | null>(null)
   const [isMouvementModalOpen, setIsMouvementModalOpen] = useState(false)
 
+  // Le stock est réparti par site : la page travaille toujours sur le site
+  // actif. Sans site, il n'y a rien à afficher — ce n'est pas une erreur réseau.
+  const cabinetActifId = useCabinetStore((etat) => etat.cabinetActifId)
+  const sitePret = Boolean(cabinetActifId)
+
   const articlesQuery = useQuery({
-    queryKey: ['stock', 'articles', recherche, categorieFiltre, alerteSeul],
+    queryKey: ['stock', 'articles', cabinetActifId, recherche, categorieFiltre, alerteSeul],
     queryFn: () =>
       stockApi.listerArticles({
+        cabinetId: cabinetActifId as string,
         q: recherche.trim() || undefined,
         categorie: categorieFiltre || undefined,
-        alerte_seuil: alerteSeul || undefined,
+        alerteSeuil: alerteSeul || undefined,
       }),
-    // Le endpoint n'existe pas encore : inutile de marteler l'API.
-    retry: false,
+    enabled: sitePret,
   })
 
   const mouvementsQuery = useQuery({
-    queryKey: ['stock', 'mouvements'],
-    queryFn: () => stockApi.listerMouvements(50),
-    retry: false,
+    queryKey: ['stock', 'mouvements', cabinetActifId],
+    queryFn: () => stockApi.listerMouvements({ cabinetId: cabinetActifId as string, limit: 50 }),
+    enabled: sitePret,
   })
 
-  const endpointAbsent =
-    estEndpointManquant(articlesQuery.error) || estEndpointManquant(mouvementsQuery.error)
+  const alertesQuery = useQuery({
+    queryKey: ['stock', 'alertes', cabinetActifId],
+    queryFn: () => stockApi.listerAlertes(cabinetActifId as string),
+    enabled: sitePret,
+  })
+
   const erreurReseau =
-    !endpointAbsent &&
-    (articlesQuery.error instanceof ApiError || mouvementsQuery.error instanceof ApiError)
+    articlesQuery.error instanceof ApiError || mouvementsQuery.error instanceof ApiError
 
   const articles = articlesQuery.data?.items ?? []
   const mouvements = mouvementsQuery.data?.items ?? []
+  const alertes = alertesQuery.data?.data ?? []
 
-  // KPIs calculés depuis l'API — 0 tant que l'endpoint n'existe pas.
+  // KPIs calculés depuis l'API. Aucune valeur n'est inventée : un catalogue vide
+  // affiche des zéros, ce qui est vrai.
   const totalArticles = articles.length
-  const articlesEnAlerte = articles.filter((a) => a.quantite_stock <= a.seuil_alerte)
+  const articlesEnAlerte = alertes.length
   const valeurStockTotale = articles.reduce(
     (acc, a) => acc + a.quantite_stock * (a.prix_achat || 0),
     0,
@@ -86,10 +104,12 @@ export function StockPage() {
   const recharger = () => {
     void articlesQuery.refetch()
     void mouvementsQuery.refetch()
+    void alertesQuery.refetch()
   }
 
-  // Bandeau module indisponible : endpoint backend absent (404/501).
-  if (endpointAbsent) {
+  // Aucun site sélectionné : le stock est réparti par site, il n'y a donc rien
+  // à afficher tant qu'aucun n'est choisi. Ce n'est pas une panne.
+  if (!sitePret) {
     return (
       <div className="space-y-6">
         <PageHeader
@@ -97,16 +117,13 @@ export function StockPage() {
           sousTitre="Suivi des produits dentaires, seuils de réapprovisionnement et péremptions"
           onRefresh={recharger}
         />
-
-        {/* TODO(backend): endpoints manquants – GET/POST /stock/articles,
-            GET/POST /stock/mouvements. Voir PLAN_RESTE_A_FAIRE.md (P0). */}
         <EmptyState
           icon={PackageX}
-          titre="Module Stock non disponible"
-          description="Le backend n'expose pas encore les endpoints /stock/articles et /stock/mouvements. L'interface est prête et se branchera dès leur livraison — aucune donnée fictive n'est affichée."
+          titre="Aucun site sélectionné"
+          description="Le stock est suivi par site. Choisissez un site en haut de l'écran pour consulter ses produits et ses mouvements."
         >
           <Button variant="outline" onClick={recharger}>
-            <RefreshCw className="h-4 w-4" /> Réessayer
+            <RefreshCw className="h-4 w-4" /> Recharger les sites
           </Button>
         </EmptyState>
       </div>
@@ -171,7 +188,7 @@ export function StockPage() {
           onClick={() => setAlerteSeul(!alerteSeul)}
           aria-pressed={alerteSeul}
           className={`focus-ring p-5 rounded-xl2 border flex items-center justify-between text-left transition-colors ${
-            articlesEnAlerte.length > 0
+            articlesEnAlerte > 0
               ? 'bg-danger/10 border-danger/40 hover:bg-danger/15'
               : 'floating-panel bg-card/80 border-border hover:bg-surface-hover'
           }`}
@@ -184,7 +201,7 @@ export function StockPage() {
               <Skeleton className="mt-2 h-8 w-16" />
             ) : (
               <span className="text-2xl font-bold text-danger tabular-nums">
-                {articlesEnAlerte.length}
+                {articlesEnAlerte}
               </span>
             )}
             <span className="text-[10px] text-muted-foreground block mt-0.5">
@@ -228,6 +245,10 @@ export function StockPage() {
           [
             { id: 'CATALOGUE', label: 'Catalogue', icon: Package, count: articles.length },
             { id: 'MOUVEMENTS', label: 'Mouvements', icon: Clock, count: mouvements.length },
+            // Pas de compteur : contrairement aux deux autres onglets, on ne charge pas
+            // les commandes tant qu'on ne les consulte pas. Un badge « 0 » affiche avant
+            // chargement serait un mensonge.
+            { id: 'COMMANDES', label: 'Commandes', icon: Truck, count: undefined },
           ] as const
         ).map((ongletDef) => {
           const Icone = ongletDef.icon
@@ -246,7 +267,8 @@ export function StockPage() {
               }`}
             >
               <Icone className="h-3.5 w-3.5" aria-hidden />
-              {ongletDef.label} ({ongletDef.count})
+              {ongletDef.label}
+              {ongletDef.count !== undefined ? ` (${ongletDef.count})` : ''}
             </button>
           )
         })}
@@ -476,7 +498,7 @@ export function StockPage() {
                           {estEntree ? `+${m.quantite}` : estSortie ? `-${m.quantite}` : m.quantite}
                         </td>
                         <td className="px-4 py-3 text-card-foreground italic">{m.motif || '—'}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{m.auteur || '—'}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{m.auteur_email || '—'}</td>
                       </tr>
                     )
                   })}
@@ -495,6 +517,7 @@ export function StockPage() {
           setSelectedArticle(null)
         }}
         article={selectedArticle}
+      cabinetId={cabinetActifId ?? ''}
         onSuccess={() => recharger()}
       />
 
@@ -506,9 +529,11 @@ export function StockPage() {
           setSelectedArticle(null)
         }}
         articles={articles}
+      cabinetId={cabinetActifId ?? ''}
         articleInitial={selectedArticle}
         onSuccess={() => recharger()}
       />
+      {onglet === 'COMMANDES' && sitePret && <CommandesPanel cabinetId={cabinetActifId as string} articles={articles} />}
     </div>
   )
 }

@@ -16,7 +16,7 @@ import { Avatar, initiales } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/layout/theme-toggle'
-import { CabinetSelector } from '@/components/layout/cabinet-selector'
+import { SiteSelector } from '@/components/layout/site-selector'
 import { CommandPalette } from '@/components/layout/command-palette'
 import { useAuthStore } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
@@ -161,7 +161,7 @@ export function Topbar({
           </kbd>
         </button>
 
-        <CabinetSelector />
+        <SiteSelector />
 
         <div className="ml-auto flex items-center gap-1.5 md:gap-2">
           <Badge variant="outline" className={cn('hidden gap-1.5 border sm:inline-flex', couleurRole)}>

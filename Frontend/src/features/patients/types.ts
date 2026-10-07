@@ -26,6 +26,12 @@ export interface EtatGeneral {
   hta: boolean
   tabac: boolean
   alcool: boolean
+  // Ajoutés par la migration backend d7e4a1b2c9f3 : le serveur les attend,
+  // le formulaire du dossier permet de les saisir.
+  diabete_traitement?: string | null
+  hta_traitement?: string | null
+  groupe_sanguin?: string | null
+  antecedents_familiaux?: string | null
   allergies?: AllergieItem[] | null
   autres_conditions?: string[] | null
   examens_complementaires?: ExamenComplementaireItem[] | null

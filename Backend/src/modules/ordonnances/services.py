@@ -236,7 +236,19 @@ class OrdonnanceService:
     async def _resoudre_praticien(
         db: AsyncSession, auteur: Optional[Utilisateur]
     ) -> uuid.UUID:
-        """Identifiant du praticien prescripteur : obligatoire (acte médical signé)."""
+        """
+        Identifiant du praticien prescripteur : obligatoire (acte médical signé).
+
+        **Découplage appliqué ici volontairement.** Une ordonnance n'est pas un
+        enregistrement interne : c'est un support papier qui sort du cabinet et
+        engage la responsabilité de son auteur. Elle exige donc encore un profil
+        `Praticien`, là où une consultation n'en exige plus.
+
+        L'asymétrie est assumée et doit être expliquée dans l'interface, sinon
+        elle ressemblera à un oubli. Cf.
+        `docs/corrections/03_CONSULTATION_PRATICIEN.md` §5 pour les options et la
+        cible proposée (exiger aussi un numéro d'Ordre renseigné).
+        """
         if auteur is None:
             raise BusinessRuleViolationException(
                 "Identité du prescripteur inconnue.", code="PRATICIEN_NON_IDENTIFIE"
@@ -245,8 +257,8 @@ class OrdonnanceService:
         profil = (await db.execute(stmt)).scalar_one_or_none()
         if profil is None:
             raise BusinessRuleViolationException(
-                "Votre compte n'est rattaché à aucun profil praticien : impossible "
-                "d'établir une ordonnance signée.",
+                "Une ordonnance doit porter l'identité d'un praticien : votre "
+                "compte n'est rattaché à aucun profil praticien.",
                 code="PRATICIEN_NON_IDENTIFIE",
             )
         return profil

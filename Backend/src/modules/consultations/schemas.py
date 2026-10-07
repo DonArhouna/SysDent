@@ -180,7 +180,13 @@ class ConsultationResponse(BaseSchema):
     dossier_medical_id: uuid.UUID
     patient_id: uuid.UUID
     patient_numero_dossier: Optional[str] = None
-    praticien_id: uuid.UUID
+    # Compte authentifie qui a realise l'episode de soin : c'est lui la
+    # tracabilite. Toujours present.
+    auteur_id: uuid.UUID
+    auteur_email: Optional[str] = None
+    # Profil `Praticien` : attribution reglementaire FACULTATIVE. Absent
+    # quand l'auteur n'est pas inscrit a l'Ordre, ce qui est legitime.
+    praticien_id: Optional[uuid.UUID] = None
     cabinet_id: uuid.UUID
     motif: str
     type_motif: MotifConsultationEnum
@@ -223,6 +229,9 @@ class AlerteConsultation(BaseSchema):
 
 class RechercheConsultations(BaseSchema):
     patient_id: Optional[uuid.UUID] = None
+    #: Compte authentifie qui a realise l'episode de soin.
+    auteur_id: Optional[uuid.UUID] = None
+    #: Profil `Praticien` : ne filtre plus que les auteurs inscrits a l'Ordre.
     praticien_id: Optional[uuid.UUID] = None
     statut: Optional[StatutConsultationEnum] = None
     date_debut: Optional[datetime] = None

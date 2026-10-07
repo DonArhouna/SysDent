@@ -12,6 +12,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { api, type ApiReponse, type PageReponse } from '@/lib/api'
+import { possedePermission, useAuthStore } from '@/stores/auth-store'
+import { useCabinetStore } from '@/stores/cabinet-store'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TBody, TD, TH, THead, TRow } from '@/components/ui/table'
@@ -126,26 +128,58 @@ function FabAide() {
 }
 
 /** Date du jour (AAAA-MM-JJ), figée pour la session de l'onglet. */
+/** Champs minimaux lus par les blocs « Ma journée » et « Alertes de stock ». */
+interface RendezVousLigne {
+  id: string
+  debut: string
+  motif?: string | null
+  statut?: string | null
+}
+
+interface AlerteStockLigne {
+  article_id: string
+  designation: string
+  type: string
+  message: string
+}
+
 const AUJOURDHUI = new Date().toISOString().slice(0, 10)
 
 const formatFcfa = (valeur: number) =>
   new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(valeur)
 
-/** Charge l'API, puis `/factures` (émises), `/devis` (envoyés), caisse et cabinets. */
+/**
+ * Statistiques du tableau de bord.
+ *
+ * Chaque requête est **conditionnée par la permission** qui la protège. Sans
+ * cela, un dentiste — qui n'a délibérément aucun droit de facturation — sealant
+ * cinq requêtes interdites à chaque ouverture du tableau de bord : cinq
+ * allers-retours perdus, une console pleine de 403, et des cartes vides qui
+ * ressemblent à une panne alors que c'est la règle qui s'applique.
+ *
+ * Le contrôle reste **côté serveur** : ici on évite une requête inutile, on
+ * n'autorise rien.
+ */
 function useStatsCabinet() {
   const aujourdhui = AUJOURDHUI
+  const profil = useAuthStore((s) => s.profil)
+  const litPatients = possedePermission(profil, 'PATIENTS:READ')
+  const litFacturation = possedePermission(profil, 'FACTURATION:READ')
 
   const patients = useQuery({
     queryKey: ['stats', 'patients'],
     queryFn: () => api.get<PageReponse<unknown>>('/patients?page=1&limit=1'),
+    enabled: litPatients,
   })
   const facturesEmises = useQuery({
     queryKey: ['stats', 'factures-emises'],
     queryFn: () => api.get<PageReponse<unknown>>('/factures?statut=EMISE&limit=1'),
+    enabled: litFacturation,
   })
   const devisEnvoyes = useQuery({
     queryKey: ['stats', 'devis-envoyes'],
     queryFn: () => api.get<PageReponse<unknown>>('/devis?statut=ENVOYE&limit=1'),
+    enabled: litFacturation,
   })
   const caisseJour = useQuery({
     queryKey: ['stats', 'caisse-jour', aujourdhui],
@@ -153,18 +187,56 @@ function useStatsCabinet() {
       api.get<PageReponse<LigneCaisse>>(
         `/factures/journal-caisse?date_debut=${aujourdhui}&date_fin=${aujourdhui}&limit=100`,
       ),
+    enabled: litFacturation,
   })
 
-  return { patients, facturesEmises, devisEnvoyes, caisseJour, aujourdhui }
+  return { patients, facturesEmises, devisEnvoyes, caisseJour, aujourdhui, litFacturation }
 }
 
 export function DashboardPage() {
   const queryClient = useQueryClient()
-  const { patients, facturesEmises, devisEnvoyes, caisseJour } = useStatsCabinet()
+  const { patients, facturesEmises, devisEnvoyes, caisseJour, litFacturation } = useStatsCabinet()
+
+  // Le tableau de bord est **compose par permission**, pas par role : chaque
+  // bloc demande ce qu'il affiche, et n'apparait que si le role l'a. Un
+  // dentiste voit sa journee, un caissier la facturation, un gestionnaire le
+  // stock — et personne ne voit une carte a zero qui ressemble a une panne.
+  const profil = useAuthStore((s) => s.profil)
+  const litCabinets = possedePermission(profil, 'CABINETS:READ')
+  const litStock = possedePermission(profil, 'STOCK:READ')
+  const litConsultations = possedePermission(profil, 'CONSULTATIONS:READ')
+  const litAgenda = possedePermission(profil, 'AGENDA:READ')
+  const cabinetActifId = useCabinetStore((s) => s.cabinetActifId)
+
+  const journee = useQuery({
+    queryKey: ['stats', 'journee', AUJOURDHUI],
+    queryFn: () =>
+      api.get<PageReponse<unknown>>(
+        `/consultations?date_debut=${AUJOURDHUI}&date_fin=${AUJOURDHUI}&limit=5`,
+      ),
+    enabled: litConsultations,
+  })
+
+  const rendezVous = useQuery({
+    queryKey: ['stats', 'rendez-vous-jour', AUJOURDHUI],
+    queryFn: () =>
+      api.get<ApiReponse<RendezVousLigne[]>>('/rendez-vous?page=1&limit=5'),
+    enabled: litAgenda,
+  })
+
+  const alertesStock = useQuery({
+    queryKey: ['stats', 'alertes-stock', cabinetActifId],
+    queryFn: () =>
+      api.get<ApiReponse<AlerteStockLigne[]>>('/stock/alertes', {
+        params: { cabinet_id: cabinetActifId },
+      }),
+    enabled: litStock && Boolean(cabinetActifId),
+  })
 
   const derniers = useQuery({
     queryKey: ['stats', 'derniers-paiements'],
     queryFn: () => api.get<PageReponse<LigneCaisse>>('/factures/journal-caisse?limit=6'),
+    enabled: litFacturation,
   })
 
   const cabinets = useQuery({
@@ -204,33 +276,39 @@ export function DashboardPage() {
       hint: patients.isError ? 'API injoignable' : undefined,
       chargement: patients.isPending,
     },
-    {
-      label: 'Factures en attente',
-      value: chiffre(facturesEmises.data),
-      detail: 'Émises, non soldées',
-      accent: 'green',
-      icon: FileText,
-      hint: facturesEmises.isError ? 'API injoignable' : undefined,
-      chargement: facturesEmises.isPending,
-    },
-    {
-      label: 'Devis envoyés',
-      value: chiffre(devisEnvoyes.data),
-      detail: 'En attente de signature',
-      accent: 'purple',
-      icon: Receipt,
-      hint: devisEnvoyes.isError ? 'API injoignable' : undefined,
-      chargement: devisEnvoyes.isPending,
-    },
-    {
-      label: 'Encaissé du jour',
-      value: caisseJour.isSuccess ? `${formatFcfa(encaisseJour)} FCFA` : '—',
-      detail: `${caisseJour.data?.meta.total_records ?? 0} encaissement(s)`,
-      accent: 'orange',
-      icon: Banknote,
-      hint: caisseJour.isError ? 'API injoignable' : undefined,
-      chargement: caisseJour.isPending,
-    },
+    // Un role sans droit de facturation ne voit pas les chiffres de la
+    // comptabilite : des zeros affichés feraient croire a une panne.
+    ...(litFacturation
+      ? [
+          {
+            label: 'Factures en attente',
+            value: chiffre(facturesEmises.data),
+            detail: 'Émises, non soldées',
+            accent: 'green' as AccentStat,
+            icon: FileText,
+            hint: facturesEmises.isError ? 'API injoignable' : undefined,
+            chargement: facturesEmises.isPending,
+          },
+          {
+            label: 'Devis envoyés',
+            value: chiffre(devisEnvoyes.data),
+            detail: 'En attente de signature',
+            accent: 'purple' as AccentStat,
+            icon: Receipt,
+            hint: devisEnvoyes.isError ? 'API injoignable' : undefined,
+            chargement: devisEnvoyes.isPending,
+          },
+          {
+            label: 'Encaissé du jour',
+            value: caisseJour.isSuccess ? `${formatFcfa(encaisseJour)} FCFA` : '—',
+            detail: `${caisseJour.data?.meta?.total_records ?? 0} encaissement(s)`,
+            accent: 'orange' as AccentStat,
+            icon: Banknote,
+            hint: caisseJour.isError ? 'API injoignable' : undefined,
+            chargement: caisseJour.isPending,
+          },
+        ]
+      : []),
   ]
 
   return (
@@ -251,6 +329,9 @@ export function DashboardPage() {
 
       {/* Panneaux */}
       <div className="grid gap-6 lg:grid-cols-2">
+        {/* Meme regle : le journal d encaissement n existe que pour qui peut
+            encaisser. Un dentiste n a pas a voir la comptabilite du cabinet. */}
+        {litFacturation && (
         <Card>
           <CardHeader>
             <CardTitle>Derniers Encaissements</CardTitle>
@@ -303,7 +384,9 @@ export function DashboardPage() {
             )}
           </CardContent>
         </Card>
+        )}
 
+        {litCabinets && (
         <Card>
           <CardHeader>
             <CardTitle>Structure du Cabinet</CardTitle>
@@ -343,6 +426,79 @@ export function DashboardPage() {
             )}
           </CardContent>
         </Card>
+        )}
+
+        {/* Ma journée : ce qui concerne le rôle, pas la comptabilité du cabinet. */}
+        {(litConsultations || litAgenda) && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Ma journée</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4 sm:grid-cols-2">
+              {litConsultations && (
+                <div className="rounded-xl2 border bg-card/60 px-4 py-3">
+                  <span className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Consultations du jour
+                  </span>
+                  <span className="mt-1 block text-2xl font-bold tabular-nums">
+                    {journee.data?.meta?.total_records ?? 0}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    réalisées aujourd'hui dans ce cabinet
+                  </span>
+                </div>
+              )}
+              {litAgenda && (
+                <div className="rounded-xl2 border bg-card/60 px-4 py-3">
+                  <span className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Prochains rendez-vous
+                  </span>
+                  <span className="mt-1 block text-2xl font-bold tabular-nums">
+                    {rendezVous.data?.data?.length ?? 0}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    rendez-vous à venir
+                  </span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {litStock && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Alertes de stock</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!cabinetActifId ? (
+                <p className="text-sm text-muted-foreground">
+                  Sélectionnez un site pour consulter les seuils et péremptions.
+                </p>
+              ) : (alertesStock.data?.data ?? []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Aucune alerte : tous les seuils sont respectés sur ce site.
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {(alertesStock.data?.data ?? []).slice(0, 5).map((a) => (
+                    <li
+                      key={a.article_id + a.type}
+                      className="flex items-center justify-between gap-3 rounded-xl2 border px-3 py-2"
+                    >
+                      <span className="min-w-0 truncate text-sm font-medium">
+                        {a.designation}
+                      </span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {a.message}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Bulle d'aide (maquette) — un conseil pratique par jour. */}
