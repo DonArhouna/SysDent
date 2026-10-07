@@ -178,6 +178,26 @@ Et un défaut dans le **correctif précédent lui-même** :
 comportement visible reste à confirmer par l'utilisateur : laisser expirer la
 session → redirection vers `/login`, **aucune** cascade 401/403.
 
+### Leçon — les défauts d'exécution ne se voient pas au build
+
+La purge de session **cassait le démarrage de l'application** : `QueryProvider` est
+monté au-dessus de `BrowserRouter` (`main.tsx`), et le `useNavigate()` que j'y avais
+ajouté levait
+`useNavigate() may be used only in the context of a <Router> component`.
+
+`tsc -b` était propre, `oxlint` à 0 erreur, la suite backend verte. **Aucun de ces
+contrôles ne pouvait le voir** : le défaut n'existe qu'à l'exécution dans un
+navigateur.
+
+Désormais `src/test/arbre-application.test.tsx` monte l'arbre de fournisseurs dans
+l'ordre réel de `main.tsx` et échoue si un hook de routeur est appelé au mauvais
+niveau. Sensibilité prouvée : bug réintroduit → le test reproduit exactement
+l'erreur de l'utilisateur ; corrigé → 8/8 verts, build passé.
+
+C'est le seul filet pour cette famille de défauts. **À étendre** : tout composant
+consommant `useNavigate` / `useLocation` hors d'un routeur a le même risque, et
+personne n'a de navigateur pour le découvrir.
+
 ---
 
 ## Reste à faire
