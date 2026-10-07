@@ -20,6 +20,15 @@ export default defineConfig(({ mode }) => {
         '@': new URL('./src', import.meta.url).pathname,
       },
     },
+    test: {
+      // `jsdom` : le store d'authentification persiste dans `localStorage` et la
+      // purge de session s'appuie sur `BroadcastChannel`. Sans DOM, les tests
+      // porteraient sur une version dégénérée du code.
+      environment: 'jsdom',
+      globals: true,
+      setupFiles: ['./src/test/setup.ts'],
+      include: ['src/**/*.test.{ts,tsx}'],
+    },
     server: {
       port: 5173,
       proxy: {

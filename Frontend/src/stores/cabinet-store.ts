@@ -27,6 +27,8 @@ interface CabinetState {
   cabinets: CabinetItem[]
   chargement: boolean
   setCabinetActifId: (id: string | null) => void
+  /** Oublie le site courant et la liste des sites : fin de session. */
+  vider: () => void
   chargerCabinets: () => Promise<void>
 }
 
@@ -38,6 +40,8 @@ export const useCabinetStore = create<CabinetState>()(
       chargement: false,
 
       setCabinetActifId: (id) => set({ cabinetActifId: id }),
+
+      vider: () => set({ cabinetActifId: null, cabinets: [], chargement: false }),
 
       chargerCabinets: async () => {
         try {

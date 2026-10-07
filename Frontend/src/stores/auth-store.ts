@@ -31,6 +31,7 @@ import {
   setGestionnaireSessionMorte,
   type ApiReponse,
 } from '@/lib/api'
+import { useCabinetStore } from '@/stores/cabinet-store'
 
 export interface ProfilUtilisateur {
   id: string
@@ -83,6 +84,7 @@ export const useAuthStore = create<AuthState>()(
           email,
           password,
         })
+        sessionVivante()
         set({
           token: reponse.data.access_token,
           refreshToken: reponse.data.refresh_token,
@@ -124,21 +126,47 @@ export const useAuthStore = create<AuthState>()(
 /** Purgeur enregistre par l'application : vide le cache et renvoie a la connexion. */
 type PurgeurSession = () => void
 let purgeurSession: PurgeurSession | null = null
-let sessionEnCoursDePurge = false
+
+/**
+ * La session a-t-elle déjà été purgée ?
+ *
+ * Un verrou « purge en cours » ne suffit pas, et c'est ce que le premier correctif
+ * avait fait : les six requêtes du tableau de bord ne reviennent pas 401 au même
+ * instant mais **échelonnées**, chacune après la résolution de la promesse de
+ * renouvellement partagée. La première purge se termine et libère le verrou
+ * avant que la suivante n'arrive — six purges, six `client.clear()`, six
+ * navigations vers `/login`.
+ *
+ * L'état correct est « cette session est déjà morte », pas « une purge est en
+ * cours ». Il est remis à zéro quand une session **vivante** est créée
+ * (connexion ou renouvellement réussi), donc une déconnexion ultérieure purge
+ * bien de nouveau.
+ */
+let sessionVidee = false
 
 /**
  * Enregistre le purgeur de session.
  *
  * Le store ne peut pas importer le client React Query — cela créerait un cycle
- * avec `lib/api`. On enregistre donc lprocedure depuis le provider, comme pour le
- * renouvellement du jeton.
+ * avec `lib/api`. On enregistre donc la procédure depuis le provider, comme pour
+ * le renouvellement du jeton.
  */
 export function setPurgeurSession(fn: PurgeurSession | null): void {
   purgeurSession = fn
 }
 
+/** Marque une session vivante : les purges suivantes redeviennent effectives. */
+function sessionVivante(): void {
+  sessionVidee = false
+}
+
+/** `true` si la session courante a déjà été purgée (évite de purger six fois). */
+export function sessionDejaVidee(): boolean {
+  return sessionVidee
+}
+
 /**
- * Vide le cache applicatif et renvoie à l'écran de connexion.
+ * Vide le cache applicatif, le site mémorisé, et renvoie à l'écran de connexion.
  *
  * Sans ce nettoyage, deux choses se produisent :
  *
@@ -149,20 +177,64 @@ export function setPurgeurSession(fn: PurgeurSession | null): void {
  * - les réponses en cache restent en mémoire. Sur un poste partagé, la personne
  *   qui se connecte ensuite voit les données de la précédente avant même que la
  *   première requête ne revienne.
+ *
+ * `diffuse` évite la boucle entre onglets : celui qui reçoit le message purge,
+ * mais ne le repart pas.
  */
-function purgerSession(): void {
-  // Six requêtes en vol reçoivent 401 en même temps et appellent chacune ce
-  // gestionnaire. Vider six fois ni coûte cher ni fait scintiller la navigation,
-  // mais on évite le travail inutile.
-  if (sessionEnCoursDePurge) return
-  sessionEnCoursDePurge = true
+function purgerSession(diffuse = true): void {
+  if (sessionVidee) return
+  sessionVidee = true
+
   useAuthStore.setState({ token: null, refreshToken: null, profil: null })
+
+  // Le site mémorisé est un identifiant de tenant. Le garder ferait porter les
+  // requêtes du second utilisateur vers le site du premier : le backend refuse
+  // (l'isolation tient), mais l'application demanderait malgré tout une donnée
+  // qui n'est pas la sienne, et afficherait une erreur incompréhensible.
+  useCabinetStore.getState().vider()
+
   try {
+    if (diffuse) diffuserPurgeSession()
     purgeurSession?.()
   } catch {
     // Un cache non vidé ne doit jamais empêcher la déconnexion.
-  } finally {
-    sessionEnCoursDePurge = false
+  }
+}
+
+/** Nom du canal : un même nom = même canal, dans tout le navigateur. */
+const CANAL_SESSION = 'sysdent-session'
+
+/**
+ * Propagation de la purge aux autres onglets.
+ *
+ * Le `localStorage` partagé ne suffit pas : le store d'un onglet déjà chargé
+ * garde son état **en mémoire**. Sans ce canal, un onglet resté ouvert continue
+ * d'appeler l'API avec un jeton révoqué côté serveur — l'utilisateur voit des
+ * erreurs sur une fenêtre qu'il croit encore valide.
+ *
+ * `BroadcastChannel` est disponible dans tous les navigateurs d'usage depuis
+ * 2022. Son absence n'empêche pas la déconnexion locale : on se contente de ne
+ * pas propager.
+ */
+function diffuserPurgeSession(): void {
+  if (typeof BroadcastChannel === 'undefined') return
+  try {
+    const canal = new BroadcastChannel(CANAL_SESSION)
+    canal.postMessage('session-purge')
+    canal.close()
+  } catch {
+    // Canal indisponible : la purge locale a déjà eu lieu, c'est l'essentiel.
+  }
+}
+
+if (typeof BroadcastChannel !== 'undefined') {
+  try {
+    const canal = new BroadcastChannel(CANAL_SESSION)
+    canal.onmessage = (evenement: MessageEvent) => {
+      if (evenement.data === 'session-purge') purgerSession(false)
+    }
+  } catch {
+    /* même raison que ci-dessus */
   }
 }
 
@@ -189,6 +261,8 @@ setRafraichisseur(async () => {
       { silencieux: true },
     )
     const nouveau = reponse.data.access_token
+    // La session redevient vivante : une purge ulterieure doit avoir lieu.
+    sessionVivante()
     useAuthStore.setState({
       token: nouveau,
       // Le backend fait tourner le refresh token : l'ancien ne vaut plus rien.

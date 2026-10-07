@@ -113,7 +113,7 @@ exiger aussi un numéro d'Ordre renseigné.
 | **S0-4** | Semer `ActeNomenclature` au provisionnement | `master/services.py:106` (à côté de `semer_formulaire`) | **Un cabinet neuf ne peut rien facturer.** Une lecture, une ligne. |
 | **S0-5** | `limit` borné (`Query(le=100)`) sur `/rendez-vous`, `/ordonnances`, `/nomenclature/actes` | 3 routeurs | Évite qu'un `limit=99999` tue le serveur. `/nomenclature/actes?limit=201` renvoie 500 au lieu de 422. |
 | **S0-6** | `POST /praticiens` : service + UI | `praticiens-api.ts` + page | **Impossible d'ajouter un dentiste.** C'est la première action d'un cabinet. |
-| **S0-7** | `queryClient.clear()` à la déconnexion et au changement d'utilisateur | App React Query | **Seule fuite inter-tenant plausible du système.** 3 lignes. |
+| ~~**S0-7**~~ | ~~`queryClient.clear()` à la déconnexion et au changement d'utilisateur~~ | `auth-store.ts` + `query-provider.tsx` | **CLOS 2026-10-07.** Purge branchée sur la déconnexion **et** sur la session morte, idempotente (un seul passage malgré six 401 échelonnés), propagée aux autres onglets. Prouvé par `session-expiree.test.ts` (6/6). La purge couvre aussi le site mémorisé, qui est une donnée de tenant. |
 | **S0-8** | Déverrouiller `_psycopg` (politique Windows) | Environnement | **Aucun nouveau cabinet ne peut être provisionné** sans `_psycopg`. Bloque la recette. |
 
 **Critère de sortie** : `GET /factures` et `GET /rbac/roles` renvoient 200 sur une
