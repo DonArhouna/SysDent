@@ -87,11 +87,24 @@ def demander_mot_de_passe() -> str:
 
 
 def _valider_email(email: str) -> str:
-    from src.core.validation import valider_email
+    """
+    Normalise et valide une adresse, avec le **meme validateur que les schemas**.
 
-    email = email.strip().lower()
-    valider_email(email)
-    return email
+    `pydantic.EmailStr` est la validation du projet ; en ecrire une seconde
+    accepterait des adresses que l'API refuse ensuite, et l'erreur n'apparaitrait
+    qu'a l'enregistrement du compte.
+    """
+    from pydantic import BaseModel, EmailStr, ValidationError
+
+    class _Email(BaseModel):
+        valeur: EmailStr
+
+    candidat = (email or "").strip().lower()
+    try:
+        return str(_Email(valeur=candidat).valeur)
+    except ValidationError:
+        print(f"Adresse e-mail invalide : {candidat!r}", file=sys.stderr)
+        raise SystemExit(2)
 
 
 async def _session():
