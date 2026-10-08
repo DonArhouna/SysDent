@@ -68,6 +68,42 @@ le controle de securite le plus discret du module. Le test qui l'attrape est
 ecrit : l'injection donne desormais **1 echec sur 12**, puis 12 verts apres
 remise. Assertions inchangees dans les 10 tests d'origine.
 
+### Le « mot de passe errone » n'etait pas un mot de passe
+
+Le proprietaire a reinitialise son mot de passe plusieurs fois, sans jamais
+pouvoir se connecter. **Trois fois de suite, il etait correct** : le journal
+d'audit enregistrait `PLATFORM_2FA_DEFI`, c'est-a-dire des connexions **reussies**,
+et `tentatives_echouees` restait a 0. Aucun echec de comparaison n'avait lieu.
+
+Le message venait du backoffice. `connexion` testait l'absence d'`access_token`
+**avant** de regarder les jetons d'etape, et levait « Identifiants invalides ».
+Une reponse portant un jeton d'etape n'a pas d'`access_token` - c'est meme la
+garantie qu'aucune session ne s'ouvre avant le second facteur. **La branche
+`jeton_challenge` qui suivait etait donc du code mort** : tout compte plateforme
+echouait a l'ecran apres une reussite serveur.
+
+Deux aggravants :
+
+- `ReponseJeton` declarait `access_token` obligatoire, alors que le serveur ne
+  l'envoie pas avant le second facteur. **Le type validait un code ecrit contre
+  l'inverse de la realite** - il rendait l'erreur invisible au compilateur.
+- le jeton d'enrolement n'etait ni type, ni stocke, ni traite.
+
+Le refus n'est plus deduit de l'absence de jeton : `api.post` leve deja une
+`ApiError` sur une 4xx, avec le message unique que le backend veut. Un 200 sans
+jeton n'est plus affiche comme « identifiants invalides » - ce serait faux, et
+debuguerait l'operateur dans la mauvaise direction pendant des heures.
+
+**Lecon, a retenir** : le journal d'audit tranche ce que l'ecran affirme. Un
+ecran qui affiche un refus alors que le serveur a reussi renvoie vers la saisie
+et non vers le code ; ici, cela a fait perdre plusieurs cycles sur un mot de
+passe qui etait correct depuis le debut. **Lire le journal avant de croire
+l'ecran.**
+
+Preuve : 5 tests du contrat de connexion sur le vrai store, avec les trois formes
+que le backend peut produire. Injection de defaut : 3 echecs sur 5, puis 5 verts
+apres remise. `npm run verifier` vert (types, lint, build) : 0 warning, 0 erreur.
+
 ### Etat verifie sans ambiguite
 
 | Point | Etat |
@@ -80,8 +116,8 @@ remise. Assertions inchangees dans les 10 tests d'origine.
 | Sensibilite a la restriction de portee | **prouvee** par injection de defaut |
 | CLI d'operateur (`lister`, `creer-super-admin`, `reinitialiser-mot-de-passe`, `reinitialiser-2fa`) | **prouvee par execution** |
 | `rhonekane@gmail.com` | cree, Super Admin, mot de passe a tourner par vous |
-| Non-regression complete | **en cours** - voir le verdict en fin de journal |
-| Ecran d'enrolement dans le backoffice | **a faire** |
+| Non-regression backend | **392 passes, 0 echec, 0 ignore, 17 min 51 s** |
+| Ecran d'enrolement dans le backoffice | **a faire** - l'ecran affiche aujourd'hui un message explicite |
 
 ### Reprise, dans cet ordre
 
