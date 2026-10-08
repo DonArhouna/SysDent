@@ -54,13 +54,25 @@ originaux sont désormais capturés avant toute substitution.
 
 ### Verdict
 
-**344 passés, 0 échec, 18,8 min** — premier verdict vert de l'histoire du dépôt
-(il porte sur le code au moment du lancement ; les changements `/rendez-vous` et
-`/ordonnances` sont postérieurs, un second passage est nécessaire).
+| Exécution | Passés | Échoués | Ignorés | Durée |
+|---|---|---|---|---|
+| Avant corrections | — | — | — | **> 40 min, jamais achevée** |
+| Après modèle cloné + hachage rapide | 344 | 0 | 0 | 18,8 min |
+| **Après clonage des tests d'isolation** | **344** | **0** | **0** | **12,1 min** |
 
-Objectif < 15 min : les trois fichiers d'isolation migrating 2 bases chacun ont
-ensuite été passés sur le même modèle (**setup 6–8,6 s → 0,80 s**), ce qui retire
-≈ 3 min 30. Second verdict en cours.
+**Objectif < 15 min atteint**, et cette fois sur le code qui contient la pagination
+de `/rendez-vous` et `/ordonnances` — le verdict intermediate ne la couvrait pas.
+
+Ce sont les **mêmes 344 tests** qu'avant : aucun supprimé, aucun ignoré, aucun
+assoupli.
+
+### Goulot résiduel
+
+Les tests **plateforme** (`tests/platform/test_auth_et_roles.py`) ont encore un
+setup de 3 à 5 s : `platform_engine_test` applique les migrations plateforme à
+chaque test, exactement le défaut corrigé côté tenant. Gain estimé ≈ 1 min. Non
+fait — sous 15 min, l'effort ne se justifie pas encore ; à reprendre si la suite
+repasse le seuil.
 
 Commandes et pièges : `docs/TESTS.md`.
 

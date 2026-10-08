@@ -54,6 +54,16 @@ code **1** si une liste volumineuse n'est pas paginée. À brancher en CI.
 
 ---
 
+## Résultat mesuré
+
+| Exécution | Passés | Échoués | Ignorés | Durée |
+|---|---|---|---|---|
+| Avant corrections | — | — | — | **> 40 min, jamais achevée** |
+| Après modèle cloné + hachage rapide | 344 | 0 | 0 | 18,8 min |
+| Après clonage des tests d'isolation | **344** | **0** | **0** | **12,1 min** |
+
+Les mêmes 344 tests qu'avant : aucun supprimé, ignoré ni assoupli.
+
 ## Pourquoi la suite est passée de 40 min à moins de 15
 
 | Correction | Effet mesuré |
