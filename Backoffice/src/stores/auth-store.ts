@@ -43,11 +43,23 @@ export interface ProfilPlateforme {
   deux_facteurs_prevu?: boolean
 }
 
+/**
+ * Les jetons sont **absents** selon le cas, jamais tous presents.
+ *
+ * Ce type les declarait obligatoires, alors que le backend n'ouvre volontairement
+ * aucune session avant la confirmation du second facteur. Un type qui promet un
+ * champ que le serveur n'envoie pas ne protege de rien : il fait ecrire le code
+ * appelant comme si le champ etait la.
+ */
 interface ReponseJeton {
-  access_token: string
-  refresh_token: string
-  /** Présent au premier contacts : le client doit confirmer le secret TOTP. */
+  /** Absent tant que le second facteur n'est pas confirme. */
+  access_token?: string
+  /** Absent tant que le second facteur n'est pas confirme. */
+  refresh_token?: string
+  /** Etape 2 : le client doit confirmer le secret TOTP d'un compte deja configure. */
   jeton_challenge?: string
+  /** Etape 2 : le compte n'a encore aucun secret TOTP ; il doit s'enroler. */
+  jeton_enrolement?: string
 }
 
 interface AuthState {
@@ -56,9 +68,18 @@ interface AuthState {
   profil: ProfilPlateforme | null
   /** Jeton d'étape 2, entre le mot de passe et la saisie du code TOTP. */
   challenge2fa: string | null
-  connexion: (email: string, password: string) => Promise<'challenge' | 'ok'>
+  /**
+   * Jeton d'enrolement : **tenu en memoire uniquement**, jamais persiste.
+   *
+   * Il n'ouvre que la preparation et l'activation du second facteur. Persiste, il
+   * survivrait a la fermeture de l'onglet et rouvrirait une porte que la session,
+   * elle, a fermee.
+   */
+  jetonEnrolement: string | null
+  connexion: (email: string, password: string) => Promise<'challenge' | 'enrolement' | 'ok'>
   valider2fa: (code: string) => Promise<void>
   annuler2fa: () => void
+  annulerEnrolement: () => void
   chargerProfil: () => Promise<void>
   deconnexion: () => void
 }
@@ -70,6 +91,7 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       profil: null,
       challenge2fa: null,
+        jetonEnrolement: null,
 
       connexion: async (email, password) => {
         const reponse = await api.post<ApiReponse<ReponseJeton>>('/platform/auth/login', {
@@ -79,28 +101,52 @@ export const useAuthStore = create<AuthState>()(
           // pouvait le dire, l'appel passant par une enveloppe generique.
           mot_de_passe: password,
         })
-        // Message volontairement identique quel que soit le motif du refus :
-        // distinguer « compte inconnu » de « mot de passe faux » offre un oracle
-        // aux énumérations de comptes.
-        if (!reponse?.data?.access_token) {
-          throw new Error('Identifiants invalides.')
-        }
+        // **Un refus reel ne passe pas par ici.** `api.post` leve deja une
+        // `ApiError` sur une 4xx, et le backend y met le meme message unique quel
+        // que soit le motif : « compte inconnu » et « mot de passe faux » doivent
+        // rester indistinguables.
+        //
+        // Ce qui se passait avant : le test « pas d'access_token » levait
+        // « Identifiants invalides » sur une reponse **200**. Or une reponse
+        // portant un jeton d'etape n'a pas d'access_token, par construction - c'est
+        // meme la garantie qu'aucune session ne s'ouvre avant le second facteur.
+        // La branche `jeton_challenge` en dessous etait donc du **code mort** :
+        // tout compte plateforme, 2FA comprise, echouait a l'ecran de connexion
+        // alors que le serveur venait d'ouvrir une etape. Le journal d'audit
+        // enregistrait des connexions reussies cote serveur, et l'ecran
+        // affirmait le contraire.
+        const donnees = reponse?.data
 
-        // Un compte sans 2FA configuré reçoit un jeton d'étape : la session ne
-        // s'ouvre qu'après confirmation du secret TOTP.
-        if (reponse.data.jeton_challenge) {
-          set({ challenge2fa: reponse.data.jeton_challenge })
+        // 1. Compte deja configure : il doit confirmer son secret TOTP.
+        if (donnees?.jeton_challenge) {
+          set({ challenge2fa: donnees.jeton_challenge, jetonEnrolement: null })
           return 'challenge'
         }
 
-        sessionVivante()
-        set({
-          token: reponse.data.access_token,
-          refreshToken: reponse.data.refresh_token,
-          challenge2fa: null,
-        })
-        await get().chargerProfil()
-        return 'ok'
+        // 2. Compte sans aucun secret : il doit s'enroler. Ce jeton ouvre la
+        // preparation et l'activation, et ne vaut pas session.
+        if (donnees?.jeton_enrolement) {
+          set({ challenge2fa: null, jetonEnrolement: donnees.jeton_enrolement })
+          return 'enrolement'
+        }
+
+        // 3. Session complete.
+        if (donnees?.access_token && donnees?.refresh_token) {
+          sessionVivante()
+          set({
+            token: donnees.access_token,
+            refreshToken: donnees.refresh_token,
+            challenge2fa: null,
+            jetonEnrolement: null,
+          })
+          await get().chargerProfil()
+          return 'ok'
+        }
+
+        // 4. 200 sans aucun jeton exploitable : ce n'est **pas** un refus
+        // d'identifiants, et le dire serait faux. C'est une rupture de contrat
+        // cote serveur, et elle doit se voir comme telle.
+        throw new Error('Reponse du serveur inattendue : aucun jeton. Rechargez la page.')
       },
 
       valider2fa: async (code) => {
@@ -120,6 +166,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       annuler2fa: () => set({ challenge2fa: null }),
+    annulerEnrolement: () => set({ jetonEnrolement: null }),
 
       chargerProfil: async () => {
         const reponse = await api.get<ApiReponse<ProfilPlateforme>>('/platform/auth/me')
@@ -221,12 +268,19 @@ setRafraichisseur(async () => {
     )
     // La session redevient vivante : une purge ultérieure doit avoir lieu.
     sessionVivante()
+    const { access_token, refresh_token } = reponse.data
+    // Un 200 sans jeton n'est pas un renouvellement : c'est une rupture de contrat
+    // cote serveur. Le traiter comme un succes ecrirait `token: undefined`, et
+    // l'ecran semblerait connecte alors qu'aucune requete ne partirait plus.
+    if (!access_token || !refresh_token) {
+      throw new Error("Renouvellement refuse : le serveur n'a renvoye aucun jeton.")
+    }
     useAuthStore.setState({
-      token: reponse.data.access_token,
+      token: access_token,
       // Le backend fait tourner le refresh token : l'ancien ne vaut plus rien.
-      refreshToken: reponse.data.refresh_token,
+      refreshToken: refresh_token,
     })
-    return reponse.data.access_token
+    return access_token
   } catch {
     // Renouvellement impossible : la session est terminée.
     return null

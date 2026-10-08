@@ -1,13 +1,35 @@
-docs: contrat des dependances « soft » et etat de l'acces du proprietaire
+fix(backoffice): le login echouait meme quand le serveur reussissait
 
-Le docstring de `get_current_platform_user_soft` affirmait « le `except` est
-volontairement large ». Le code capture `AuthenticationException`, et rien
-d'autre : le commentaire decrivait un etat anterieur du code. Remplace par les
-trois regles reellement appliquees - captage type, pas une porte de securite,
-comportement par defaut = refus - avec le renvoi a `preparer_2fa`, ou l'absence
-de porteur doit lever une erreur explicite au lieu de produire un 500.
+Trois defectos lies, tous invisibles sans passer par l'ecran.
 
-PROGRESS.md : le blocage 500 est corrige et preuve sur le serveur en service
-(200 + secret 32 caracteres + URI otpauth). Restent le mot de passe a tourner
-par le proprietaire, l'assistant d'enrolement dans le backoffice, puis la
-desactivation de l'ancien compte une fois le nouvel acces prouve.
+1. `connexion` testait `!access_token` AVANT de regarder les jetsons d'etape, et
+   levait « Identifiants invalides ». Or une reponse portant un jeton d'etape n'a
+   pas d'access_token - c'est meme la garantie qu'aucune session ne s'ouvre avant
+   le second facteur. La branche `jeton_challenge` qui suivait etait donc du code
+   mort : **tout** compte plateforme echouait a l'ecran, y compris le compte du
+   proprietaire, alors que le serveur venait d'ouvrir une etape. Le journal
+   d'audit enregistrait des connexions reussies ; l'ecran affirmait le
+   contraire, et le mot de passe etait innocent.
+
+2. `ReponseJeton` declarait `access_token` et `refresh_token` obligatoires. Le
+   backend n'en envoie aucun avant la confirmation du second facteur. Le type
+   promettait donc un champ que le serveur n'envoie jamais, et validait un code
+   ecrit contre une realite inversee.
+
+3. Le jeton d'enrolement n'etait ni type, ni stocke, ni traite. Le backend le
+   renvoie depuis le debut de l'enrolement ; le store ne le connaissait pas.
+
+Le refus n'est plus deduit de l'absence de jeton mais remonte tel quel de
+`api.post`, qui leve deja une `ApiError` sur une 4xx. Un 200 sans aucun jeton
+n'est plus affiche comme « identifiants invalides » : ce serait faux, et
+debuguerait l'operateur dans la mauvaise direction pendant des heures.
+
+Pendant la correction, TypeScript a releve deux omissions reelles que le build
+ne voyait pas : l'etat initial ne remettait pas `jetonEnrolement` a null, et le
+rafraichissement acceptait un 200 sans jeton - ce qui ecrivait `token:
+undefined` et laissait l'ecran paraitre connecte. Un 200 sans jeton est desormais
+un echec.
+
+Preuve : 5 tests du contrat de connexion, sur le vrai store, avec les trois
+formes que le backend peut produire. Injection de defaut : le test d'access_token
+remis en tete fait echouer 3 tests sur 5, et 5 repassent apres remise.
