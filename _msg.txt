@@ -1,41 +1,6 @@
-update(Backoffice): assistant d enrollement 2FA - QR, code, codes de secours
+docs: consigner la dette contrat:verifier et l etat de l assistant
 
-Ecran manquant qui bloquait le proprietaire depuis le debut. Route /enrolement,
-atteinte depuis le login quand le backend renvoie un jeton d enrollement.
-
-**Aucun code n'est envoye par e-mail.** Le second facteur plateforme est un TOTP :
-le serveur renvoie un secret base32 et une URI otpauth, a scanner. La table
-utilisateurs_plateforme n'a aucune colonne de verification d'e-mail : l'etape
-n'existe pas, et aucun message ne viendra dans une boite mail.
-
-Trois decisions, deux corrections :
-
-- Le client HTTP prend son en-tete `Authorization` dans le jeton de session, qui
-  n'existe pas encore pendant l'enrolement. L'appel partait donc sans porteur et
-  le backend repondait « jeton invalide ». `bearer` rend le porteur explicite :
-  s'appuyer sur l'absence de session aurait laisse une session future ecraser le
-  jeton d'etape en silence.
-- Les codes de secours ne sont jamais stockes. Le store les renvoie a l'appelant
-  et l'ecran les affiche une seule fois, derriere une case « j'ai copie » : les
-  perdre impose de repasser par un operateur, autant que ce soit choice et non
-  que ce soit subi. Un test verifie que le store serialise ne contient pas un
-  code.
-- Le secret et le jeton d'enrolement restent hors du `partialize` : persistes, ils
-  survivraient a la fermeture de l'onglet et permettraient de fabriquer un code
-  TOTP sans l'avoir jamais scanne.
-
-**Bug d'ordonnancement attrape par les tests** : l'ecran des codes de secours
-passait apres la garde « pas de jeton ». Or le store consomme le jeton a
-l'activation, donc des la reussite il vaut null - et les codes, qui ne
-s'affichent qu'une fois, n'etaient jamais vus. Les codes passent avant la garde.
-
-Le QR porte aussi `role="img"` et un `aria-label` : sans eux le SVG n'a aucun nom
-accessible et un lecteur d'ecran passe dessus sans rien dire.
-
-Preuve : 15 tests (3 fichiers) - store d'authentification, store d'enrolement,
-ecran. `npm run verifier` vert : 0 warning, 0 erreur.
-
-Reserve : `contrat:verifier` ne fonctionne pas, `scripts/generer-types.ts` n'existe
-pas, et la reponse de login est declaree `APIResponse[dict]` donc ses champs ne
-figurent pas dans le schema. Les noms de champs de cet ecran ont donc ete releves
-a la main dans `openapi.json`, sans controle automatique des deux cotes.
+La regle de verification des noms de champs des deux cotes n est pas applicable :
+le script appele par contrat:verifier n existe pas, et la reponse de login est
+declaree APIResponse[dict], donc absente du schema OpenAPI. Consigne comme dette
+ouverte plutot que presente comme une verification faite.

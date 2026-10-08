@@ -117,16 +117,38 @@ apres remise. `npm run verifier` vert (types, lint, build) : 0 warning, 0 erreur
 | CLI d'operateur (`lister`, `creer-super-admin`, `reinitialiser-mot-de-passe`, `reinitialiser-2fa`) | **prouvee par execution** |
 | `rhonekane@gmail.com` | cree, Super Admin, mot de passe a tourner par vous |
 | Non-regression backend | **392 passes, 0 echec, 0 ignore, 17 min 51 s** |
-| Ecran d'enrolement dans le backoffice | **a faire** - l'ecran affiche aujourd'hui un message explicite |
+| Assistant d'enrolement (QR, code, codes de secours) | **fait** - 15 tests, `verifier` vert |
+
+### Regle du proprietaire NON respectee : `contrat:verifier` ne fonctionne pas
+
+`Backoffice/package.json` declare `types:generer` et `contrat:verifier`, tous deux
+appellent `scripts/generer-types.ts`. **Ce fichier n'existe pas** : le dossier
+`scripts/` est absent. La commande echoue en `ERR_MODULE_NOT_FOUND`.
+
+Consequence : la regle « noms de champs verifies des deux cotes dans le meme
+commit, avec `contrat:verifier` » **n'est pas applicable en l'etat**, et la
+decision 7 (client TS genere depuis l'OpenAPI) **n'est pas en place** : `api.ts`
+utilise des types ecrits a la main.
+
+Cause racine identifiee : la reponse de `/platform/auth/login` est declaree
+`APIResponse[dict]`, donc **ses champs ne figurent pas dans le schema
+OpenAPI**. Le contrat de connexion est celui-la meme qu'on ne peut pas verifier.
+Les schemas 2FA, eux, sont types (`Activation2FAResponse`,
+`Enrolement2FAResponse`), et c'est sur eux que l'assistant d'enrolement s'appuie.
+
+Les noms de champs de l'assistant ont donc ete **releves a la main** dans
+`openapi.json` (dump au commit `5b435fe`), sans controle automatique des deux
+cotes. A traiter comme une dette ouverte, pas comme une verification faite.
 
 ### Reprise, dans cet ordre
 
-1. Vous : tourner le mot de passe avec `--generer`, puis prouver la connexion.
-2. **Assistant d'enrolement dans `Backoffice/`** : QR, saisie du code, codes de
-   secours avec confirmation, jeton en memoire uniquement.
-3. Regenerer le client OpenAPI, `npm run verifier`.
-4. Desactiver `aminadiop@sysdent.pro` **apres** avoir prouve votre acces.
-5. Puis : les 5 endpoints manquants, Lots 1 et 2, puis Lots 3-6.
+1. **Vous** : enroller le second facteur avec une application TOTP (Aegis,
+   Google Authenticator, 1Password) sur `http://127.0.0.1:5174/enrolement`, puis
+   **copier les codes de secours**.
+2. Desactiver `aminadiop@sysdent.pro` **apres** avoir prouve votre acces.
+3. Reparer `contrat:verifier` : typer la reponse de login cote backend, ecrire
+   `scripts/generer-types.ts`, basculer `api.ts` sur les types generes.
+4. Les 5 endpoints manquants, Lots 1 et 2, puis Lots 3-6.
 
 ### Regle a retenir
 
