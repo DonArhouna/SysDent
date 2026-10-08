@@ -577,7 +577,7 @@ class ConsultationService:
                 selectinload(Consultation.dossier_medical).selectinload(DossierMedical.antecedents),
                 selectinload(Consultation.dossier_medical).selectinload(DossierMedical.etat_general),
             )
-            .order_by(Consultation.date_consultation.desc())
+            .order_by(Consultation.date_consultation.desc(), Consultation.id)
             .offset(offset)
             .limit(limit)
         )

@@ -114,6 +114,37 @@ liste : l'inverse de l'effet voulu.
 | `/ordonnances/medicaments` | catalogue de médicaments |
 | `/stock/alertes` | produits sous le seuil |
 
+### Défauts réels trouvés par le test de contrat
+
+Le test a échoué **sur du code déjà livré**, pas sur un défaut injecté :
+
+| Défaut | Effet |
+|---|---|
+| **Tri non déterministe** sur `Fournisseur.nom` (sans clé secondaire) | 60 fournisseurs dont 4 noms distincts, paginés en 3 pages → **57 identifiants uniques, 3 doublons et 3 manquants**. Une ligne apparaissait deux fois et une autre disparaissait. L'écran, lui, affichait une liste plausible. |
+| `/caisse/paiements-hors-session` : `limit` sans `page`, et `total_records = len(items)` | plafonné à 100, annonçait 100 alors qu'il pouvait en exister 150 — troncature silencieuse sur une liste comptable |
+| `/caisse/sessions` : `limit=50` sans page, enveloppe non paginée | l'historique de caisse perdait ses journées anciennes sans message |
+| `limite` coexistant avec `limit` | l'ancien nom restait sur une route ; un appel l'utilisant aurait été ignoré |
+
+Tous corrigés : clé secondaire `id` sur les tris paginés (fournisseurs, articles,
+commandes, mouvements, factures, devis, consultations), `/caisse/sessions` et
+`/caisse/paiements-hors-session` paginées avec total réel.
+
+### Refus des paramètres inconnus
+
+Un middleware rejette (422) tout paramètre de requête qu'aucune route ne déclare.
+Le bug de référence — le tableau de bord envoyait `limit` à une route attendant
+`limite` — devient désormais **impossible** : il est détecté au premier appel, et
+le test de contrat le vérifie sur chaque route semable.
+
+> Trois pièges rencontrés en écrivant ce middleware, tous **silencieux** :
+> - les routers inclus ne sont pas aplatis dans `app.routes` — il faut suivre
+>   `original_router`, et ce nœud **n'a pas** d'attribut `routes` ;
+> - `route.path` est le chemin **relatif au router**, alors que la requête porte le
+>   chemin monté : comparer les deux ne matchait jamais, et le contrôle était
+>   simplement inerte ;
+> - la table doit être bâtie à la **première requête**, pas à l'enregistrement du
+>   middleware, qui est posé avant l'inclusion des routes.
+
 ### Fait dans cette étape
 
 - `/rendez-vous` et `/ordonnances` paginés : enveloppe `PaginatedResponse`,

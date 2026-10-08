@@ -474,7 +474,7 @@ class FactureService:
 
         total = int((await db.execute(count_stmt)).scalar_one())
         data_stmt = (
-            data_stmt.order_by(Facture.date_emission.desc(), Facture.created_at.desc())
+            data_stmt.order_by(Facture.date_emission.desc(), Facture.created_at.desc(), Facture.id)
             .offset(offset)
             .limit(limit)
         )
@@ -967,7 +967,7 @@ class DevisService:
             data_stmt = data_stmt.where(*conditions)
 
         total = int((await db.execute(count_stmt)).scalar_one())
-        data_stmt = data_stmt.order_by(Devis.created_at.desc()).offset(offset).limit(limit)
+        data_stmt = data_stmt.order_by(Devis.created_at.desc(), Devis.id).offset(offset).limit(limit)
         rows = await db.execute(data_stmt)
         return list(rows.scalars().unique().all()), total
 

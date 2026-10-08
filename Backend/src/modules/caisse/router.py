@@ -57,19 +57,36 @@ def _serialiser(session: SessionCaisse) -> SessionCaisseResponse:
     )
 
 
-@router.get("/sessions", response_model=APIResponse[list[SessionCaisseResponse]])
+@router.get("/sessions", response_model=PaginatedResponse[list[SessionCaisseResponse]])
 async def lister_sessions(
     cabinet_id: uuid.UUID = Query(..., description="Site dont on veut les sessions"),
     statut: StatutSessionCaisseEnum | None = None,
-    limit: int = Query(50, ge=1, le=200),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=LIMITE_PAGE_MAX),
     db: AsyncSession = Depends(get_tenant_db),
     _: bool = Depends(require_permissions("FACTURATION:READ")),
 ):
-    """Historique des sessions de caisse, de la plus récente à la plus ancienne."""
-    sessions = await CaisseService.lister(
-        db, cabinet_id=cabinet_id, statut=statut, limit=limit
+    """
+    Historique des sessions de caisse, de la plus récente à la plus ancienne.
+
+    **Elle grossit sans fin** : au moins une session par caissier et par jour,
+    donc environ 1 100 par an pour trois caissiers. La plafonner à 50 sans page
+    faisait disparaître les sessions anciennes sans le moindre message — le
+    défaut « donnée absente présentée comme un zéro », ici sur l'historique
+    comptable.
+    """
+    sessions, total = await CaisseService.lister(
+        db,
+        cabinet_id=cabinet_id,
+        statut=statut,
+        offset=(page - 1) * limit,
+        limit=limit,
     )
-    return APIResponse(data=[_serialiser(s) for s in sessions])
+    return paginate(
+        [_serialiser(s) for s in sessions],
+        total,
+        PaginationParams(page=page, limit=limit),
+    )
 
 
 @router.get("/session-courante", response_model=APIResponse[SessionCaisseResponse | None])
@@ -186,7 +203,8 @@ async def paiements_de_la_session(
 )
 async def paiements_hors_session(
     cabinet_id: uuid.UUID = Query(..., description="Site concerné"),
-    limit: int = Query(100, ge=1, le=LIMITE_PAGE_MAX),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=LIMITE_PAGE_MAX),
     db: AsyncSession = Depends(get_tenant_db),
     _: bool = Depends(require_permissions("FACTURATION:READ")),
 ):
@@ -198,8 +216,11 @@ async def paiements_hors_session(
     somme dont personne ne répond, et c'est exactement le genre d'écart qu'une
     clôture doit faire apparaître.
     """
-    paiements = await CaisseService.paiements_hors_session(
-        db, cabinet_id=cabinet_id, limit=limit
+    paiements, total = await CaisseService.paiements_hors_session(
+        db,
+        cabinet_id=cabinet_id,
+        offset=(page - 1) * limit,
+        limit=limit,
     )
     items = [
         PaiementCaisseResponse(
@@ -214,4 +235,7 @@ async def paiements_hors_session(
         )
         for p in paiements
     ]
-    return paginate(items, len(items), PaginationParams(page=1, limit=limit))
+    # `total` vient du service, pas de `len(items)` : sinon une liste
+    # plafonnee annonce le nombre de lignes renvoyees et l'utilisateur
+    # croit avoir tout vu.
+    return paginate(items, total, PaginationParams(page=page, limit=limit))

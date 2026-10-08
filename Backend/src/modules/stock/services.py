@@ -129,7 +129,7 @@ class ArticleStockService:
             (
                 await db.execute(
                     stmt.options(selectinload(ArticleStock.stocks_sites))
-                    .order_by(ArticleStock.designation)
+                    .order_by(ArticleStock.designation, ArticleStock.id)
                     .offset(offset)
                     .limit(limit)
                 )
@@ -418,7 +418,9 @@ class MouvementStockService:
         if type_mouvement:
             stmt = stmt.where(MouvementStock.type_mouvement == type_mouvement)
         return list(
-            (await db.execute(stmt.order_by(MouvementStock.date_mouvement.desc()).limit(limit)))
+            (await db.execute(
+                stmt.order_by(MouvementStock.date_mouvement.desc(), MouvementStock.id).limit(limit)
+            ))
             .unique()
             .scalars()
             .all()
@@ -455,7 +457,7 @@ class FournisseurService:
         lignes = list(
             (
                 await db.execute(
-                    stmt.order_by(Fournisseur.nom).offset(offset).limit(limit)
+                    stmt.order_by(Fournisseur.nom, Fournisseur.id).offset(offset).limit(limit)
                 )
             )
             .scalars()
@@ -553,7 +555,7 @@ class CommandeFournisseurService:
         lignes = list(
             (
                 await db.execute(
-                    stmt.order_by(CommandeFournisseur.date_commande.desc())
+                    stmt.order_by(CommandeFournisseur.date_commande.desc(), CommandeFournisseur.id)
                     .offset(offset)
                     .limit(limit)
                 )

@@ -49,7 +49,9 @@ export function CaissePage() {
   })
 
   const session = sessionQuery.data ?? null
-  const historique = historiqueQuery.data?.data ?? []
+  // Enveloppe paginee `{ items, meta }` : lire `.data` renvoyait `undefined`,
+  // donc un historique vide sans le moindre message d'erreur.
+  const historique = historiqueQuery.data?.items ?? []
 
   const cloturer = useMutation({
     // Un objet et non deux arguments : `useMutation` ne transmet qu'une seule

@@ -1,4 +1,4 @@
-import { api, type ApiReponse, type PageReponse } from '@/lib/api'
+import { api, type PageReponse } from '@/lib/api'
 import type {
   ClotureCaissePayload,
   OuvertureCaissePayload,
@@ -22,13 +22,23 @@ export const caisseApi = {
     })
   },
 
-  historique: (cabinetId: string, statut?: string) => {
-    // Reponse enveloppe `APIResponse` : sans le `.data` cote appelant, l'historique
-    // des journees s'affichait vide.
-    return api.get<ApiReponse<SessionCaisse[]>>('/caisse/sessions', {
-      params: { cabinet_id: cabinetId, statut: statut || undefined },
-    })
-  },
+    /**
+     * Historique des sessions de caisse, pagine.
+     *
+     * La liste grossit d'une session par caissier et par jour : la plafonner
+     * faisait disparaitre les journees anciennes sans aucun message. Enveloppe
+     * `{ items, meta }` : lire `.data` renvoyait `undefined`.
+     */
+    historique: (cabinetId: string, statut?: string, page = 1, limit = 20) => {
+      return api.get<PageReponse<SessionCaisse>>('/caisse/sessions', {
+        params: {
+          cabinet_id: cabinetId,
+          statut: statut || undefined,
+          page,
+          limit,
+        },
+      })
+    },
 
   /**
    * Ouvre le tiroir en annonçant les espèces dont le caissier dispose.
@@ -66,9 +76,15 @@ export const caisseApi = {
    * cacher : une somme qui n'entre dans aucune clôture est une somme dont personne
    * ne répond.
    */
-  paiementsHorsSession: (cabinetId: string) => {
-    return api.get<PageReponse<PaiementCaisse>>('/caisse/paiements-hors-session', {
-      params: { cabinet_id: cabinetId },
-    })
-  },
+    /**
+     * Encaissements hors session, pagines.
+     *
+     * Le `total` vient du serveur : annoncer `total_records = 100` quand il en
+     * existe 150 ferait croire a l'utilisateur qu'il a tout vu.
+     */
+    paiementsHorsSession: (cabinetId: string, page = 1, limit = 20) => {
+      return api.get<PageReponse<PaiementCaisse>>('/caisse/paiements-hors-session', {
+        params: { cabinet_id: cabinetId, page, limit },
+      })
+    },
 }

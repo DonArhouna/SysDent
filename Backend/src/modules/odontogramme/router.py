@@ -10,6 +10,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.common.dentaire import ETATS_ATTENTION, ETATS_SOIGNES, FACES_COURTES, FACES_DENT
+from src.common.pagination import LIMITE_PAGE_MAX
 from src.common.schemas import APIResponse
 from src.modules.audit.services import AuditService
 from src.modules.auth.dependencies import get_current_user, get_tenant_db, require_permissions
@@ -270,13 +271,15 @@ async def get_historique_dent(
 )
 async def get_historique_global(
     patient_id: uuid.UUID,
-    limite: int = Query(100, ge=1, le=500, description="Nombre de lignes maxi"),
+    limit: int = Query(
+        100, ge=1, le=LIMITE_PAGE_MAX, description="Nombre de lignes maxi"
+    ),
     db: AsyncSession = Depends(get_tenant_db),
     current_user: Utilisateur = Depends(get_current_user),
     _: bool = Depends(require_permissions("ODONTOGRAMME:READ")),
 ):
     """Historique du patient toutes dents confondues, du plus récent au plus ancien."""
-    lignes = await OdontogrammeService.historique_global(db, patient_id, limite=limite)
+    lignes = await OdontogrammeService.historique_global(db, patient_id, limit=limit)
     return APIResponse(
         data=[
             EtatHistoriqueResponse(

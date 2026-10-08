@@ -243,21 +243,33 @@ class CaisseService:
         *,
         cabinet_id: Optional[uuid.UUID] = None,
         statut: Optional[StatutSessionCaisseEnum] = None,
+        offset: int = 0,
         limit: int = 50,
-    ) -> List[SessionCaisse]:
+    ) -> Tuple[List[SessionCaisse], int]:
+        """
+        Sessions de caisse paginees, avec le total reel.
+
+        Cle secondaire sur `id` : deux sessions ouvertes la meme seconde (deux
+        caisses, ou une ouverture et une cloture au meme instant) resortiraient
+        dans un ordre non garanti, et l'une disparaitrait entre deux pages.
+        """
         stmt = select(SessionCaisse)
         if cabinet_id:
             stmt = stmt.where(SessionCaisse.cabinet_id == cabinet_id)
         if statut:
             stmt = stmt.where(SessionCaisse.statut == statut)
-        return list(
+        total = int(await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
+        lignes = list(
             (
                 await db.execute(
-                    stmt.order_by(SessionCaisse.ouverte_le.desc()).limit(limit)
+                    stmt.order_by(SessionCaisse.ouverte_le.desc(), SessionCaisse.id)
+                    .offset(offset)
+                    .limit(limit)
                 )
             ).scalars()
             .all()
         )
+        return lignes, total
 
     @staticmethod
     async def paiements(
@@ -279,8 +291,12 @@ class CaisseService:
 
     @staticmethod
     async def paiements_hors_session(
-        db: AsyncSession, *, cabinet_id: uuid.UUID, limit: int = 100
-    ) -> List[Paiement]:
+        db: AsyncSession,
+        *,
+        cabinet_id: uuid.UUID,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> Tuple[List[Paiement], int]:
         """
         Encaissements faits sans session ouverte, sur un site donné.
 
@@ -293,16 +309,30 @@ class CaisseService:
         Un cabinet multi-sites ne doit pas voir les encaissements orphelins de
         ses autres sites.
         """
-        return list(
+        conditions = (
+            Paiement.session_caisse_id.is_(None),
+            Facture.cabinet_id == cabinet_id,
+        )
+        base = (
+            select(Paiement)
+            .join(Facture, Paiement.facture_id == Facture.id)
+            .where(*conditions)
+        )
+        # Le total compte les lignes qui satisfont le filtre, **pas** les lignes
+        # renvoyees : confondre les deux fait annoncer `total_records = 100`
+        # alors qu'il existe 150 paiements, et l'utilisateur croit avoir tout vu.
+        total = int(
+            await db.scalar(select(func.count()).select_from(base.subquery())) or 0
+        )
+        lignes = list(
             (
                 await db.execute(
-                    select(Paiement)
-                    .join(Facture, Paiement.facture_id == Facture.id)
-                    .where(
-                        Paiement.session_caisse_id.is_(None),
-                        Facture.cabinet_id == cabinet_id,
-                    )
-                    .order_by(Paiement.date_paiement.desc())
+                    base
+                    # Clé secondaire : deux paiements à la même seconde
+                    # sortiraient dans un ordre non garanti, et l'une
+                    # disparaîtrait entre deux pages.
+                    .order_by(Paiement.date_paiement.desc(), Paiement.id)
+                    .offset(offset)
                     .limit(limit)
                 )
             )
@@ -310,3 +340,4 @@ class CaisseService:
             .scalars()
             .all()
         )
+        return lignes, total
