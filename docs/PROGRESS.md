@@ -54,7 +54,15 @@ originaux sont désormais capturés avant toute substitution.
 
 ### Verdict
 
-En cours. Cf. `docs/TESTS.md`.
+**344 passés, 0 échec, 18,8 min** — premier verdict vert de l'histoire du dépôt
+(il porte sur le code au moment du lancement ; les changements `/rendez-vous` et
+`/ordonnances` sont postérieurs, un second passage est nécessaire).
+
+Objectif < 15 min : les trois fichiers d'isolation migrating 2 bases chacun ont
+ensuite été passés sur le même modèle (**setup 6–8,6 s → 0,80 s**), ce qui retire
+≈ 3 min 30. Second verdict en cours.
+
+Commandes et pièges : `docs/TESTS.md`.
 
 ---
 
@@ -94,9 +102,26 @@ liste : l'inverse de l'effet voulu.
 | `/ordonnances/medicaments` | catalogue de médicaments |
 | `/stock/alertes` | produits sous le seuil |
 
+### Fait dans cette étape
+
+- `/rendez-vous` et `/ordonnances` paginés : enveloppe `PaginatedResponse`,
+  `page`/`limit` avec `LIMITE_PAGE_MAX` (100) et **422** sur valeur invalide,
+  `total` calculé sur les mêmes filtres que les lignes
+- **Clé secondaire de tri** (`id`) sur les deux : sans elle, deux lignes de même
+  date sortent dans un ordre que PostgreSQL ne garantit pas être stable, et
+  sautent d'une page à l'autre. C'est le défaut que le test de contrat doit traquer
+- Filtre **signature** des ordonnances déplacé côté serveur, pagination branchée sur
+  la liste, retour page 1 sur changement de filtre
+- Frontend mis à jour sur les trois appels (`rendezvous-api`, `ordonnances-api`,
+  `ordonnances-list-page`) : `dashboard.tsx` envoyait déjà `?page=1&limit=5`, que le
+  backend **ignorait** puisqu'il attendait `limite`
+
 ### Reste à faire
 
-1. Paginer `/rendez-vous` et `/ordonnances` (index si le tri l'exige)
+1. **Test de contrat exécutable** : insérer 60 lignes, vérifier que `page`/`limit`
+   sont réellement pris en compte, `total` exact, aucune ligne perdue ni dupliquée
+   sur l'ensemble des pages. `inventaire_listes.py` ne vérifie que la *forme* de
+   l'enveloppe, pas le comportement.
 2. Test de contrat exécutable : 60 lignes insérées, `page`/`limit` réellement pris
    en compte, `total` exact, **aucune ligne perdue ni dupliquée** sur l'ensemble des
    pages, tri déterministe avec clé secondaire
@@ -381,6 +406,19 @@ personne n'a de navigateur pour le découvrir.
 ---
 
 ## Décisions à valider
+
+4. **Recherche serveur sur les ordonnances** — la page filtre encore le texte en
+   client sur la page courante. Corrigé il faudrait une recherche serveur portant sur
+   nom et numéro de dossier du patient, donc un JOIN qui traverse deux modules.
+   À valider : est-ce attendu avant l'étape file d'attente ?
+5. **`/caisse/sessions` non paginée** — croît d'une session par jour et par caissier.
+   Volumineuse à l'échelle d'un an, mais la page n'affiche que les sessions récentes.
+   Volontairement laissée en dehors de l'inventaire : à confirmer.
+6. **Vues bornées classées comme telles** (`agenda`, `creneaux-libres`, `referentiel`,
+   `medicaments`, `alertes`) — décision assumée et documentée dans
+   `inventaire_listes.py`, pour qu'elle se relise au lieu de se découvrir par
+   absence. À valider : `/ordonnances/medicaments` croît avec le catalogue et
+   pourrait mercer la pagination un jour.
 
 1. **Tests frontend sans MSW** (fetch piloté) — choix fait pour l'économie et la
    précision ; à confirmer.
