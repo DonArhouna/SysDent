@@ -12,7 +12,7 @@
     "test:watch": "vitest",
     "types:generer": "tsx scripts/generer-types.ts",
     "contrat:verifier": "tsx scripts/generer-types.ts --verifier",
-    "verifier": "npm run types:verifier && npm run lint && npm run build",
+    "verifier": "npm run contrat:verifier && npm run types:verifier && npm run lint && npm run build",
     "types:verifier": "tsc -b --force"
   },
   "dependencies": {

@@ -37,6 +37,7 @@ from src.modules.platform.schemas import (
     Challenge2FARequest,
     ChangementMotDePasseRequest,
     Confirmer2FARequest,
+    LoginPlateformeResponse,
     PlatformLoginRequest,
     PlatformProfilResponse,
     PlatformRefreshRequest,
@@ -70,7 +71,7 @@ def _deposer_cookie(response: Response, token: str) -> None:
 
 @platform_auth_router.post(
     "/login",
-    response_model=APIResponse[dict],
+    response_model=APIResponse[LoginPlateformeResponse],
     summary="Première étape : e-mail + mot de passe",
     responses={
         401: {"description": "Identifiants invalides (message volontairement indistinct)"},
@@ -109,9 +110,18 @@ async def login(
     except Exception:
         raise
     login_platform_limiter.reussite(cle)
+    # **Le schema doit decrire la reponse reelle.** `APIResponse[dict]`
+    # acceptait n'importe quoi : un champ renomme cote service auraitcontinue de
+    # fonctionner, et le front l'aurait decouvert a l'execution - un 422, ou pire
+    # un `undefined` silencieusement lu comme absent. En typant, le contrat
+    # devient visible dans l'OpenAPI et se verifie des deux cotes.
+    #
+    # Le filtre de FastAPI ne perd rien ici : le service renvoie exactement les
+    # champs declares par `LoginPlateformeResponse`. Si un jour il en renvoyait un
+    # de plus, la reponse le perdrait **silencieusement** - d'ou le test de contrat.
     return APIResponse(
         message="Mot de passe correct. Saisissez le code de votre application d'authentification.",
-        data=resultat,
+        data=LoginPlateformeResponse(**resultat),
     )
 
 

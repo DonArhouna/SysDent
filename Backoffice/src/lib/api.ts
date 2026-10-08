@@ -1,3 +1,4 @@
+import type { paths } from '@/lib/openapi'
 /**
  * Client HTTP unique du backoffice.
  *
@@ -27,6 +28,40 @@ export class ApiError extends Error {
     this.details = details
   }
 }
+
+/**
+ * Client type par l'OpenAPI.
+ *
+ * `ReponseDe<'/chemin'>` est calcule a partir de `src/lib/openapi.d.ts`, lui-meme
+ * genere depuis `openapi.json`. Un nom de champ ecrit ici mais absent du schema
+ * devient donc une **erreur de compilation**, et non un `undefined` lu comme
+ * absent a l'execution.
+ *
+ * C'est ce que la regle du projet exigeait - « noms de champs verifies des deux
+ * cotes dans le meme commit » - et ce que le client entierement ecrit a la main
+ * ne garantissait pas : `ReponseJeton` declarait `access_token` obligatoire la
+ * ou le serveur ne l'envoie jamais, et le type validait l'inverse de la realite.
+ */
+export type Chemins = keyof paths
+
+type ReponseDeMethode<
+  P extends Chemins,
+  M extends 'get' | 'post',
+> = paths[P] extends { [K in M]: { responses: infer R } } ? R : never
+
+/** Corps JSON d'une reponse 200, pour un chemin et une methode donnes. */
+export type ReponseDe<P extends Chemins, M extends 'get' | 'post' = 'get'> =
+  ReponseDeMethode<P, M> extends {
+    200: { content: { 'application/json': infer Corps } }
+  }
+    ? Corps
+    : never
+
+/** Corps d'une requete (JSON), pour un chemin et une methode donnes. */
+export type CorpsDe<P extends Chemins, M extends 'get' | 'post' = 'post'> =
+  paths[P] extends { [K in M]: { requestBody: { content: { 'application/json': infer C } } } }
+    ? C
+    : never
 
 const BASE = import.meta.env.VITE_API_URL ?? ''
 const PREFIXE = '/api/v1'

@@ -1,6 +1,44 @@
-docs: consigner la dette contrat:verifier et l etat de l assistant
+fix(contrat): contrat:verifier existe enfin, et mord des deux cotes
 
-La regle de verification des noms de champs des deux cotes n est pas applicable :
-le script appele par contrat:verifier n existe pas, et la reponse de login est
-declaree APIResponse[dict], donc absente du schema OpenAPI. Consigne comme dette
-ouverte plutot que presente comme une verification faite.
+`package.json` declarait `types:generer` et `contrat:verifier`, tous deux
+appelaient `scripts/generer-types.ts`, qui n'existait pas : le dossier `scripts/`
+etait absent et les commandes echouaient en ERR_MODULE_NOT_FOUND. La regle du
+proprietaire - « noms de champs verifies des deux cotes dans le meme commit » -
+etait donc invérifiable, et rien ne la faisait.
+
+**Cause racine du manque.** `/platform/auth/login` etait declare
+`APIResponse[dict]` : ses champs n'etaient pas dans le schema, donc le contrat a
+verifier ne pouvait pas l'etre. `LoginPlateformeResponse` declarait deja les trois
+issues - la route l'utilise maintenant, et le schema contient desormais
+`jeton_enrolement`, `jeton_challenge` et les jetons de session.
+
+**Le store ne declare plus ses types.** `ReponseDe<'/chemin'>` les tire du schema
+genere. C'etait la faille qui a produit le faux « identifiants invalides » :
+`ReponseJeton` declarait `access_token` obligatoire la ou le serveur ne l'envoie
+jamais, et le type validait donc l'inverse de la realite. Le backend
+ne declare que ce qu'il renvoie ; le compilateur refuse ce que le backend ne
+declare pas.
+
+**Preuve de sensibilite.** `jeton_enrolement` renomme en `jeton_enrolement_renomme`
+cote backend, schema regenere :
+
+- `tsc` echoue sur deux lignes du store - le front ne peut plus utiliser un champ
+  non declare ;
+- `contrat:verifier` signale la derive, puis repasse au vert apres regeneration.
+
+**Un defaut du verificateur trouve au passage.** Il comparait le contenu genere
+avec l'en-tete qu'il ecrit lui-meme dans le fichier, donc il echouait en
+permanence. Un controle qui echoue toujours est un controle qu'on ignore : il
+serait devenu pire que son absence. Compare desormais en-tete compris.
+
+`openapi-typescript` v7 renvoie un AST, pas une chaine : sans `astToString` le
+fichier genere ne contenait que `[object Object]` repete, soit un `.d.ts` vide
+qui compilait encore. Le pire des deux.
+
+`npm run verifier` enchaine contrat, types, lint et build - le controle ne peut
+plus etre saute par megarde. References de scripts rendues explicites (`npm run
+x`) : sous Windows, `contrat:verifier` seul n'etait pas resolu par cmd.
+
+Dette restante : 8 routes renvoient encore `APIResponse[dict]` (`router.py` x4,
+`commercial.py`, `onboarding.py`, `supervision.py`, `tenants.py`). Leurs reponses
+ne sont pas verifiables tant qu'elles ne sont pas typees.

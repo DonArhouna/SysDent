@@ -119,26 +119,44 @@ apres remise. `npm run verifier` vert (types, lint, build) : 0 warning, 0 erreur
 | Non-regression backend | **392 passes, 0 echec, 0 ignore, 17 min 51 s** |
 | Assistant d'enrolement (QR, code, codes de secours) | **fait** - 15 tests, `verifier` vert |
 
-### Regle du proprietaire NON respectee : `contrat:verifier` ne fonctionne pas
+### Regle du proprietaire : `contrat:verifier` REPARE et preuve sensible
 
-`Backoffice/package.json` declare `types:generer` et `contrat:verifier`, tous deux
-appellent `scripts/generer-types.ts`. **Ce fichier n'existe pas** : le dossier
-`scripts/` est absent. La commande echoue en `ERR_MODULE_NOT_FOUND`.
+Le script appele par `contrat:verifier` n'existait pas (`scripts/` absent). Il
+ecrit desormais `src/lib/openapi.d.ts` depuis `openapi.json`, et verifie que le
+fichier versionne correspond - ce dernier **echoue** desormais si l'API a change
+sans que le front soit regenere.
 
-Consequence : la regle « noms de champs verifies des deux cotes dans le meme
-commit, avec `contrat:verifier` » **n'est pas applicable en l'etat**, et la
-decision 7 (client TS genere depuis l'OpenAPI) **n'est pas en place** : `api.ts`
-utilise des types ecrits a la main.
+**Cause racine du manque** : `/platform/auth/login` etait declare
+`APIResponse[dict]`. Ses champs n'etaient donc **absents du schema**, et le
+contrat qu'il fallait verifier ne pouvait pas l'etre. La route renvoie desormais
+`LoginPlateformeResponse`, qui declarait deja les trois issues - le schema
+contient desormais `jeton_enrolement`, `jeton_challenge` et les jetons de session.
 
-Cause racine identifiee : la reponse de `/platform/auth/login` est declaree
-`APIResponse[dict]`, donc **ses champs ne figurent pas dans le schema
-OpenAPI**. Le contrat de connexion est celui-la meme qu'on ne peut pas verifier.
-Les schemas 2FA, eux, sont types (`Activation2FAResponse`,
-`Enrolement2FAResponse`), et c'est sur eux que l'assistant d'enrolement s'appuie.
+Le store ne declare plus ses types a la main : `ReponseDe<'/chemin'>` les tire du
+schema. C'etait exactement la faille qui a produit le faux « identifiants
+invalides » - `ReponseJeton` declarait `access_token` **obligatoire** la ou le
+serveur ne l'envoie jamais, et le type validait donc l'inverse de la realite.
 
-Les noms de champs de l'assistant ont donc ete **releves a la main** dans
-`openapi.json` (dump au commit `5b435fe`), sans controle automatique des deux
-cotes. A traiter comme une dette ouverte, pas comme une verification faite.
+**Preuve de sensibilite, des deux cotes.** Renommer `jeton_enrolement` en
+`jeton_enrolement_renomme` cote backend, regenerer le schema :
+
+- `tsc` echoue : `Property 'jeton_enrolement' does not exist on type
+  'ReponseJeton'`. **Le front ne peut plus utiliser un champ que le backend ne
+  declare pas.**
+- `contrat:verifier` signale la derive ; apres regeneration, il repasse au vert.
+
+Un second defaut du verificateur a ete trouve et corrige au passage : il comparait
+le contenu genere sans l'en-tete qu'il ecrit dans le fichier, donc il echouait
+**en permanence**. Un controle qui echoue toujours est un controle qu'on ignore -
+c'est ce qui l'aurait rendu pire que son absence.
+
+`npm run verifier` enchaine maintenant `contrat:verifier`, `types:verifier`, `lint`
+et `build` : le controle ne peut plus etre saute par megarde.
+
+**Dette restante** : 8 autres routes renvoient encore `APIResponse[dict]`
+(`router.py` x4, `commercial.py`, `onboarding.py`, `supervision.py`,
+`tenants.py`). Leurs reponses ne sont pas verifiables des deux cotes tant qu'elles
+ne sont pas typees.
 
 ### Reprise, dans cet ordre
 

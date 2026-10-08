@@ -8,6 +8,7 @@ import {
   setGestionnaireSessionMorte,
   type ApiReponse,
 } from '@/lib/api'
+import type { ReponseDe } from '@/lib/api'
 import { useCabinetStore } from '@/stores/tenant-store'
 
 /**
@@ -51,16 +52,19 @@ export interface ProfilPlateforme {
  * champ que le serveur n'envoie pas ne protege de rien : il fait ecrire le code
  * appelant comme si le champ etait la.
  */
-interface ReponseJeton {
-  /** Absent tant que le second facteur n'est pas confirme. */
-  access_token?: string
-  /** Absent tant que le second facteur n'est pas confirme. */
-  refresh_token?: string
-  /** Etape 2 : le client doit confirmer le secret TOTP d'un compte deja configure. */
-  jeton_challenge?: string
-  /** Etape 2 : le compte n'a encore aucun secret TOTP ; il doit s'enroler. */
-  jeton_enrolement?: string
-}
+/**
+ * Les trois issues du login, **tires du schema**.
+ *
+ * Une interface ecrite a la main promettait `access_token` obligatoire la ou le
+ * serveur ne l'envoie jamais, et le type validait donc l'inverse de la realite.
+ * Ici, un champ absent du schema est une erreur de compilation : le defaut que
+ * nous avons racks caute ne peut pas revenir par la meme porte.
+ */
+type CheminLogin = '/api/v1/platform/auth/login'
+type ReponseLogin = ReponseDe<CheminLogin, 'post'>
+
+/** Champs presents quelle que soit l'issue. */
+interface ReponseJeton extends Partial<NonNullable<ReponseLogin['data']>> {}
 
 /**
  * Formes OpenAPI, relevees dans `openapi.json` sur les schemas
@@ -70,16 +74,16 @@ interface ReponseJeton {
  * `Activer2FARequest.code`. Un `code_2fa` aurait ete refuse en 422, et rien dans
  * un appel enveloppe par `api.post` ne l'aurait signale.
  */
-interface Preparation2FA {
-  /** Secret TOTP base32. Affichable une fois : il est renvoye ici et nulle part ailleurs. */
-  secret: string
-  /** URI `otpauth://` a encoder en QR code par le client. */
-  uri: string
-  instruction: string
-}
+/** `/platform/auth/2fa/preparation`, tel que le backend le repond. */
+type Preparation2FA = NonNullable<
+  ReponseDe<'/api/v1/platform/auth/2fa/preparation', 'get'>['data']
+>
+
+/** Reponse de `/platform/auth/2fa/activation`, tiree du schema. */
+type Activation = ReponseDe<'/api/v1/platform/auth/2fa/activation', 'post'>
 
 /** Reponse de `/platform/auth/2fa/activation`. */
-interface EnrolementTermine extends ReponseJeton {
+interface EnrolementTermine extends NonNullable<Activation['data']> {
   /**
    * Codes de secours, **une seule fois**.
    *
