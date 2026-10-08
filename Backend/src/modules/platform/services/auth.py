@@ -283,7 +283,19 @@ class PlatformAuthService:
             raise AuthenticationException("Compte indisponible.", code="COMPTE_NON_ACTIF")
 
         secret = valider_secret_2fa(user.secret_2fa_chiffre)
-        if secret is None or not verifier_code_totp(secret, code):
+        # Un code de secours remplace le code TOTP quand le telephone n'est pas
+        # sous la main. Cette tentative manquait ici : elle n'existait qu'a
+        # l'ACTIVATION, donc un compte dont le telephone est perdu ne pouvait plus
+        # se reconnecter du tout - le mecanisme des codes de secours etait
+        # produit, stocke, et mort.
+        # Usage unique : la consommation est un effet de bord, retire de la liste,
+        # et le commit qui ouvre la session la rend definitive.
+        code_valide = secret is not None and verifier_code_totp(secret, code)
+        if not code_valide:
+            code_valide = await PlatformAuthService.consommer_code_de_secours(
+                db, user, code
+            )
+        if not code_valide:
             await JournalService.journaliser(
                 db,
                 action="PLATFORM_2FA_ECHOUCHE",

@@ -417,3 +417,107 @@ def _code_totp(secret_base32: str, *, decalage: int = 0) -> str:
     dyna = mac[-1] & 0x0F
     code = struct.unpack(">I", mac[dyna : dyna + 4])[0] & 0x7FFFFFFF
     return f"{code % 1_000_000:06d}"
+
+
+# ---------------------------------------------------------------------------
+# 5. La portee du jeton, et le comportement par defaut du refus
+# ---------------------------------------------------------------------------
+#
+# Les tests precedents verifient ce que le jeton d'enrolement **ouvre**. Les
+# deux suivants verifient ce qu'il **ne doit pas ouvrir**. C'est le controle de
+# securite le plus discret du fichier : la clause `usage == ENROLEMENT_2FA`
+# disparait sans erreur visible, et le jeton d'un autre usage se met a ouvrir
+# l'enrolement. Aucun test ne le couvrait : la suppression de la clause laissait
+# les dix tests verts. D'ou ce test, ecrit apres l'injection de defaut qu'il
+# doit aujourd'hui attraper.
+
+
+async def _inserer_jeton(nom_base: str, *, usage: str, cible_id: str, jeton: str) -> None:
+    """Insere un jeton usage unique valide, inutilise et non expire."""
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    from src.modules.platform.security import hacher_jeton
+
+    engine = create_async_engine(
+        f"postgresql+asyncpg://{settings.PLATFORM_DB_USER}:{settings.PLATFORM_DB_PASSWORD}"
+        f"@{settings.PLATFORM_DB_HOST}:{settings.PLATFORM_DB_PORT}/{nom_base}"
+    )
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(
+                text(
+                    """
+                    INSERT INTO jetons_usage_unique
+                        (id, usage, hash_jeton, cible_type, cible_id, expire_le,
+                         utilise, cree_par, created_at, updated_at)
+                    VALUES (gen_random_uuid(), :usage, :hash, 'PLATEFORME_UTILISATEUR',
+                            :cible, now() + interval '10 minutes', false, 'test', now(), now())
+                    """
+                ),
+                {"usage": usage, "hash": hacher_jeton(jeton), "cible": cible_id},
+            )
+    finally:
+        await engine.dispose()
+
+
+async def test_un_jeton_d_autre_usage_n_ouvre_pas_l_enrolement(client, plateforme):
+    """
+    Un jeton valide, non expire et inutilise, mais d'un **autre usage**, est refuse.
+
+    C'est le test de sensibilite de la clause `usage`. Sans elle, un jeton de
+    challenge 2FA - present dans la base a chaque connexion - ouvrirait la
+    preparation et l'activation, et donc la porte d'entree de la plateforme.
+    """
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    moteur = create_async_engine(
+        f"postgresql+asyncpg://{settings.PLATFORM_DB_USER}:{settings.PLATFORM_DB_PASSWORD}"
+        f"@{settings.PLATFORM_DB_HOST}:{settings.PLATFORM_DB_PORT}/{plateforme}"
+    )
+    try:
+        async with moteur.connect() as conn:
+            cible = (
+                await conn.execute(
+                    text("SELECT id FROM utilisateurs_plateforme WHERE email = :e"),
+                    {"e": EMAIL},
+                )
+            ).scalar_one()
+    finally:
+        await moteur.dispose()
+
+    jeton = "jeton-de-defaut-a-portee-trop-large-1234567890"
+    await _inserer_jeton(plateforme, usage="CHALLENGE_2FA", cible_id=str(cible), jeton=jeton)
+
+    r = await client.get(
+        "/api/v1/platform/auth/2fa/preparation",
+        headers={"Authorization": f"Bearer {jeton}"},
+    )
+    assert r.status_code == 401, (
+        "un jeton d'un autre usage a ouvert l'enrolement : la restriction de portee "
+        f"est ineffective ({r.status_code})"
+    )
+    assert "secret" not in r.text, (
+        "un secret TOTP a ete emis sur un jeton qui ne devrait pas ouvrir l'enrolement"
+    )
+
+
+async def test_absence_de_jeton_refusee_sans_erreur_interne(client):
+    """
+    Aucune dependance resolue -> un refus 401 explicite, jamais une 500.
+
+    Les deux dependances sont « soft » : un jeton inconnu, expire ou deja utilise
+    les met a `None` plutot que de lever. La route doit donc refuser elle-meme.
+    Sans cela elle passait `None` au service, qui levait un AttributeError : la
+    reponse 500 affirmait au client que la route etait cassee, et un detail
+    interne fut exposé dans la charge utile d'erreur.
+    """
+    r = await client.get("/api/v1/platform/auth/2fa/preparation")
+    assert r.status_code == 401, (
+        f"une requete sans jeton a repondu {r.status_code} au lieu d'etre refusee"
+    )
+    corps = r.json()
+    assert corps.get("error", {}).get("code") != "INTERNAL_SERVER_ERROR", (
+        "une absence d'identite a produit une erreur interne : la route ne refuse pas"
+    )

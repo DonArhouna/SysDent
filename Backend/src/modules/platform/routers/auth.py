@@ -19,6 +19,7 @@ from src.core.config import settings
 from src.core.exceptions import AuthenticationException
 from src.core.platform_database import get_platform_db
 from src.core.rate_limit import cle_login, login_platform_limiter
+from src.modules.platform.services.journal import JournalService
 from src.modules.platform.dependencies import (
     client_ip,
     exiger_ip_autorisee,
@@ -245,7 +246,22 @@ async def preparer_2fa(
     redevient jamais lisible : perdre son téléphone impose de passer par une
     réinitialisation tracée par un Super Admin.
     """
-    preparation = await PlatformAuthService.preparer_second_facteur(db, user)
+    # L'un OU l'autre ouvre la preparation. Sans cela, un jeton d'enrolement
+    # resolvait bien `user_enrolement` mais n'etait pas utilise : le service
+    # recevait `user=None` et levait un AttributeError -> 500 sur le premier
+    # ecran de l'enrolement, celui que tout operateur voit en premier.
+    porteur = user_enrolement or user
+    if porteur is None:
+        # **Echec ferme.** Aucune des deux dependances n'a resolu de porteur : le
+        # jeton presente est invalide, expire, ou d'un autre usage. Passer `None`
+        # au service levait un AttributeError -> 500, qui dit a l'appelant que la
+        # route est cassee alors que la seule erreur est l'absence d'identite.
+        # Les deux types de jeton sont refuses ici, sans dire lequel : dire lequel
+        # reviendrait a confirmer qu'un jeton existe.
+        raise AuthenticationException(
+            "Authentification requise.", code="AUTHENTICATION_REQUIRED"
+        )
+    preparation = await PlatformAuthService.preparer_second_facteur(db, porteur)
     await db.commit()
     return APIResponse(data=Activation2FAResponse(**preparation))
 

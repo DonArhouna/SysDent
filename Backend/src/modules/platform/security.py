@@ -247,10 +247,24 @@ def generer_codes_secours(nombre: int = NB_CODES_SECOURS) -> List[str]:
     lu par un humain, pas seulement par l'ordinateur.
     """
     alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
-    codes = []
-    for _ in range(nombre):
-        brut = generer_jeton_opaque(10)
-        codes.append("".join(alphabet[int(c, 16) % len(alphabet)] for c in brut[:8]))
+    longueur = 8
+    codes: List[str] = []
+    # **Tirage direct dans l'alphabet**, et non reinterpretation d'un jeton deja
+    # produit. `generer_jeton_opaque` renvoie du base64url, dont les caracteres
+    # sortent de [0-9a-f] : `int(c, 16)` levait ValueError sur le premier d'entre
+    # eux, et l'activation du second facteur echouait en 500 pour tout le monde.
+    # Le modulo sur un octet ajouterait par ailleurs un biais mesurable ;
+    # `randbelow` est uniforme et lisible.
+    #
+    # ** unicite garantie** : deux codes identiques signifie qu'en consommer un
+    # invalide les deux. L'operateur croit alors disposer de dix codes et n'en
+    # a que neuf - un piege qui n'apparait qu'a l'usage, bien apres l'activation.
+    while len(codes) < nombre:
+        candidat = "".join(
+            alphabet[secrets.randbelow(len(alphabet))] for _ in range(longueur)
+        )
+        if candidat not in codes:
+            codes.append(candidat)
     return codes
 
 
