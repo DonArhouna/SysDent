@@ -4,14 +4,6 @@
 > est, ce qui est **prouvé**, ce qui ne l'est pas, et par où reprendre.
 > Mis à jour à la fin de chaque étape. Un commit atomique par étape.
 
----
-
-## État à date : 2026-10-08 (session 3)
-
-**Étape en cours : 1 — non-régression backend et accélération de la suite.**
-La suite n'a jamais été verte : elle dépassait 40 min et fut abandonnée deux fois.
-Verdict en cours. L'écran Fournisseurs et la pagination stock sont livrés ; l'étape
-file d'attente reste donc bloquée.
 
 ---
 
@@ -94,6 +86,16 @@ apres le login) mais **n'a pas produit de sortie** avant l'epuisement du context
 Une dependance « soft » ne doit exister que pour une route a **deux** types de
 jeton, doit etre documentee, et son comportement par defaut doit etre le **refus** :
 une erreur inattendue ne peut jamais se transformer en acces accorde.
+
+---
+---
+
+## État à date : 2026-10-08 (session 3)
+
+**Étape en cours : 1 — non-régression backend et accélération de la suite.**
+La suite n'a jamais été verte : elle dépassait 40 min et fut abandonnée deux fois.
+Verdict en cours. L'écran Fournisseurs et la pagination stock sont livrés ; l'étape
+file d'attente reste donc bloquée.
 
 ---
 
