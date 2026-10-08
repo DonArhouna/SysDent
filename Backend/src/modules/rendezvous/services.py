@@ -1013,8 +1013,21 @@ class RendezVousService:
         du: Optional[datetime] = None,
         au: Optional[datetime] = None,
         statuts: Optional[Sequence[str]] = None,
-        limite: int = 100,
-    ) -> List[RendezVous]:
+        offset: int = 0,
+        limit: int = 100,
+    ) -> Tuple[List[RendezVous], int]:
+        """
+        Rendez-vous pagines, avec le nombre total correspondant.
+
+        Le total est calcule **avec** les lignes et sur les memes filtres :
+        les compter separement inviterait a les faire diverger, et la
+        pagination afficherait alors un compte que la liste ne contient pas.
+
+        Le tri porte une **cle secondaire** (`id`). Sans elle, deux rendez-vous
+        du meme debut sont renvoyes dans un ordre que PostgreSQL ne garantit
+        pas etre stable d'une requete a l'autre : une ligne peut alors
+        apparaitre deux fois en page 2 et manquer en page 3.
+        """
         stmt = (
             select(RendezVous)
             .options(
@@ -1026,7 +1039,7 @@ class RendezVousService:
                 ),
                 selectinload(RendezVous.consultation),
             )
-            .order_by(RendezVous.debut)
+                            .order_by(RendezVous.debut, RendezVous.id)
         )
         if patient_id:
             stmt = stmt.where(RendezVous.patient_id == patient_id)
@@ -1048,7 +1061,11 @@ class RendezVousService:
                     )
                 )
             )
-        return list((await db.execute(stmt.limit(limite))).scalars().all())
+        total = int(await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
+        lignes = list(
+            (await db.execute(stmt.offset(offset).limit(limit))).scalars().all()
+        )
+        return lignes, total
 
     @staticmethod
     async def agenda(
@@ -1067,13 +1084,13 @@ class RendezVousService:
         debut_jour = datetime.combine(jour, datetime.min.time(), tzinfo=timezone.utc)
         fin_jour = debut_jour + timedelta(days=1)
 
-        rendez_vous = await RendezVousService.lister(
+        rendez_vous, _total = await RendezVousService.lister(
             db,
             cabinet_id=cabinet_id,
             praticien_id=praticien_id,
             du=debut_jour,
             au=fin_jour,
-            limite=500,
+            limit=500,
         )
 
         stmt = (

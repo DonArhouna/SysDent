@@ -1200,17 +1200,17 @@ async def test_filtres_de_liste(client_authenticated, decor, patient_id):
     par_patient = await client_authenticated.get(
         "/api/v1/rendez-vous", params={"patient_id": patient_id}
     )
-    assert len(par_patient.json()["data"]) == 2
+    assert len(par_patient.json()["items"]) == 2
 
     par_fauteuil = await client_authenticated.get(
         "/api/v1/rendez-vous", params={"fauteuil_id": decor["fauteuil_1"]}
     )
-    assert len(par_fauteuil.json()["data"]) == 1
+    assert len(par_fauteuil.json()["items"]) == 1
 
     par_statut = await client_authenticated.get(
         "/api/v1/rendez-vous", params={"statut": "PLANIFIE"}
     )
-    assert len(par_statut.json()["data"]) == 2
+    assert len(par_statut.json()["items"]) == 2
 
     # 09h45 doit inclure le rendez-vous de 09h30 (filtre sur l'intervalle).
     intervalle = await client_authenticated.get(
@@ -1220,7 +1220,7 @@ async def test_filtres_de_liste(client_authenticated, decor, patient_id):
             "au": "2026-10-05T10:15:00+00:00",
         },
     )
-    assert len(intervalle.json()["data"]) == 1
+    assert len(intervalle.json()["items"]) == 1
 
 
 # ==============================================================================

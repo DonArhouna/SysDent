@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Pagination } from '@/components/ui/pagination'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
@@ -8,6 +9,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { useToastStore } from '@/stores/toast-store'
+import type { PageReponse } from '@/lib/api'
 import { ordonnancesApi } from '../services/ordonnances-api'
 import type { OrdonnanceResponse } from '../types'
 import { OrdonnanceModal } from '../components/ordonnance-modal'
@@ -27,6 +29,9 @@ import {
   WifiOff,
 } from 'lucide-react'
 
+/** Taille de page. Une seule valeur pour toutes les listes de l'application. */
+const TAILLE_PAGE = 20
+
 export function OrdonnancesListPage() {
   const { addToast } = useToastStore()
   const [ordonnances, setOrdonnances] = useState<OrdonnanceResponse[]>([])
@@ -35,6 +40,8 @@ export function OrdonnancesListPage() {
   const [erreurChargement, setErreurChargement] = useState(false)
   const [filtreStatut, setFiltreStatut] = useState<'TOUS' | 'SIGNE' | 'NON_SIGNE'>('TOUS')
   const [recherche, setRecherche] = useState('')
+  const [page, setPage] = useState(1)
+  const [meta, setMeta] = useState<PageReponse<OrdonnanceResponse>['meta'] | undefined>()
 
   // Modales
   const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -50,8 +57,15 @@ export function OrdonnancesListPage() {
     try {
       setLoading(true)
       setErreurChargement(false)
-      const res = await ordonnancesApi.lister({ limite: 100 })
-      setOrdonnances(res.data)
+      const res = await ordonnancesApi.lister({
+        page,
+        limit: TAILLE_PAGE,
+        // Le filtre passe sur le serveur : filtrer la page chargee en cliente
+        // ferait dire « 3 ordonnances » a un cabinet qui en compte 300.
+        signe: filtreStatut === 'TOUS' ? undefined : filtreStatut === 'SIGNE',
+      })
+      setOrdonnances(res.items)
+      setMeta(res.meta)
     } catch {
       // toast géré par l'intercepteur API
       setErreurChargement(true)
@@ -87,22 +101,6 @@ export function OrdonnancesListPage() {
     }
   }
 
-  const ordonnancesFiltrees = ordonnances.filter((o) => {
-    if (filtreStatut === 'SIGNE' && !o.signe) return false
-    if (filtreStatut === 'NON_SIGNE' && o.signe) return false
-    if (recherche) {
-      const q = recherche.toLowerCase()
-      const matchNum = o.numero.toLowerCase().includes(q)
-      const matchLignes = o.lignes.some(
-        (l) =>
-          l.medicament_texte?.toLowerCase().includes(q) ||
-          l.nom_commercial?.toLowerCase().includes(q) ||
-          l.dci?.toLowerCase().includes(q)
-      )
-      if (!matchNum && !matchLignes) return false
-    }
-    return true
-  })
 
   return (
     <div className="space-y-6">
@@ -144,7 +142,7 @@ export function OrdonnancesListPage() {
           <span className="text-xs text-muted-foreground">Statut :</span>
           <div className="flex rounded-lg bg-muted p-1 border border-border">
             <button
-              onClick={() => setFiltreStatut('TOUS')}
+              onClick={() => { setFiltreStatut('TOUS'); setPage(1) }}
               className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${
                 filtreStatut === 'TOUS'
                   ? 'bg-primary text-white'
@@ -154,7 +152,7 @@ export function OrdonnancesListPage() {
               Toutes ({ordonnances.length})
             </button>
             <button
-              onClick={() => setFiltreStatut('SIGNE')}
+              onClick={() => { setFiltreStatut('SIGNE'); setPage(1) }}
               className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${
                 filtreStatut === 'SIGNE'
                   ? 'bg-primary text-white'
@@ -164,7 +162,7 @@ export function OrdonnancesListPage() {
               Signées ({ordonnances.filter((o) => o.signe).length})
             </button>
             <button
-              onClick={() => setFiltreStatut('NON_SIGNE')}
+              onClick={() => { setFiltreStatut('NON_SIGNE'); setPage(1) }}
               className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${
                 filtreStatut === 'NON_SIGNE'
                   ? 'bg-primary text-white'
@@ -196,7 +194,7 @@ export function OrdonnancesListPage() {
               <RefreshCw className="h-4 w-4" /> Réessayer
             </Button>
           </EmptyState>
-        ) : ordonnancesFiltrees.length === 0 ? (
+        ) : ordonnances.length === 0 ? (
           <EmptyState
             icon={FileText}
             titre="Aucune ordonnance trouvée"
@@ -214,7 +212,7 @@ export function OrdonnancesListPage() {
               </TRow>
             </THead>
             <TBody>
-              {ordonnancesFiltrees.map((ord) => (
+              {ordonnances.map((ord) => (
                 <TRow key={ord.id}>
                   <TD className="font-mono font-bold text-foreground text-xs">{ord.numero}</TD>
                   <TD className="text-xs">{formatDateFr(ord.date_ordonnance)}</TD>
@@ -274,6 +272,14 @@ export function OrdonnancesListPage() {
             </TBody>
           </Table>
         )}
+
+        <Pagination
+          meta={meta}
+          page={page}
+          limit={TAILLE_PAGE}
+          onPageChange={setPage}
+          libelle="ordonnances"
+        />
       </div>
 
       {/* Modale de création */}

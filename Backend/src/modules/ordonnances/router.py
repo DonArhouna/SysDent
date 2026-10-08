@@ -9,7 +9,8 @@ import uuid
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.common.schemas import APIResponse
+from src.common.schemas import APIResponse, PaginatedResponse
+from src.common.pagination import LIMITE_PAGE_MAX, PaginationParams, paginate
 from src.modules.audit.services import AuditService
 from src.modules.auth.dependencies import get_current_user, get_tenant_db, require_permissions
 from src.modules.ordonnances.schemas import (
@@ -191,20 +192,29 @@ async def creer_ordonnance(
     )
 
 
-@router.get("", response_model=APIResponse[List[OrdonnanceResponse]])
+@router.get("", response_model=PaginatedResponse[OrdonnanceResponse])
 async def list_ordonnances(
     patient_id: Optional[uuid.UUID] = Query(None, description="Filtrer par patient"),
     consultation_id: Optional[uuid.UUID] = Query(None, description="Filtrer par consultation"),
-    limite: int = Query(50, ge=1, le=200),
+    signe: Optional[bool] = Query(
+        None, description="Filtrer sur la signature : true signee, false non signee"
+    ),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=LIMITE_PAGE_MAX),
     db: AsyncSession = Depends(get_tenant_db),
     current_user: Utilisateur = Depends(get_current_user),
     _: bool = Depends(require_permissions("ORDONNANCES:READ")),
 ):
     """Ordonnances du cabinet, de la plus récente à la plus ancienne."""
-    prescriptions = await OrdonnanceService.lister(
-        db, patient_id=patient_id, consultation_id=consultation_id, limite=limite
+    prescriptions, total = await OrdonnanceService.lister(
+        db,
+        patient_id=patient_id,
+        consultation_id=consultation_id,
+        signe=signe,
+        offset=(page - 1) * limit,
+        limit=limit,
     )
-    return APIResponse(data=[_vers_reponse(p) for p in prescriptions])
+    return paginate([_vers_reponse(p) for p in prescriptions], total, PaginationParams(page=page, limit=limit))
 
 
 @router.get("/{prescription_id}", response_model=APIResponse[OrdonnanceResponse])

@@ -448,7 +448,7 @@ async def test_controle_a_blanc_refuse_sans_ecrire(client_authenticated, formula
     assert any(a["gravite"] == INTERDIT for a in data["alertes"])
 
     liste = await client_authenticated.get("/api/v1/ordonnances", params={"patient_id": patient_id})
-    assert liste.json()["data"] == []
+    assert liste.json()["items"] == []
 
 
 @pytest.mark.asyncio
@@ -867,7 +867,7 @@ async def test_ordonnance_liee_a_la_consultation(client_authenticated, formulair
         "/api/v1/ordonnances", params={"consultation_id": consultation_id}
     )
     assert liste.status_code == 200, liste.text
-    assert len(liste.json()["data"]) == 1
+    assert len(liste.json()["items"]) == 1
 
 
 # ==============================================================================

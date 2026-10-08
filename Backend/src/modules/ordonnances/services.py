@@ -684,8 +684,17 @@ class OrdonnanceService:
         *,
         patient_id: Optional[uuid.UUID] = None,
         consultation_id: Optional[uuid.UUID] = None,
-        limite: int = 50,
-    ) -> List[Prescription]:
+        signe: Optional[bool] = None,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> Tuple[List[Prescription], int]:
+        """
+        Ordonnances paginees, avec le total.
+
+        Cle secondaire sur `id` pour la meme raison que les rendez-vous : deux
+        ordonnances prescriptions a l'identique ont une date identique, et un
+        tri non deterministe fait sauter des lignes d'une page a l'autre.
+        """
         stmt = select(Prescription).options(
             selectinload(Prescription.lignes).selectinload(LignePrescription.medicament)
         )
@@ -693,8 +702,17 @@ class OrdonnanceService:
             stmt = stmt.where(Prescription.patient_id == patient_id)
         if consultation_id:
             stmt = stmt.where(Prescription.consultation_id == consultation_id)
-        stmt = stmt.order_by(Prescription.date_ordonnance.desc()).limit(limite)
-        return list((await db.execute(stmt)).scalars().all())
+        if signe is not None:
+            # Filtre **serveur** : filtrer cote client sur une page revient a
+            # annoncer « 3 resultats » alors que le cabinet en compte 300. La
+            # page affiche ce qu'elle a charge, pas ce qui existe.
+            stmt = stmt.where(Prescription.signe == signe)
+        stmt = stmt.order_by(Prescription.date_ordonnance.desc(), Prescription.id)
+        total = int(await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
+        lignes = list(
+            (await db.execute(stmt.offset(offset).limit(limit))).scalars().all()
+        )
+        return lignes, total
 
     @staticmethod
     async def controler_possibilite(

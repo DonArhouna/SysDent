@@ -17,13 +17,19 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-
-from src.core.migrations import upgrade_tenant_to_head
 from src.core.security import create_access_token, get_password_hash
 from src.main import app
 from src.modules.auth import dependencies as auth_deps
 from src.modules.tenants.models import Cabinet, Praticien, Role, Utilisateur
 from tests.conftest import _async_url, _sync_url
+# `tests/__init__.py` existe : le dossier des tests est un paquet, et un
+# import nu ne resout donc pas. La racine du depot doit etre sur le chemin,
+# ce que fait pytest via la racine de `testpaths`.
+try:  # pragma: no cover - depend de la maniere dont pytest est invoque
+    from tests import base_de_test
+except ImportError:  # pragma: no cover
+    import base_de_test
+
 
 
 class Ctx:
@@ -94,10 +100,9 @@ async def deux_cabinets():
     noms = [f"sysdent_odo_a_{uuid.uuid4().hex[:8]}", f"sysdent_odo_b_{uuid.uuid4().hex[:8]}"]
     admin = create_async_engine(_async_url("postgres"), isolation_level="AUTOCOMMIT")
     for nom in noms:
-        async with admin.connect() as conn:
-            await conn.execute(text(f'CREATE DATABASE "{nom}"'))
-    for nom in noms:
-        await asyncio.to_thread(upgrade_tenant_to_head, _sync_url(nom))
+        # Clone du modèle migré : rejouer 17 migrations par base
+        # coûtait 6 à 8 s par test dans ce fichier.
+        await base_de_test.cloner(nom)
 
     ctx_a = await _creer_ctx("odo-a", noms[0])
     ctx_b = await _creer_ctx("odo-b", noms[1])

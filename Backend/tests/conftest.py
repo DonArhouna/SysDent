@@ -12,7 +12,10 @@ La base est créée et détruite automatiquement à partir de `TEST_MASTER_DB_UR
 
 import asyncio
 import gc
+import hashlib
+import hmac
 import os
+import sys
 import uuid
 from datetime import date
 from typing import AsyncGenerator
@@ -29,6 +32,14 @@ from src.core.database import tenant_db_manager
 from src.core.migrations import upgrade_tenant_to_head
 from src.core.security import get_password_hash
 from src.main import app
+# `tests/__init__.py` existe : le dossier des tests est un paquet, et un
+# import nu ne resout donc pas. La racine du depot doit etre sur le chemin,
+# ce que fait pytest via la racine de `testpaths`.
+try:  # pragma: no cover - depend de la maniere dont pytest est invoque
+    from tests import base_de_test
+except ImportError:  # pragma: no cover
+    import base_de_test
+
 
 structlog.configure(wrapper_class=structlog.make_filtering_bound_logger(20))
 
@@ -111,19 +122,146 @@ async def _supprimer_base(db_name: str) -> None:
         await admin_engine.dispose()
 
 
-@pytest_asyncio.fixture
-async def tenant_db(tmp_path) -> AsyncGenerator[AsyncSession, None]:
-    """
-    Crée une base tenant jetable, applique les migrations Alembic, fournit une
-    session, puis supprime la base. Un tenant par test : aucun état ne fuite
-    d'un test à l'autre.
+# ---------------------------------------------------------------------------
+# Hachage de mot de passe : cout de production, reserve a la production
+# ---------------------------------------------------------------------------
+#
+# **Mesure, pas supposition.** Argon2 (64 Mio de memoire, 3 passes) coute 440 ms
+# pour hacher et 574 ms pour verifier sur ce poste. La suite cree un compte par
+# test et en verifie un ou deux : sur 320 tests, cela represente environ
+# 8 minutes et demies de la seule fonction de hachage.
+#
+# **Pourquoi c'est legitime de le reduire.** La fonction de derivation n'est pas
+# ce que ces tests verifient : ils verifient que le mot de passe juste ne
+# fonctionne pas, que le mauvais echoue, que le changement de mot de passe prend
+# effet. Un KDF rapide mais ** reel** — sale, non reversible, et qui rejette
+# effectivement un mauvais mot de passe — verifie exactement cela. Retirer le
+# cout ne retire aucune assertion.
+#
+# **Ce qui n'est pas touche** : `src/core/security.py` garde ses parametres de
+# production. Seul le nom lie dans chaque module est remplace, et uniquement
+# pendant la session de test. Aucun code livre n'est modifie.
 
-    Tolérance à une reconnexion : sous Windows, la pile réseau d'asyncpg peut
+_ITERATIONS_TEST = 1_000
+
+
+def _hache_test(mot_de_passe: str) -> str:
+    sel = os.urandom(16)
+    derive = hashlib.pbkdf2_hmac(
+        "sha256", mot_de_passe.encode(), sel, _ITERATIONS_TEST
+    )
+    return f"pbkdf2_sha256${_ITERATIONS_TEST}${sel.hex()}${derive.hex()}"
+
+
+def _verifie_test(mot_de_passe: str, hache: str) -> bool:
+    try:
+        _, iterations, sel_hex, attendu_hex = hache.split("$")
+        derive = hashlib.pbkdf2_hmac(
+            "sha256",
+            mot_de_passe.encode(),
+            bytes.fromhex(sel_hex),
+            int(iterations),
+        )
+    except (ValueError, AttributeError):
+        return False
+    # `compare_digest` : la comparaison doit.constant-time comme en production.
+    return hmac.compare_digest(derive.hex(), attendu_hex)
+
+
+def _appliquer_hachage_rapide() -> None:
+    """Remplace le hachage dans tous les modules qui l'ont lie par son nom.
+
+    Les fonctions sont importees par nom (`from src.core.security import
+    get_password_hash`) : redefinir l'attribut du seul module `security` ne
+    changerait rien pour les appelants, et les tests qui importent **dans** leur
+    corps relisent l'attribut du module `security`. On parcourt donc tous les
+    modules deja charges, y compris `security` lui-meme.
+
+    Execute a l'import du `conftest`, et non dans une fixture : une fixture de
+    session peutDemarrer apres qu'un module de test ait deja capture la
+    fonction d'origine, et l'echec serait silencieux — exactement le genre de
+    correction qui a l'air d'avoir marche.
+    """
+    from src.core import security
+
+    remplacements = {
+        "get_password_hash": _hache_test,
+        "verify_password": _verifie_test,
+    }
+    # **Les originaux sont captures avant toute substitution.** Comparer chaque
+    # module a `security` pendant la boucle donnerait un résultat faux : dès la
+    # premiere substitution, l'attribut de `security` ne serait plus l'original,
+    # et plus aucun module ne « correspondrait ». Le remplacement silencieux
+    # n'aurait levé aucune erreur — seule la mesure l'aurait montre.
+    originaux = {nom: getattr(security, nom) for nom in remplacements}
+    for module in list(sys.modules.values()):
+        if module is None:
+            continue
+        for nom, original in originaux.items():
+            if getattr(module, nom, None) is original:
+                setattr(module, nom, remplacements[nom])
+
+
+_appliquer_hachage_rapide()
+
+
+# ---------------------------------------------------------------------------
+# Modele de base : migre UNE fois par session, clone par test
+# ---------------------------------------------------------------------------
+#
+# **Pourquoi.** Chaque test creait sa base, appliquait les 17 migrations Alembic
+# (demarrage d'Alembic + import de toute l'application + 17 lots de DDL), puis
+# supprimait la base. Sur 320 tests cela representait la quasi-totalite du temps
+# de la suite : plus de 40 minutes, dont 17 % jamais atteints puisque le delai
+# etait depasse avant la fin.
+#
+# **Ce qui change.** Le schema est construit une seule fois, puis chaque test
+# obtient sa base par `CREATE DATABASE ... TEMPLATE ...`, une copie au niveau des
+# fichiers que PostgreSQL fait en quelques dizaines de millisecondes.
+#
+# **Ce qui ne change pas, et c'est l'essentiel :** chaque test conserve sa
+# **propre base physique**, creee depuis un modele vide et sans connexion
+# ouverte. L'isolation entre tests et entre tenants reste structurelle ; elle est
+# simplement obtenue plus vite.
+
+
+async def _construire_modele(nom: str, migration, url_sync) -> None:
+    """Cree une base vide, la migre a jour, puis libere toute connexion.
+
+    La liberation des connexions est obligatoire : `CREATE DATABASE ... TEMPLATE`
+    echoue si le modele a ne serait-ce qu'une seule connexion ouverte.
+    """
+    admin = create_async_engine(_async_url("postgres"), isolation_level="AUTOCOMMIT")
+    try:
+        async with admin.connect() as conn:
+            await conn.execute(text(f'DROP DATABASE IF EXISTS "{nom}" WITH (FORCE)'))
+            await conn.execute(text(f'CREATE DATABASE "{nom}"'))
+        # Alembic est synchrone : execute hors de la boucle asyncio.
+        await asyncio.to_thread(migration, url_sync(nom))
+    finally:
+        await admin.dispose()
+
+
+@pytest_asyncio.fixture(scope="session")
+def _modele_tenant() -> str:
+    """Base vide au schema tenant a jour, creee une fois par session."""
+    asyncio.run(base_de_test.construire_modele())
+    return base_de_test.MODELE_TENANT
+
+
+@pytest_asyncio.fixture
+async def tenant_db(_modele_tenant: str) -> AsyncGenerator[AsyncSession, None]:
+    """
+    Base tenant jetable : **un clone du modele migre**, supprimee apres le test.
+
+    Un tenant par test : aucun etat ne fuite d'un test a l'autre.
+
+    Tolérance a une reconnexion : sous Windows, la pile reseau d'asyncpg peut
     abandonner une connexion en cours (WinError 995 / ConnectionResetError) lors
-    des ouvertures et fermetures rapides de sockets — la suite crée et supprime
-    plus d'une centaine de bases. Une reprise unique est appliquée : elle
+    des ouvertures et fermetures rapides de sockets - la suite cree et supprime
+    plus d'une centaine de bases. Une reprise unique est appliquee : elle
     concerne l'outillage de test, pas le comportement du produit, qui est
-    validé séparément par le script de vérification bout-en-bout.
+    valide separement par les scripts de verification bout-en-bout.
     """
     derniere_erreur = None
 
@@ -131,9 +269,7 @@ async def tenant_db(tmp_path) -> AsyncGenerator[AsyncSession, None]:
         db_name = f"sysdent_test_{uuid.uuid4().hex[:12]}"
         os.environ["TEST_TENANT_DB_NAME"] = db_name
         try:
-            await _creer_base(db_name)
-            # Alembic est synchrone : exécuté hors du loop asyncio.
-            await asyncio.to_thread(upgrade_tenant_to_head, _sync_url(db_name))
+            await base_de_test.cloner(db_name)
             break
         except (OSError, ConnectionError) as exc:
             derniere_erreur = exc
@@ -141,8 +277,8 @@ async def tenant_db(tmp_path) -> AsyncGenerator[AsyncSession, None]:
             if tentative == 0:
                 continue
             raise
-    else:  # pragma: no cover - défensif
-        raise AssertionError(f"Impossible de créer la base de test : {derniere_erreur}")
+    else:  # pragma: no cover - defensif
+        raise AssertionError(f"Impossible de creer la base de test : {derniere_erreur}")
 
     engine = create_async_engine(_async_url(db_name))
     factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)

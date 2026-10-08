@@ -6,14 +6,110 @@
 
 ---
 
-## État à date : 2026-10-07 (session 2)
+## État à date : 2026-10-08 (session 3)
 
-**Étape en cours : 2 — file d'attente.** Migration **écrite et testée sur copie**,
-**pas encore appliquée** à la base de démo. Étape 1 close et prouvée.
+**Étape en cours : 1 — non-régression backend et accélération de la suite.**
+La suite n'a jamais été verte : elle dépassait 40 min et fut abandonnée deux fois.
+Verdict en cours. L'écran Fournisseurs et la pagination stock sont livrés ; l'étape
+file d'attente reste donc bloquée.
 
 ---
 
-## Étape 1 bis — écran Fournisseurs et pagination des listes
+## Étape 1 — Non-régression et performance de la suite
+
+### Mesures, pas suppositions
+
+| Cause | Mesure | Coût total |
+|---|---|---|
+| Les **17 migrations Alembic s'exécutent pour chaque test** (création de base, migration, suppression) | démarrage d'Alembic + import de toute l'application + 17 lots de DDL, répété ~320 fois | la quasi-totalité de la suite |
+| Hachage de mot de passe à **coût de production** | `get_password_hash` **440 ms**, `verify_password` **574 ms** | ~8 min 30 sur 320 tests |
+
+Écartées après vérification : aucune attente réelle (`sleep`) dans les tests, et les
+N+1 ont été traités par `selectinload` lors du chantier Finance.
+
+### Corrections — sans affaiblir aucune assertion
+
+**1. Modèle de base migré une fois, cloné par test.** `CREATE DATABASE … TEMPLATE`
+copie au niveau des fichiers : quelques dizaines de millisecondes au lieu de rejouer
+17 migrations.
+
+> Ce qui ne change pas, et c'est l'essentiel : chaque test garde **sa propre base
+> physique**, créée depuis un modèle vide et sans connexion ouverte. L'isolation
+> reste structurelle ; elle est seulement obtenue plus vite.
+
+**2. Hachage rapide en session de test.** PBKDF2-SHA256 à 1 000 itérations
+(2,2 ms au lieu de 440 ms), salé et réellement irréversible : les tests qui
+vérifient qu'un mauvais mot de passe échoue restent honnêtes.
+
+> `src/core/security.py` garde ses paramètres de production. Seul le nom lié dans
+> chaque module est remplacé, pendant la seule session de test. Aucun code livré
+> n'est modifié, et aucun test ne vérifie Argon2 ou bcrypt lui-même (grep : 0).
+
+**Un bug d'implémentation rencontré au passage.** La boucle de remplacement
+comparait chaque module à `src.core.security` **pendant** la substitution : dès la
+première substitution la référence n'était plus l'original, donc plus aucun module ne
+« correspondait ». Le remplacement échouait **silencieusement**, sans lever la moindre
+erreur ; seule la mesure du coût (440 ms toujours présents) l'a révélé. Les
+originaux sont désormais capturés avant toute substitution.
+
+### Verdict
+
+En cours. Cf. `docs/TESTS.md`.
+
+---
+
+## Étape 2 — Contrat de pagination
+
+### Inventaire extrait des routes enregistrées
+
+`Backend/tests/inventaire_listes.py` lit le spectre OpenAPI de l'application — ni
+mémoire, ni documentation — et **échoue (code 1)** si une liste volumineuse n'est
+pas paginée. C'est l'instrument qui empêche la régression.
+
+> Deux pièges rencontrés en l'écrivant, tous deux silencieux :
+> - les routers inclus ne sont **pas aplatis** dans `app.routes` sur cette version
+>   de FastAPI (`_IncludedRouter`) ; ne pas les traverser donnait **0 route** ;
+> - `tests/platform/` **masque le module standard `platform`** dont SQLAlchemy a
+>   besoin, car Python ajoute le dossier du script en tête de `sys.path`. L'erreur
+>   affichée n'avait aucun rapport avec l'objet du script.
+
+### Résultat : 47 conformes, **2 listes volumineuses non paginées**
+
+| Chemin | Constat |
+|---|---|
+| `GET /rendez-vous` | liste non bornée, croît avec l'activité du cabinet |
+| `GET /ordonnances` | idem |
+
+### Vues bornées — décision, pas oubli
+
+Un module peut contenir une liste volumineuse **et** des vues bornées. Les confondre
+ferait paginer l'agenda — qui tient dans un écran — tout en laissant passer la vraie
+liste : l'inverse de l'effet voulu.
+
+| Chemin | Nature |
+|---|---|
+| `/rendez-vous/agenda` | vue d'une journée |
+| `/rendez-vous/creneaux-libres` | créneaux d'un créneau de place |
+| `/rendez-vous/referentiel` | statuts de rendez-vous |
+| `/ordonnances/medicaments` | catalogue de médicaments |
+| `/stock/alertes` | produits sous le seuil |
+
+### Reste à faire
+
+1. Paginer `/rendez-vous` et `/ordonnances` (index si le tri l'exige)
+2. Test de contrat exécutable : 60 lignes insérées, `page`/`limit` réellement pris
+   en compte, `total` exact, **aucune ligne perdue ni dupliquée** sur l'ensemble des
+   pages, tri déterministe avec clé secondaire
+3. Recherche, filtres et tri **côté serveur**, combinés avec la pagination
+4. Frontend : `Pagination` sur chaque liste, page et filtres **dans l'URL**, retour
+   page 1 sur changement de filtre, debounce, sélecteur de taille de page
+
+---
+
+## Livré — session 2 : écran Fournisseurs, pagination stock, purge de session
+
+
+### Détail — écran Fournisseurs et pagination des listes
 
 Signalé par le propriétaire : pas d'écran Fournisseurs dans le menu Stock, et
 pagination absente des listes. L'audit a donné plus large que la demande.
@@ -76,7 +172,7 @@ pagination côté interface. À traiter avec le composant partagé — le backen
 
 ---
 
-## Étape 2 — File d'attente : migration prête, application en attente
+## Étape 3 — File d'attente : migration prête, application en attente
 
 ### Ce qui est fait
 
@@ -145,7 +241,7 @@ peut être supprimée : `docker exec sysdent_s0b psql -U postgres -c 'DROP DATAB
 
 ---
 
-## Étape 0 — reprise
+## Historique — session 2, étape 0 : reprise
 
 ### Dépôt
 
@@ -181,7 +277,7 @@ trouve pas son binaire. Déjà fait sur ce poste ; à refaire sur un poste neuf.
 
 ---
 
-## Étape 1 — correctif de session expirée : **PROUVÉ**
+## Historique — session 2 : correctif de session expirée, **PROUVÉ**
 
 ### Le défaut
 

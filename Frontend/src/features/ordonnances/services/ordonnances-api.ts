@@ -1,4 +1,4 @@
-import { api } from '@/lib/api'
+import { api, type PaginatedResponse } from '@/lib/api'
 import type { APIResponse } from '@/types/api'
 import type {
   ControleContreIndicationResponse,
@@ -40,9 +40,11 @@ export const ordonnancesApi = {
   lister: (params?: {
     patient_id?: string
     consultation_id?: string
-    limite?: number
+      signe?: boolean
+      page?: number
+      limit?: number
   }) => {
-    return api.get<APIResponse<OrdonnanceResponse[]>>('/ordonnances', { params })
+      return api.get<PaginatedResponse<OrdonnanceResponse>>('/ordonnances', { params })
   },
 
   obtenir: (id: string) => {

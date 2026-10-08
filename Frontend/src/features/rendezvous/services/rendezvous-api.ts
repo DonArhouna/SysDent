@@ -1,4 +1,4 @@
-import { api, type ApiReponse } from '@/lib/api'
+import { api, type ApiReponse, type PageReponse } from '@/lib/api'
 import type {
   AgendaData,
   CreneauLibre,
@@ -32,6 +32,8 @@ export const rendezvousApi = {
     du?: string
     au?: string
     statuts?: string[]
+    page?: number
+    limit?: number
   } = {}) => {
     const params = new URLSearchParams()
     if (filtres.patient_id) params.set('patient_id', filtres.patient_id)
@@ -40,7 +42,11 @@ export const rendezvousApi = {
     if (filtres.fauteuil_id) params.set('fauteuil_id', filtres.fauteuil_id)
     if (filtres.du) params.set('du', filtres.du)
     if (filtres.au) params.set('au', filtres.au)
-    return api.get<ApiReponse<RendezVous[]>>(`/rendez-vous?${params.toString()}`)
+    if (filtres.page) params.set('page', String(filtres.page))
+    if (filtres.limit) params.set('limit', String(filtres.limit))
+    // Enveloppe paginee `{ items, meta }` : lire `.data` renvoyait
+    // `undefined`, donc une liste vide sans le moindre message d'erreur.
+    return api.get<PageReponse<RendezVous>>(`/rendez-vous?${params.toString()}`)
   },
 
   // Créneaux libres calculés (heures déclarées MOINS rendez-vous et fauteuils bloqués)

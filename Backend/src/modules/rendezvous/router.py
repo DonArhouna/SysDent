@@ -29,7 +29,8 @@ from src.common.rendezvous import (
     STATUTS,
     transitions_possibles,
 )
-from src.common.schemas import APIResponse
+from src.common.schemas import APIResponse, PaginatedResponse
+from src.common.pagination import LIMITE_PAGE_MAX, PaginationParams, paginate
 from src.modules.auth.dependencies import get_current_user, get_tenant_db, require_permissions
 from src.modules.rendezvous.schemas import (
     AgendaResponse,
@@ -171,7 +172,7 @@ async def creer_rendez_vous(
     )
 
 
-@router.get("", response_model=APIResponse[List[RendezVousResponse]])
+@router.get("", response_model=PaginatedResponse[RendezVousResponse])
 async def lister_rendez_vous(
     patient_id: Optional[uuid.UUID] = Query(None),
     praticien_id: Optional[uuid.UUID] = Query(None),
@@ -180,7 +181,8 @@ async def lister_rendez_vous(
     du: Optional[datetime] = Query(None, description="Inclut les rendez-vous finissant après"),
     au: Optional[datetime] = Query(None, description="Inclut les rendez-vous débutant avant"),
     statut: Optional[List[str]] = Query(None, description="Filtrer par statut(s)"),
-    limite: int = Query(100, ge=1, le=500),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=LIMITE_PAGE_MAX),
     db: AsyncSession = Depends(get_tenant_db),
     current_user: Utilisateur = Depends(get_current_user),
     _: bool = Depends(require_permissions("AGENDA:READ")),
@@ -191,7 +193,7 @@ async def lister_rendez_vous(
     `du` / `au` filtrent sur l'INTERVALLE (et non sur un instant) : un
     rendez-vous de 14h30 à 15h est bien renvoyé pour `du=14h00`.
     """
-    rendez_vous = await RendezVousService.lister(
+    rendez_vous, total = await RendezVousService.lister(
         db,
         patient_id=patient_id,
         praticien_id=praticien_id,
@@ -200,9 +202,14 @@ async def lister_rendez_vous(
         du=du,
         au=au,
         statuts=statut,
-        limite=limite,
+        offset=(page - 1) * limit,
+        limit=limit,
     )
-    return APIResponse(data=[RendezVousService._vers_reponse(r) for r in rendez_vous])
+    return paginate(
+        [RendezVousService._vers_reponse(r) for r in rendez_vous],
+        total,
+        PaginationParams(page=page, limit=limit),
+    )
 
 
 @router.get("/agenda", response_model=APIResponse[AgendaResponse])
