@@ -1,33 +1,17 @@
-fix(tests): garde de purge durcie - registre, liste de protection, 46 tests
+fix(admin): reinitialiser-2fa ne fonctionnait pas - voie de secours hors service
 
-La garde d'origine supprimait sur un motif de nom trop permissif. Elle a
-supprime 80 bases le 08/10, dont **119 lignes du registre `tenants_db` sont
-restees orphelines** : le registre ne faisait pas autorite.
+Sur une colonne JSONB, None est serialise en JSONB `null` : une *valeur*, pas
+l'absence de valeur. La commande ecrivait donc `codes_secours_haches` a `null` au
+sens JSON, et la contrainte `ck_codes_secours_exigent_2fa`
+(`codes_secours_haches IS NULL OR deux_facteurs_actif = true`) levait une
+CheckViolation. La commande echouait toujours.
 
-**Registre de session.** Toute base creee par un test y est notee. Elle est
-supprimee sur certitude, pas sur indice : elle n'existait pas au depart.
+Consequence : **la seule voie de recours quand un telephone est perdu ne
+fonctionnait pas**. Un compte dont le secret TOTP est perdu pour une raison
+quelconque - telephone vole,中的应用 reinstallee, operateur absent - restait
+bloque avec une 2FA active que personne ne pouvait produire. C'est le meme
+genre d'impasse que l'enrolement bloquant avant le travail sur les jetons
+d'etape, et elle est ressortie pendant qu'on prouvait le parcours d'acces.
 
-**Liste de protection non contournable.** `postgres`, `template0`, `template1`,
-`sysdent_master`, `sysdent_modele_tenant`, `sysdent_platform`, `sysdent_tenant_ref`,
-plus **toute base referencee par `tenants_db`**. Le registre est lu avant toute
-decision : c'est la seule source qui dise si une base est un tenant reel.
-
-**Le cas par defaut est `conserve`.** Une garde destructive doit etablir par
-l'absence de doute, jamais par l'absence de preuve. Une base inconnue est une
-base gardee.
-
-**Motif par prefixe, forme fixee.** Une longueur unique aurait ete fausse :
-`nom_jetable` fait 12 caracteres, l'isolation 8, le partage 6, et les cabinets
-`lettre_hex8_hex6`. Quatre formes, chacune verifiable. Les 53 residus reels ont
-ete recalibres dessus, et les 6 bases de demonstration verifiees hors motif -
-dont `d_mo_dakar_69a2de`, que le motif attrapait et qui est une base utilisee.
-
-**Purge armee.** `SYSDENT_TESTS_PURGE=1` est requis. Une purge sur le mauvais
-serveur est irrattrapable ; une purge qui ne s'execute pas se relance. Armer la
-purge n elargit pas son pouvoir : la liste de protection prime sur l autorisation.
-
-**46 tests.** Injection de defaut dans les deux sens : longueur de suffixe non
-fixee -> 3 echecs ; registre neutralise -> 3 echecs ; restaure -> 46 verts.
-
-Reserve, non traite ici : la suite ecrit dans la **vraie base master** (voir
-PROGRESS.md). Une instance Postgres dediee aux tests reste recommandee.
+Corrige par `null()` SQL explicite. Verifie par execution sur la base reelle :
+2FA desactivee, secret efface, `codes_secours_haches` a SQL NULL.

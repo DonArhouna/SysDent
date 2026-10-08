@@ -36,7 +36,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import null, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from src.core.config import settings
@@ -354,7 +354,16 @@ async def cmd_reinitialiser_2fa(args) -> int:
             compte.secret_2fa_chiffre = None
             compte.deux_facteurs_actif = False
             compte.deux_facteurs_confirme_at = None
-            compte.codes_secours_haches = None
+            # **SQL NULL, pas le litteral JSON `null`.** Sur une colonne JSONB, `None`
+            # est serialise en JSONB `null` - une *valeur*, pas l'absence de valeur. La
+            # contrainte `ck_codes_secours_exigent_2fa` teste
+            # `codes_secours_haches IS NULL` : un JSONB `null` passe le premier test et
+            # echoue sur le second, et la commande levait une CheckViolation.
+            #
+            # Consequence si ce n'est pas corrige : **reinitialiser-2fa ne marche
+            # jamais** - c'est-a-dire la seule voie de recours quand un telephone est
+            # perdu. Le compte resterait bloque avec un secret que personne ne detient.
+            compte.codes_secours_haches = null()
             compte.tentatives_echouees = 0
             compte.verrouille_jusqua = None
             await _journaliser(
