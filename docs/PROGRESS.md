@@ -15,6 +15,40 @@ file d'attente reste donc bloquée.
 
 ---
 
+## VERDICT DE NON-RÉGRESSION — 2026-10-08
+
+| Exécution | Passés | Échoués | Ignorés | Durée |
+|---|---|---|---|---|
+| Départ de session | **380** | **0** | **0** | **13,1 min** |
+
++4 tests CORS. Sous le seuil de 15 min.
+
+---
+
+## BLOCAGE TROUVÉ — la 2FA obligatoire rend la plateforme inutilisable
+
+`POST /platform/auth/login` refuse la connexion quand `deux_facteurs_actif` est
+faux : `401 DEUX_FACTEURS_NON_ACTIVE`, « contactez un Super Admin pour la
+réinitialiser ».
+
+Or **la seule façon de réinitialiser la 2FA est `GET
+/platform/auth/2fa/preparation`, qui exige une session déjà ouverte**. La
+2FA est donc obligatoire, et son enrolment exige d'être déjà connecté : sur une
+plateforme à un seul Super Admin, il n'existe **aucune sortie**.
+
+C'est un défaut réel du backend, pas une lacune de configuration. Il n'a pas été
+détecté parce qu'aucun test ne couvrait « le seul Super Admin perd sa 2FA ».
+
+**Correctif attendu** : une commande d'opérateur (CLI), au niveau serveur, qui
+ré-enrolle la 2FA d'un compte sans exiger de session — l'équivalent d'un
+`reset_mfa` chez un fournisseur d'identité. C'est une nécessité d'exploitation
+reconnue pour toute plateforme à 2FA obligatoire, et elle doit être journalisée.
+
+**Non fait** : contexte épuisé avant d'atteindre l'implémentation. C'est la
+première chose à reprendre.
+
+---
+
 ## VERDICT DE NON-RÉGRESSION
 
 **376 passés, 0 échec, 0 ignoré, 12,7 min.**

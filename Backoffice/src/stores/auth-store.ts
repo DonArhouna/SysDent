@@ -74,7 +74,10 @@ export const useAuthStore = create<AuthState>()(
       connexion: async (email, password) => {
         const reponse = await api.post<ApiReponse<ReponseJeton>>('/platform/auth/login', {
           email,
-          password,
+          // Le backend nomme le champ `mot_de_passe`, pas `password`. Trouve par
+          // execution : l'ecran renvoyait 422 et rien dans le type TypeScript ne
+          // pouvait le dire, l'appel passant par une enveloppe generique.
+          mot_de_passe: password,
         })
         // Message volontairement identique quel que soit le motif du refus :
         // distinguer « compte inconnu » de « mot de passe faux » offre un oracle
