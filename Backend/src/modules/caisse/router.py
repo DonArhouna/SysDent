@@ -57,7 +57,7 @@ def _serialiser(session: SessionCaisse) -> SessionCaisseResponse:
     )
 
 
-@router.get("/sessions", response_model=PaginatedResponse[list[SessionCaisseResponse]])
+@router.get("/sessions", response_model=PaginatedResponse[SessionCaisseResponse])
 async def lister_sessions(
     cabinet_id: uuid.UUID = Query(..., description="Site dont on veut les sessions"),
     statut: StatutSessionCaisseEnum | None = None,

@@ -255,7 +255,7 @@ async def test_totaux_ne_bougent_pas_apres_cloture(
         "/api/v1/caisse/sessions", params={"cabinet_id": site}
     )
     premiere = next(
-        s for s in relu.json()["data"] if s["id"] == session_caisse["id"]
+        s for s in relu.json()["items"] if s["id"] == session_caisse["id"]
     )
     assert Decimal(str(premiere["total_especes"])) == Decimal("6000.00")
     assert premiere["nb_paiements"] == 1
