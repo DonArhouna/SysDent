@@ -122,6 +122,81 @@ async def _supprimer_base(db_name: str) -> None:
         await admin_engine.dispose()
 
 
+#: Prefixes produits par les tests, chacun suivi d'un fragment aleatoire.
+#: La liste est **explicite** : un motif trop large (`sysdent_%`) supprimerait
+#: `sysdent_platform` et `sysdent_tenant_ref`, c'est-a-dire la plateforme et son
+#: tenant de reference. Un nettoyage qui massacre la base de travail n'est pas un
+#: nettoyage, c'est un accident.
+PREFIXES_JETABLES = (
+    "sysdent_test_",
+    "sysdent_iso_a_",
+    "sysdent_iso_b_",
+    "sysdent_tenant_cabinet_verif_",
+    "sysdent_tenant_cabinet_recette_",
+    "sysdent_tenant_cabinet_onboarding_",
+    "sysdent_tenant_clinique_partage_",
+    "sysdent_tenant_clinique_cabinet_sn_",
+    "sysdent_tenant_clinique_d_mo_",
+    "sysdent_tenant_clinique_diagnostic_",
+    "sysdent_tenant_clinique_essai_",
+    "sysdent_platform_enrolement_",
+)
+
+
+def _est_jetable(nom: str) -> bool:
+    """Une base est jetable si elle est nee d'un test, jamais si elle est vivante.
+
+    Le nom suffit, et le fragment aleatoire derriere le prefixe est ce qui
+    distingue une base de test d'une base nommee a la main : un administrateur
+    qui cree `sysdent_tenant_clinique_demo` n'a pas de fragment hexadecimal
+    derriere.
+    """
+    for prefixe in PREFIXES_JETABLES:
+        if nom.startswith(prefixe):
+            suffixe = nom[len(prefixe):]
+            if suffixe and all(c in "0123456789abcdef_" for c in suffixe):
+                return True
+    return False
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _nettoyer_les_bases_jetables():
+    """
+    Supprime, en fin de session, les bases laissees derriere par les tests.
+
+    **Pourquoi une garde globale plutot qu'un `finally` par test.** Les tests
+    creent des bases par plusieurs chemins - `nom_jetable`, creation de tenant par
+    l'API, clones d'isolation - et chacun avait sa propre suppression, ou pas du
+    tout. Resultat : 89 bases accumulees, soit pres de 700 Mo, et une suite dont
+    la duree cresait de facon monotone avec le nombre de bases (13 min, puis 18,
+    puis 21). Le cout venait de l'accumulation, pas des tests ajoutes.
+
+    Une garde unique rattrape tout, y compris les oublis de demain. Elle ne
+    touche qu'a ce qui est demonstrablement ne d'un test : les bases de travail
+    (`sysdent_platform`, `sysdent_master`, `sysdent_modele_tenant`,
+    `sysdent_tenant_ref`) et les modeles sont hors liste.
+    """
+    async def _nettoyer() -> None:
+        admin_engine = create_async_engine(_async_url("postgres"), isolation_level="AUTOCOMMIT")
+        try:
+            async with admin_engine.connect() as conn:
+                lignes = await conn.execute(
+                    text("SELECT datname FROM pg_database WHERE datistemplate = false")
+                )
+                noms = [r[0] for r in lignes.fetchall()]
+            a_supprimer = [n for n in noms if _est_jetable(n)]
+            if not a_supprimer:
+                return
+            async with admin_engine.connect() as conn:
+                for nom in a_supprimer:
+                    await conn.execute(text(f'DROP DATABASE IF EXISTS "{nom}" WITH (FORCE)'))
+        finally:
+            await admin_engine.dispose()
+
+    yield
+    asyncio.run(_nettoyer())
+
+
 # ---------------------------------------------------------------------------
 # Hachage de mot de passe : cout de production, reserve a la production
 # ---------------------------------------------------------------------------
