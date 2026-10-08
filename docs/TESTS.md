@@ -43,14 +43,28 @@ npx oxlint
 `tsc -b --force` et non `tsc --noEmit -p tsconfig.json` : ce dernier ne type-checke
 **rien**, `tsconfig.json` n'étant qu'un redirectionneur.
 
-### Contrat de pagination
+### Contrats de pagination
+
+Deux contrôles complémentaires, tous deux découverts depuis les routes
+enregistrées — ni mémoire, ni documentation.
 
 ```powershell
+# 1. La forme : une liste volumineuse sans pagination
 .\.venv\Scripts\python.exe tests\inventaire_listes.py
+
+# 2. Le comportement : pages perdues, doublons, tri instable, paramètres ignorés
+.\.venv\Scripts\python.exe -m pytest tests\test_contrat_pagination.py -q
 ```
 
-Lit le spectre OpenAPI de l'application — ni mémoire, ni documentation — et sort en
-code **1** si une liste volumineuse n'est pas paginée. À brancher en CI.
+`inventaire_listes.py` sort en code **1** si une liste volumineuse n'est pas
+paginée. `test_contrat_pagination.py` parcourt **toutes** les pages et vérifie
+qu'aucune ligne n'est perdue ni dupliquée, que `total` est exact, que deux
+parcours successifs rendent le même ordre, et que les paramètres invalides ou
+inconnus sont refusés.
+
+**Les deux doivent être branchés en CI.** Un test de contrat jamais vu en échec
+n'est pas prouvé : celui-ci a d'abord échoué sur du code livré, en détectant un
+tri non déterministe.
 
 ---
 
