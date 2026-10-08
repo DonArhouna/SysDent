@@ -41,7 +41,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from src.core.config import settings
 from src.core.platform_database import settings as _platform_settings
-from src.core.security import get_password_hash
+from src.core.security import get_password_hash, verify_password
 from src.modules.platform.models import (
     UtilisateurPlateforme,
 )
@@ -71,7 +71,17 @@ def mot_de_passe_temporaire() -> str:
     return "A" + "".join(secrets.choice(alphabet) for _ in range(19))
 
 
-def demander_mot_de_passe() -> str:
+def demander_mot_de_passe(generer: bool = False) -> str:
+    """
+    `--generer` produit un mot de passe affiche **une seule fois**, sans saisie.
+
+    La saisie masquee est la source du piege : sur un terminal que le programme
+    ne controle pas, `getpass` lit en echo, et une entree vide est acceptee sans
+    erreur. Le compte se retrouve alors avec un mot de passe que personne ne
+    connait. Generer supprime l'etape entiere.
+    """
+    if generer:
+        return mot_de_passe_temporaire()
     """
     Mot de passe : variable d'environnement, sinon saisie masquee.
 
@@ -262,6 +272,7 @@ async def _assigner_role(db, utilisateur_id) -> None:
 async def cmd_reinitialiser_mot_de_passe(args) -> int:
     email = _valider_email(args.email)
     moteur, fabrique = await _session()
+    saisie_affiche = ""
     try:
         async with fabrique() as db:
             compte = (
@@ -272,14 +283,41 @@ async def cmd_reinitialiser_mot_de_passe(args) -> int:
             if compte is None:
                 print(f"Compte introuvable : {email}")
                 return 1
-            # Les sessions sont revoquees : un mot de passe reinitialise laisse
-            # actives les sessions ouvertes avec l'ancien, ce qui rend
-            # l'operation sans effet.
+
+            # Les sessions sont revoquees : un mot de passe reinitialise laisserait
+            # actives celles ouvertes avec l'ancien, ce qui vide l'operation de son effet.
             nb = await _revoquer_sessions(db, compte.id)
-            compte.mot_de_passe = get_password_hash(demander_mot_de_passe())
+
+            saisi = demander_mot_de_passe(args.generer)
+            if not saisi:
+                print(
+                    "Aucun mot de passe capture. La saisie masquee n'a rien recu :\n"
+                    "  - terminal que le programme ne controle pas : getpass lit en echo ;\n"
+                    "  - une entree vide est acceptee sans erreur.\n"
+                    "  Reessayez avec --generer, ou via PLATFORM_ADMIN_PASSWORD.",
+                    file=sys.stderr,
+                )
+                return 1
+            saisie_affiche = saisi if args.generer else ""
+
+            compte.mot_de_passe = get_password_hash(saisi)
             compte.changement_mot_de_passe_obligatoire = True
             compte.tentatives_echouees = 0
             compte.verrouille_jusqua = None
+            await db.flush()
+
+            # **Verification avant validation.** Un hachage est irreversible : une
+            # saisie capturee de travers ne se revelerait qu'a la connexion, ou
+            # l'operateur conclut a tort que son mot de passe est errone.
+            if not verify_password(saisi, compte.mot_de_passe):
+                await db.rollback()
+                print(
+                    "ECHEC : le mot de passe enregistre ne se verifie pas. "
+                    "Aucune modification conservee.",
+                    file=sys.stderr,
+                )
+                return 1
+
             await _journaliser(
                 db,
                 "PLATFORM_MDP_REINITIALISE",
@@ -291,7 +329,11 @@ async def cmd_reinitialiser_mot_de_passe(args) -> int:
             await db.commit()
     finally:
         await moteur.dispose()
-    print(f"Mot de passe réinitialisé pour {email} — {nb} session(s) révoquée(s).")
+
+    print(f"Mot de passe reinitialise pour {email} - {nb} session(s) revoquee(s).")
+    if saisie_affiche:
+        # Affiche **apres** commit et verification : jamais avant, jamais ailleurs.
+        print(f"  mot de passe : {saisie_affiche}")
     return 0
 
 
@@ -369,6 +411,11 @@ def _construire_parser() -> argparse.ArgumentParser:
     mdp = sous.add_parser("reinitialiser-mot-de-passe", help="Réinitialiser un mot de passe")
     mdp.add_argument("--email", required=True)
     mdp.add_argument("--motif", required=True)
+    mdp.add_argument(
+        "--generer",
+        action="store_true",
+        help="Genere un mot de passe affiche une seule fois, sans saisie masquee",
+    )
     mdp.set_defaults(fonction=cmd_reinitialiser_mot_de_passe)
 
     fa = sous.add_parser("reinitialiser-2fa", help="Réinitialiser la double authentification")

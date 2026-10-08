@@ -15,6 +15,37 @@ c'est la seule façon qu'aucun secret ne traverse une conversation.
 
 ## Choisir votre mot de passe
 
+### La méthode recommandée : `--generer`
+
+```powershell
+cd Backend
+.\.venv\Scripts\python.exe -m src.modules.platform.admin reinitialiser-mot-de-passe `
+    --email rhonekane@gmail.com `
+    --motif "Ouverture du backoffice" `
+    --generer
+```
+
+La commande **génère** un mot de passe et l'affiche **une seule fois**, après avoir
+vérifié qu'il est bien recorded. Copiez-le : il ne sera plus jamais montré.
+
+**Prouvez cette méthode avant `--generer`** — elle est la seule qui n'ait pas
+d'entrée àhavoir.
+
+### Pourquoi pas la saisie masquée
+
+`getpass` est le mécanisme prévu, mais sur un terminal que le programme ne
+contrôle pas il lit **en echo**, et **une entrée vide est acceptée sans erreur**.
+Un compte se retrouve alors avec un mot de passe que personne ne connaît — et
+l'échec n'apparaît qu'à la connexion, où l'opérateur conclut à tort que son mot de
+passe est erroné.
+
+La commande vérifie désormais ce qu'elle a enregistré, avant de valider : un
+hachage étant irréversible, une saisie captée de travers ne se révélerait
+sinon qu'au moment de se connecter. En cas d'échec de la vérification, **rien
+n'est conservé**.
+
+### Saisie masquée (si vous la préférez)
+
 Sur le serveur, dans le dossier `Backend` :
 
 ```powershell
