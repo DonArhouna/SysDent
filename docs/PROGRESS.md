@@ -15,6 +15,52 @@ file d'attente reste donc bloquée.
 
 ---
 
+## VERDICT DE NON-RÉGRESSION
+
+**376 passés, 0 échec, 0 ignoré, 12,7 min.**
+
+Contient le test de contrat de pagination (32 tests) et l'ensemble des 344 tests
+d'origine. Aucun test supprimé, ignoré ni assoupli. Sous le seuil de 15 min.
+
+Trois passages ont été nécessaires, et les échecs venaient de mes propres
+modifications, pas du produit : deux fois j'avais renommé un paramètre d'un côté
+seulement (`limite` → `limit` sur l'odontogramme), une fois le middleware refusait
+des requêtes **valides** parce qu'il ignorait les alias de paramètre. La suite a
+sorti les trois ; c'est sa fonction.
+
+---
+
+## CHANGEMENT DE PRIORITÉ — backoffice
+
+Le propriétaire a décidé de démarrer le **frontend du backoffice**. Les étapes
+suivantes sont **reportées, pas abandonnées**.
+
+### Reportés — ordre conservé
+
+| # | Étape reportée | Note |
+|---|---|---|
+| 1 | **Recherche serveur des ordonnances** | JOIN entre modules, trois conditions : isolation inter-tenant testée, fonction de service dédiée (pas d'accès direct aux tables d'un autre module depuis le routeur), colonnes indexées, **mesure sur ≥ 10 000 ordonnances** |
+| 2 | **Historique clinique** et traçabilité du dentiste | |
+| 3 | **Autocomplétion des médicaments** | message explicite « N résultats affichés sur M : affinez votre recherche » quand la limite est atteinte ; aucune troncature silencieuse |
+| 4 | **File d'attente (salle d'attente)** | migration `e8b2c4a7d1e5` écrite et testée sur copie, **non appliquée** |
+| 5 | Référentiels configurables, fusion Praticien → Utilisateur, rôle Médecin chef | |
+| 6 | **CI** : branchement de `inventaire_listes.py` et du test de contrat | le backend n'a pas de CI ; à créer |
+| 7 | `MATRICE_ROLES.md` et `RAPPORT_FINAL.md` régénérés depuis le code | |
+
+### Décisions prises
+
+- **Décision 7 — client TypeScript généré depuis l'OpenAPI : OUI.** `openapi-typescript`
+  + `openapi-fetch`, appliqués **d'abord au backoffice** (projet neuf, coût de migration
+  nul). Pour l'application client : types générés, utilisés pour les **nouveaux** écrans,
+  plus un script CI `contrat:verifier` qui échoue si les types ne correspondent plus à
+  l'OpenAPI. Migration progressive consignée ci-dessus.
+- **Décision 8 — les 12 routes de liste non semables : reportée.** Elles restent au
+  registre dans `docs/TESTS.md`. **D'ici là, toute nouvelle route de liste — y
+  compris au backoffice — doit être semable et couverte par le contrat
+  comportemental dès sa création. Le stock ne doit pas augmenter.**
+
+---
+
 ## Étape 1 — Non-régression et performance de la suite
 
 ### Mesures, pas suppositions
