@@ -15,6 +15,52 @@ file d'attente reste donc bloquée.
 
 ---
 
+## ENROLEMENT 2FA — À 50 %, À REPRENDRE (2026-10-08)
+
+### Ce qui est fait et vérifié
+
+| Élément | Preuve |
+|---|---|
+| Migration `a3e7d1b95c24` (enum `ENROLEMENT_2FA`, colonnes `changement_mot_de_passe_obligatoire` et `codes_secours_haches`) | **allers-retours 2 fois sur copie**, puis appliquée sur la base réelle, compte conservé |
+| Tests écrits **avant** le correctif | **9 échecs sur 10** — le défaut est donc bien Reproduit |
+| Login sans 2FA active → jeton d'enrôlement, **aucune session** | 4 tests verts |
+| Le jeton est **rejeté** sur `/platform/auth/me`, sur une route client et sur `/auth/refresh` | 3 tests verts |
+| Codes de secours : génération sans alphabet ambigu, **hachés** en Argon2, usage unique à la consommation | codé, pas encore testé de bout en bout |
+
+### Ce qui BLOQUE — 5 tests en échec
+
+`GET /platform/auth/2fa/preparation` renvoie **500** avec un `NoneType` : le jeton
+d'enrôlement est bien émis et accepté par la dépendance, mais la route ne résout
+plus d'utilisateur. Deux causes possibles, non tranchées :
+
+1. la dépendance « soft » rend `None` sur une exception que je n'ai pas identifiée
+   (le contrôle d'adresse IP lève `PermissionDeniedException`, un nom différent de
+   celui que j'avais importé) ;
+2. le corps de `preparer_2fa` utilise encore une variable qui n'est plus alimentée
+   après le changement de signature.
+
+**L'accès du propriétaire n'est donc PAS opérationnel.** Le compte
+`rhonekane@gmail.com` n'a pas été créé et l'ancien compte reste tel quel.
+
+### Ordre de reprise, test par test
+
+1. `GET /platform/auth/2fa/preparation` renvoie 200 avec `secret` et `uri`
+2. `POST /platform/auth/2fa/activation` renvoie la session **et** les codes de secours
+3. un code de secours ouvre une session, puis le même code est refusé
+4. le jeton d'enrolement ne vaut plus rien après activation
+5. **injection de défaut** : retirer la clause `usage == ENROLEMENT_2FA` de la
+   dépendance et vérifier qu'un test échoue
+6. commandes d'opérateur CLI + `docs/backoffice/OPERATIONS.md`
+7. compte `rhonekane@gmail.com`, preuve par exécution, puis désactivation de l'ancien
+
+### Rappel de la migration
+
+Rétro-compatible : la colonne `changement_mot_de_passe_obligatoire` n'est pas utilisée
+par le code livré, et `codes_secours_haches` ne l'est que par l'activation. La
+migration peut donc être annulée sans effet de bord.
+
+---
+
 ## VERDICT DE NON-RÉGRESSION — 2026-10-08
 
 | Exécution | Passés | Échoués | Ignorés | Durée |

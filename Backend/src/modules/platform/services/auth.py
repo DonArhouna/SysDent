@@ -19,7 +19,7 @@ donc obligatoire par construction, pas par une case à cocher.
 
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import structlog
 from sqlalchemy import select
@@ -62,6 +62,10 @@ from src.modules.platform.services.rbac import PlatformRbacService
 logger = structlog.get_logger(__name__)
 
 DUREE_CHALLENGE_2FA_MINUTES = 5
+# L'enrolement ne demande qu'un scan puis une confirmation : dix minutes
+# suffisent largement, et un jeton plus durable serait une surface d'attaque
+# inutile.
+DUREE_ENROLEMENT_2FA_MINUTES = 10
 
 
 def _maintenant() -> datetime:
@@ -183,26 +187,34 @@ class PlatformAuthService:
         secret = valider_secret_2fa(user.secret_2fa_chiffre)
 
         if secret is None:
-            # Aucun secret n'existe : le compte est orphelin (créé `--sans-2fa`,
-            # ou clé de chiffrement changée). Aucun jeton de session ne peut être
-            # délivré. La sortie passe par un Super Admin
-            # (`POST /platform/users/{id}/reinitialisation-acces`), tracée.
+            # Aucun secret n'existe : premier acces, ou compte dont l'operateur a
+            # reinitialise la 2FA. **Refuser ici rendait le compte definitivement
+            # inaccessible** : la seule voie d'activation exige une session, donc
+            # la seule voie d'obtenir une session exigeait la 2FA. Impasse sur une
+            # plateforme a un seul Super Admin.
+            #
+            # On emet donc un jeton d'enrolement : opaque, usage unique, et surtout
+            # **borne** a la preparation et l'activation.
+            jeton_enrolement = await PlatformAuthService._emettre_jeton_enrolement(
+                db, user, client_ip=client_ip
+            )
             await JournalService.journaliser(
                 db,
-                action="PLATFORM_2FA_REQUIS",
+                action="PLATFORM_2FA_ENROLEMENT",
                 type_cible="AUTH",
                 acteur_email=user.email,
                 acteur_id=user.id,
-                apres={"raison": "second_facteur_non_active"},
+                apres={"raison": "second_facteur_a_activer"},
                 ip_address=client_ip,
                 user_agent=user_agent,
             )
             await db.commit()
-            raise InvalidStateException(
-                "La double authentification n'est pas activée sur ce compte. "
-                "Contactez un Super Admin pour la réinitialiser.",
-                code="DEUX_FACTEURS_NON_ACTIVE",
-            )
+            return {
+                "deux_facteurs_requis": True,
+                "activation_requise": True,
+                "jeton_enrolement": jeton_enrolement,
+                "expiration_secondes": DUREE_ENROLEMENT_2FA_MINUTES * 60,
+            }
 
         jeton_challenge = await PlatformAuthService._emettre_challenge(
             db, user, client_ip=client_ip, user_agent=user_agent
@@ -327,6 +339,35 @@ class PlatformAuthService:
     # ─────────────────────────────────────────────────────────────────────────
 
     @staticmethod
+    async def consommer_code_de_secours(
+        db: AsyncSession, user: UtilisateurPlateforme, code: str
+    ) -> bool:
+        """
+        Consomme un code de secours : `True` s'il etait valide.
+
+        **Usage unique.** Le code est retire de la liste qu'il a servi, donc un
+        code vole et rejoue ne fonctionne qu'une fois. Si deux codes��ment a la
+        meme valeur (quasi impossible, collision sur 40 bits), tous les codes de
+        cette valeur sont retires : en garder un rendrait le rejeu possible.
+        """
+        haches = list(user.codes_secours_haches or [])
+        if not haches:
+            return False
+
+        from src.core.security import verify_password
+
+        restants = []
+        trouve = False
+        for hash_stocke in haches:
+            if not trouve and verify_password(code.strip().upper(), hash_stocke):
+                trouve = True
+                continue  # consomme
+            restants.append(hash_stocke)
+        if trouve:
+            user.codes_secours_haches = restants
+        return trouve
+
+    @staticmethod
     async def preparer_second_facteur(
         db: AsyncSession, user: UtilisateurPlateforme
     ) -> Dict[str, str]:
@@ -356,17 +397,41 @@ class PlatformAuthService:
     @staticmethod
     async def activer_second_facteur(
         db: AsyncSession, user: UtilisateurPlateforme, code: str
-    ) -> None:
+    ) -> List[str]:
+        """
+        Active le second facteur et rend les **codes de secours en clair, une fois**.
+
+        Les codes sont stockes hacnes et ne ressortent plus jamais : si l'owner les
+        perd, il doit venir voir un operateur ou un autre Super Admin. C'est le
+        prix de la securite, et c'est preferable a une liste consultable par
+        quiconque lit la base.
+        """
+        from src.modules.platform.security import (
+            generer_codes_secours,
+            hacher_codes_secours,
+        )
+
         secret = valider_secret_2fa(user.secret_2fa_chiffre)
         if secret is None:
             raise InvalidStateException(
                 "Aucun secret 2FA en attente d'activation.", code="SECRET_2FA_ABSENT"
             )
-        if not verifier_code_totp(secret, code):
-            raise AuthenticationException("Code de vérification invalide.", code="CODE_2FA_INVALIDE")
+
+        # Un code de secours remplace le code TOTP quand le telephone n'est pas la.
+        # Sa consommation est un effet de bord : retire de la liste a l'usage, donc
+        # un code vole ne peut etre rejoue qu'une fois.
+        if not verifier_code_totp(secret, code) and not (
+            await PlatformAuthService.consommer_code_de_secours(db, user, code)
+        ):
+            raise AuthenticationException(
+                "Code de vérification invalide.", code="CODE_2FA_INVALIDE"
+            )
         user.deux_facteurs_actif = True
         user.deux_facteurs_confirme_at = _maintenant()
+        codes = generer_codes_secours()
+        user.codes_secours_haches = hacher_codes_secours(codes)
         await db.flush()
+        return codes
 
     # ─────────────────────────────────────────────────────────────────────────
     # Sessions
@@ -474,6 +539,52 @@ class PlatformAuthService:
     # ─────────────────────────────────────────────────────────────────────────
 
     @staticmethod
+    async def _emettre_jeton_enrolement(
+        db: AsyncSession,
+        user: UtilisateurPlateforme,
+        client_ip: Optional[str],
+    ) -> str:
+        """
+        Jeton d'enrolement : n'ouvre que la preparation et l'activation.
+
+        Un jeton de session aurait ete bien plus simple, et c'est exactement le
+        piege : un jeton large sur un compte sans second facteur est une session
+        sans second facteur. La restriction est portee par la colonne `usage`,
+        lue par la dependance d'activation.
+        """
+        jeton = generer_jeton_opaque()
+        db.add(
+            JetonUsageUnique(
+                usage=UsageJeton.ENROLEMENT_2FA,
+                hash_jeton=hacher_jeton(jeton),
+                cible_type="UTILISATEUR",
+                cible_id=str(user.id),
+                expire_le=_maintenant() + timedelta(minutes=DUREE_ENROLEMENT_2FA_MINUTES),
+                ip_address=client_ip,
+            )
+        )
+        await db.flush()
+        return jeton
+
+    async def _marquer_enrolement_consomme(db: AsyncSession, jeton: str) -> None:
+        """Marque le jeton d'enrolement consomme : il ne vaut plus rien ensuite."""
+        if not jeton:
+            return
+        from src.modules.platform.security import hacher_jeton
+
+        ligne = (
+            await db.execute(
+                select(JetonUsageUnique).where(
+                    JetonUsageUnique.hash_jeton == hacher_jeton(jeton),
+                    JetonUsageUnique.usage == UsageJeton.ENROLEMENT_2FA,
+                )
+            )
+        ).scalar_one_or_none()
+        if ligne is not None:
+            ligne.utilise = True
+            ligne.utilise_at = _maintenant()
+            await db.flush()
+
     async def _emettre_challenge(
         db: AsyncSession,
         user: UtilisateurPlateforme,

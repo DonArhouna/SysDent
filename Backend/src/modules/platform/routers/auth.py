@@ -23,11 +23,16 @@ from src.modules.platform.dependencies import (
     client_ip,
     exiger_ip_autorisee,
     get_current_platform_user,
+    get_current_platform_user_enrolement,
+    get_current_platform_user_enrolement_soft,
+    get_current_platform_user_soft,
     refuser_acces_client,
 )
 from src.modules.platform.models import UtilisateurPlateforme
 from src.modules.platform.schemas import (
+    Activer2FARequest,
     Activation2FAResponse,
+    Enrolement2FAResponse,
     Challenge2FARequest,
     ChangementMotDePasseRequest,
     Confirmer2FARequest,
@@ -40,6 +45,14 @@ from src.modules.platform.services.auth import PlatformAuthService
 from src.modules.platform.services.rbac import PlatformRbacService
 
 platform_auth_router = APIRouter(prefix="/platform/auth", tags=["Platform · Authentification"])
+
+
+def _jeton_de_l_entete(request: Request) -> str:
+    """Jeton porteur de l'enrolement, lu comme le fait la dependance."""
+    authorization = request.headers.get("Authorization") or ""
+    if authorization.lower().startswith("bearer "):
+        return authorization.split(" ", 1)[1].strip()
+    return ""
 
 
 def _deposer_cookie(response: Response, token: str) -> None:
@@ -215,8 +228,15 @@ async def me(user: UtilisateurPlateforme = Depends(get_current_platform_user),
 )
 async def preparer_2fa(
     request: Request,
-    user: UtilisateurPlateforme = Depends(get_current_platform_user),
     db: AsyncSession = Depends(get_platform_db),
+    # Un jeton d'enrolement ouvre la preparation. Une session l'ouvre aussi :
+    # un Super Admin doit pouvoir (re)generer un secret pour un collegue.
+    # L'ordre compte : le jeton d'enrolement est essaye d'abord, parce qu'il
+    # n'ouvre rien d'autre.
+    user_enrolement: Optional[UtilisateurPlateforme] = Depends(
+        get_current_platform_user_enrolement_soft
+    ),
+    user: Optional[UtilisateurPlateforme] = Depends(get_current_platform_user_soft),
 ):
     """
     Génère un secret TOTP pour le compte connecté.
@@ -245,6 +265,57 @@ async def confirmer_activation_2fa(
     await PlatformAuthService.activer_second_facteur(db, user, data.code)
     await db.commit()
     return APIResponse(message="Second facteur activé.", data=None)
+
+
+@platform_auth_router.post(
+    "/2fa/activation",
+    response_model=APIResponse[Enrolement2FAResponse],
+    summary="Activer le second facteur et ouvrir la session",
+    responses={
+        401: {"description": "Jeton d'enrolement invalide, expire ou deja utilise"},
+        422: {"description": "Code de verification invalide"},
+    },
+)
+async def activer_2fa(
+    data: Activer2FARequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_platform_db),
+    user: UtilisateurPlateforme = Depends(get_current_platform_user_enrolement),
+):
+    """
+    Troisieme etape : le code TOTP confirme l'activation, la session s'ouvre.
+
+    C'est la **seule** voie qui emet une session pour un compte dont la 2FA
+    vient d'etre activee. Le jeton d'enrolement est consomme ici et ne vaut plus
+    rien : il ne reutilise pas le jeton de session, il disparait.
+
+    Les codes de secours sont renvoyes **une seule fois**. Ni la base ni le
+    journal ne les conservent en clair.
+    """
+    jeton = _jeton_de_l_entete(request)
+    codes = await PlatformAuthService.activer_second_facteur(db, user, data.code)
+    await PlatformAuthService._marquer_enrolement_consomme(db, jeton)
+
+    await JournalService.journaliser(
+        db,
+        action="PLATFORM_2FA_ACTIVEE",
+        type_cible="AUTH",
+        acteur_email=user.email,
+        acteur_id=user.id,
+        apres={"codes_secours_emus": len(codes)},
+        ip_address=client_ip(request),
+        user_agent=request.headers.get("user-agent"),
+    )
+    tokens = await PlatformAuthService._ouvrir_session(
+        db, user, client_ip=client_ip(request), user_agent=request.headers.get("user-agent")
+    )
+    await db.commit()
+    _deposer_cookie(response, tokens["access_token"])
+    return APIResponse(
+        message="Second facteur activé.",
+        data=Enrolement2FAResponse(**tokens, codes_secours=codes),
+    )
 
 
 @platform_auth_router.post("/mot-de-passe", response_model=APIResponse[None], summary="Changer son mot de passe")

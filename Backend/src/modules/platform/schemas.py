@@ -595,3 +595,47 @@ class OnboardingEtatResponse(BaseSchema):
     total: int
     progression: int
     etapes: List[dict] = []
+
+
+# ---------------------------------------------------------------------------
+# Enrôlement 2FA (avant toute session complète)
+# ---------------------------------------------------------------------------
+
+
+class Enrolement2FAResponse(BaseSchema):
+    """Renvoye une fois, a l'activation : les codes de secours ne ressortent plus."""
+
+    access_token: str
+    refresh_token: str
+    expires_in: int
+    refresh_expires_in: int
+    codes_secours: List[str]
+
+
+class LoginPlateformeResponse(BaseSchema):
+    """Reponse de la premiere etape.
+
+    Trois cas distincts, et **jamais** les deux a la fois :
+
+    - session ouverte : `access_token` present ;
+    - defi 2FA         : `jeton_challenge` present ;
+    - enrolement       : `jeton_enrolement` present.
+
+    `access_token` n'est present que si le second facteur est actif. Le garantir
+    ici evite qu'un evolution du service emette une session a un compte qui n'a
+    pas de 2FA.
+    """
+
+    deux_facteurs_requis: bool = True
+    activation_requise: bool = False
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
+    expires_in: Optional[int] = None
+    refresh_expires_in: Optional[int] = None
+    jeton_challenge: Optional[str] = None
+    jeton_enrolement: Optional[str] = None
+    expiration_secondes: Optional[int] = None
+
+
+class Activer2FARequest(BaseSchema):
+    code: str = Field(..., min_length=6, max_length=8)

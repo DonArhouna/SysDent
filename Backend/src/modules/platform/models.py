@@ -112,6 +112,11 @@ class UsageJeton(str, enum.Enum):
     # Défi 2FA : jeton opaque à 5 minutes émis entre la vérification du mot de
     # passe et la saisie du code TOTP. Consommé une seule fois, haché en base.
     CHALLENGE_2FA = "CHALLENGE_2FA"
+    # Enrolement 2FA : jeton a portee tres limitee, emis quand les identifiants
+    # sont justes mais que le second facteur n'est pas encore actif. N'ouvre QUE
+    # la preparation et l'activation -- sans quoi un compte sans 2FA pourrait
+    # s'en servir comme d'une session.
+    ENROLEMENT_2FA = "ENROLEMENT_2FA"
 
 
 class StatutInscription(str, enum.Enum):
@@ -237,6 +242,15 @@ class UtilisateurPlateforme(PlatformBase, UUIDMixin, TimestampMixin):
     secret_2fa_chiffre: Mapped[str | None] = mapped_column(Text, nullable=True)
     deux_facteurs_confirme_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+
+    # Codes de secours, **hachés** : un vidage de la base ne doit pas rendre la
+    # plateforme accessible à la place du propriétaire. Consommés une seule fois.
+    codes_secours_haches: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    # Mis a vrai par l'opérateur ou une réinitialisation : le mot de passe connu
+    # de l'opérateur ne doit jamais devenir un mot de passe durable.
+    changement_mot_de_passe_obligatoire: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
     )
 
     tentatives_echouees: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

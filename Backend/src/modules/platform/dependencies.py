@@ -16,6 +16,7 @@ Trois contrôles, dans cet ordre :
    jeton.
 """
 
+import uuid
 from typing import Callable, List, Optional
 
 from fastapi import Depends, Request
@@ -26,7 +27,10 @@ from sqlalchemy.orm import selectinload
 from src.core.exceptions import AuthenticationException, PermissionDeniedException
 from src.core.platform_database import get_platform_db
 from src.core.security import decode_platform_token
-from src.modules.platform.models import UtilisateurPlateforme
+from src.modules.platform.models import (
+    StatutUtilisateurPlateforme,
+    UtilisateurPlateforme,
+)
 from src.modules.platform.security import ip_autorisee
 
 
@@ -101,6 +105,66 @@ async def get_current_platform_user(
             "Ce compte n'est pas actif.", code="COMPTE_NON_ACTIF"
         )
 
+    return user
+
+
+async def get_current_platform_user_enrolement(
+    request: Request,
+    db: AsyncSession = Depends(get_platform_db),
+) -> UtilisateurPlateforme:
+    """
+    Resout l'utilisateur d'un **jeton d'enrolement** — et rien d'autre.
+
+    Le jeton n'ouvre que la preparation et l'activation du second facteur. Il est
+    rejete partout ailleurs, y compris sur `/platform/auth/me` : sans cela, un
+    jeton emis a un compte sans 2FA deviendrait une session a ce compte, et la 2FA
+    serait purement decorative.
+
+    La restriction est portee par la **colonne `usage`** du jeton : c'est elle qui
+    distingue un jeton d'enrolement d'un challenge et d'une session. Une erreur
+    ici serait un trou, d'ou les tests.
+    """
+    from datetime import datetime, timezone
+
+    from src.modules.platform.models import JetonUsageUnique, UsageJeton
+    from src.modules.platform.security import hacher_jeton
+
+    token = None
+    authorization = request.headers.get("Authorization")
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+    if not token:
+        raise AuthenticationException("Authentification requise.", code="AUTHENTICATION_REQUIRED")
+
+    ligne = (
+        await db.execute(
+            select(JetonUsageUnique).where(
+                JetonUsageUnique.hash_jeton == hacher_jeton(token),
+                # **La restriction de portée.** C'est cette clause qui empêche un
+                # jeton d'enrolement de valoir session.
+                JetonUsageUnique.usage == UsageJeton.ENROLEMENT_2FA,
+                JetonUsageUnique.utilise.is_(False),
+                JetonUsageUnique.expire_le > datetime.now(timezone.utc),
+            )
+        )
+    ).scalar_one_or_none()
+    if ligne is None:
+        raise AuthenticationException("Jeton invalide ou expire.", code="JETON_INVALIDE")
+
+    try:
+        cible = uuid.UUID(ligne.cible_id)
+    except (ValueError, AttributeError):
+        raise AuthenticationException("Jeton invalide ou expire.", code="JETON_INVALIDE")
+
+    user = (
+        await db.execute(
+            select(UtilisateurPlateforme)
+            .options(selectinload(UtilisateurPlateforme.roles))
+            .where(UtilisateurPlateforme.id == cible)
+        )
+    ).scalar_one_or_none()
+    if user is None or user.statut is not StatutUtilisateurPlateforme.ACTIF:
+        raise AuthenticationException("Jeton invalide ou expire.", code="JETON_INVALIDE")
     return user
 
 
@@ -187,3 +251,66 @@ def refuser_acces_client(request: Request) -> None:
             "Accès réservé à la console d'administration de la plateforme.",
             code="PLATFORM_REQUIRED",
         )
+
+
+# ---------------------------------------------------------------------------
+# Dependances "soft" : acceptent deux types de jeton sur une meme route
+# ---------------------------------------------------------------------------
+#
+# Indispensable pour `preparer_2fa`, qui doit accepter aussi bien une session
+# qu'un jeton d'enrolement. Une dependance qui **leve** court-circuite la chaine
+# : FastAPI ne tente jamais la dependance suivante, donc une route a deux types
+# de jeton est impossible a ecrire sans ces variantes.
+#
+# L'ordre des definitions compte : la valeur par defaut d'un parametre
+# `Depends(...)` est evaluee a l'import du module.
+
+
+async def get_platform_token_payload_soft(request: Request) -> Optional[dict]:
+    """`get_platform_token_payload` qui rend `None` plutot que de lever."""
+    try:
+        return await get_platform_token_payload(request)
+    except AuthenticationException:
+        return None
+
+
+async def get_current_platform_user_soft(
+    request: Request,
+    payload: Optional[dict] = Depends(get_platform_token_payload_soft),
+    db: AsyncSession = Depends(get_platform_db),
+) -> Optional[UtilisateurPlateforme]:
+    """
+    `get_current_platform_user`, mais `None` si le jeton n'est pas une session.
+
+    Le `except` est volontairement large. Cette dependance sert sur une route
+    qui accepte **deux** types de jeton : toute exception levee ici — controle de
+    l'adresse IP, role, compte desactive — ferait echouer la requete entiere,
+    meme lorsqu'un jeton d'enrolement parfaitement valide est presente.
+
+    Ce n'est pas une porte de securite : la dependance **stricte** reste celle
+    utilisee partout ailleurs, et elle seule refuse.
+    """
+    if payload is None:
+        return None
+    try:
+        return await get_current_platform_user(request, payload, db)
+    except Exception:  # noqa: BLE001 - cf. docstring
+        return None
+
+
+async def get_current_platform_user_enrolement_soft(
+    request: Request,
+    db: AsyncSession = Depends(get_platform_db),
+) -> Optional[UtilisateurPlateforme]:
+    """
+    `get_current_platform_user_enrolement`, mais `None` au lieu d'echouer.
+
+    **Ne doit jamais se substituer a la version stricte** sur une route qui doit
+    refuser un mauvais jeton : la version stricte est la seule a lever, et donc
+    la seule a garantir le refus.
+    """
+    try:
+        return await get_current_platform_user_enrolement(request, db)
+    except Exception:  # noqa: BLE001 - route a deux types de jeton
+        return None
+

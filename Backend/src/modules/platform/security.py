@@ -228,3 +228,38 @@ def ip_autorisee(ip: Optional[str]) -> Tuple[bool, str]:
         except ValueError:
             logger.warning("entree_liste_blanche_invalide", entree=entree)
     return False, "adresse non autorisée"
+
+# ---------------------------------------------------------------------------
+# Codes de secours
+# ---------------------------------------------------------------------------
+
+#: Nombre de codes de secours emis a l'activation. Dix : assez pour un perda,
+#: pas assez pour qu'une listeenthobieusement devienne un canal d'acces.
+NB_CODES_SECOURS = 10
+
+
+def generer_codes_secours(nombre: int = NB_CODES_SECOURS) -> List[str]:
+    """
+    Codes de secours lisibles, transcrits sans ambiguite.
+
+    L'alphabet **exclut 0/O et 1/I/L** : ces caracteres sont confondus dans une
+    transcription, et un code de secours recopie de travers doit pouvoir etre
+    lu par un humain, pas seulement par l'ordinateur.
+    """
+    alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+    codes = []
+    for _ in range(nombre):
+        brut = generer_jeton_opaque(10)
+        codes.append("".join(alphabet[int(c, 16) % len(alphabet)] for c in brut[:8]))
+    return codes
+
+
+def hacher_codes_secours(codes: List[str]) -> List[str]:
+    """Hache les codes de secours : une lecture de la base ne doit rien donner.
+
+    Argon2, comme les mots de passe. Le cout est assume ici parce que ces codes
+    ne sont produits qu'a l'activation, une fois par compte.
+    """
+    from src.core.security import get_password_hash
+
+    return [get_password_hash(c) for c in codes]
