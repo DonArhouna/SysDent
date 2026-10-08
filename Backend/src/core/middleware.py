@@ -140,14 +140,34 @@ class UnknownQueryParamMiddleware(BaseHTTPMiddleware):
         if cls._autorises is not None:
             return cls._autorises
         autorises: dict[str, frozenset[str]] = {}
+        from fastapi import params as fastapi_params
+
         for route in cls._aplatir(app.routes):
             signature = inspect.signature(route.endpoint)
-            noms = {
-                nom
-                for nom, param in signature.parameters.items()
-                if param.default is not inspect.Parameter.empty
-                and param.annotation is not inspect.Parameter.empty
-            }
+            noms: set[str] = set()
+            for nom, param in signature.parameters.items():
+                defaut = param.default
+                # `Depends` : ce n'est pas un parametre de requete, c'est une
+                # injection de dependance (db, current_user, permission…).
+                if isinstance(defaut, fastapi_params.Depends):
+                    continue
+                # `Path` : fourni par l'URL, pas par la query string.
+                if isinstance(defaut, fastapi_params.Path):
+                    continue
+                # `Body` : corps de requete, pas query string.
+                if isinstance(defaut, fastapi_params.Body):
+                    continue
+                # `Query(..., alias="date")` : le nom **sur le fil** est l'alias,
+                # pas le nom Python. C'est exactement le piege de
+                # `date_ -> date` : sans l'alias, le parametre legitime aurait
+                # ete refuse et la route appelee par un client correct aurait
+                # repondu 422.
+                #
+                # Un parametre **sans defaut** reste un parametre de requete :
+                # `praticien_id: uuid.UUID` en est un, et l'exclure parce
+                # qu'il n'a pas de defaut le faisait passer pour inconnu.
+                alias = getattr(defaut, "alias", None)
+                noms.add(alias or nom)
             for methode in route.methods or set():
                 # Deux clés par route : le chemin **monté** (celui que reçoit la
                 # requête) et le chemin relatif au router (celui qu'expose
