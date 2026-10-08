@@ -6,6 +6,97 @@
 
 
 ---
+## ACCES : **FONCTIONNEL sur le fond, pas encore utilise par le proprietaire** - 2026-10-08
+
+Le parcours reste **prouve par HTTP reel** (session precedente). `rhonekane@gmail.com`
+est ACTIF, Super Admin, **sans secret TOTP** : le parcours d enrollement est ouvert.
+Ce qui manque n'est pas technique, c'est l'action du proprietaire (application TOTP,
+puis `/enrolement`). **Aucun acces n'a donc ete prouve de son cote** : rien n'a
+ete desactive.
+
+## ETAT DE FIN DE SESSION - 2026-10-08
+
+**Prouve**
+- Sauvegarde de `sysdent_master` : 215 Ko, 7 tables, hors depot, dans
+  `%LOCALAPPDATA%\Temp\sysdent-sauvegardes`. `.gitignore` complete de `*.sql` et
+  `*.backup` (le motif existant ne couvrait que `*.dump` et `*.sql.gz`, alors que
+  `pg_dump` produit du `.sql` par defaut) ; controle actif verifie par
+  `git check-ignore`.
+- Inventaire en lecture seule du registre : **3 bases a conserver, 83 lignes
+  prouvées d'origine test, 39 ambigues**.
+- `reinitialiser-2fa` repare et prouve (JSONB `null` contre SQL `NULL`).
+
+**Non verifie / non fait**
+- **La suppression des 83 lignes n'a PAS ete faite.** Une premiere tentative a ete
+  lancee en transaction et n'a rien supprime (125 lignes avant comme apres), sans
+  message d'erreur visible. Elle a ete **interrompue** plutot que reessayee : une
+  suppression en base reelle dont on n'a pas vu le resultat n'est pas une
+  suppression, c'est un risque. **Commande a reprendre avec sortie visible.**
+- **La duree de suite reste > 15 min** (18 min 08 contre 13 min 06). `--durations=30`
+  toujours pas lance.
+- **Etapes 2 a 4 non commencees** : pas d'instance Postgres dediee aux tests,
+  pas de garde de demarrage, pas de recherche JSONB/None ailleurs, pas de test
+  bout-en-bout des commandes operateur.
+- `docs/PROGRESS.md` est **duplique** dans la version commitee : 1440 lignes,
+  606 positions dupliquees, 14 titres repetes. La coupe automatique n'a pas ete
+  tentee, le bloc repete n'etant pas identique a sa source - risque de perte de
+  contenu. **A traiter a la main.**
+
+### Inventaire du registre `tenants_db` (lecture seule, 2026-10-08)
+
+Registre : **125 lignes**. Base `societes` : **125 lignes**. `utilisateur_index` :
+97 lignes, dont **18 avec au moins une connexion**.
+
+| Categorie | Nombre | Base present | Utilisateur ayant connecte | Decision |
+|---|---|---|---|---|
+| A conserver | 3 | oui | non | les 3 bases vivantes |
+| Origine test prouvee | 83 | non | **non** | supprimable, **non fait** |
+| Ambiguees | 39 | non | 9 oui / 30 non motif inconnu | **liste pour decision humaine** |
+
+Les 3 a conserver : `sysdent_tenant_clinique_d_mo_dakar_69a2de`,
+`sysdent_tenant_clinique_demo_2_70631b`, `sysdent_tenant_clinique_demo_dakar_050843`.
+
+**39 ambigues** : 18 portent un utilisateur qui s'est deja connecte alors que leur
+nom ressemble a un test (`cabinet_verif_*`, `cabinet_recette_*`, `cabinet_sn_*`,
+`essai_*`) - le nom ne prouve rien, la connexion si ; 30 relèvent de motifs hors
+table des tests (`partage_a/b_*`, `provisionnement_*`, `rollback_*`).
+
+Deux bases de demonstration vivantes ne sont **pas** dans le registre :
+`sysdent_tenant_clinique_diagnostic_dakar_d22db3` et
+`sysdent_tenant_clinique_trace_3_e3db15`. Elles sont conservees, mais le registre
+ne les connait pas - un ecart a trancher.
+
+### Pourquoi 80 lignes orphelines sont nees de la purge
+
+La garde **ignorait le registre**. La version ecrivant au commit `20addf3`
+classait une base par son **nom** seul : `sysdent_tenant_clinique_essai_3cae37`
+et `sysdent_tenant_cabinet_verif_b_18be1a24_2e1316` sont des noms de test, et
+leurs bases ont ete supprimees - alors que le registre `tenants_db` les declarait
+comme tenants. Le registre n'etait lu nulle part.
+
+**Corrige depuis** (`477b436`) : `classer_base` lit `tenants_db` et classe
+`protege` avant d'examiner le motif, le registre prime. 46 tests, sensibility
+provee. Le controle aurait donc, aujourd'hui, refuse cette suppression.
+
+### Reserve non levee : la suite ecrit dans la vraie base master
+
+`tests/conftest.py:95` utilise `settings.master_db_async_url`, soit
+`MASTER_DB_NAME="sysdent_master"`. `_server_url()` honore `TEST_MASTER_DB_URL`,
+mais la fixture qui compte l'ignore. Les tests creent donc des societes et des
+lignes `tenants_db` **dans la base de controle reelle** - 18 des lignesambiguessont
+des utilisateurs de test ayant « connecte », ce qui explique leur existence.
+
+**Consequence directe sur cette session** : l'inventaire a ete fait pendant que
+les dernieres ecritures de la suite du 08/10 atterrissaient encore (3 lignes
+creees a 19:29). Toute suppression de lignes de test doit attendre l'isolation,
+sinon la suite en recreera.
+
+**A faire par vous** : inchange - tourner le mot de passe avec `--generer`, puis
+enroller le second facteur. `aminadiop@sysdent.pro` reste **actif** (aucun acces
+prouve de votre cote) ; son mot de passe compromis a ete reinitialise a une valeur
+jamais affichee.
+
+---
 
 ## ACCES DU PROPRIETAIRE : **PRESQUE** — 2026-10-08
 

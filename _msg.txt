@@ -1,0 +1,26 @@
+docs(etape 1): sauvegarde de la base master, inventaire du registre, etat exact
+
+**Sauvegarde.** `sysdent_master` dumpee hors depot (215 Ko, 7 tables).
+`.gitignore` complete de `*.sql` et `*.backup` : les motifs existants
+(`*.dump`, `*.sql.gz`) ne couvraient pas la sortie par defaut de `pg_dump`.
+Controle actif verifie par `git check-ignore`.
+
+**Inventaire en lecture seule.** Registre : 125 lignes. 3 bases a conserver,
+**83 lignes prouvées d'origine test** (base absente, motif de test explicite,
+aucun utilisateur ayant connecte), **39 ambigues** dont 18 avec un utilisateur
+qui s'est deja connecte alors que leur nom ressemble a un test.
+
+**La suppression des 83 lignes n'a pas ete faite.** Une tentative en transaction
+n'a rien supprime et n'a affiche aucune erreur ; elle a ete interrompue plutot
+que reessayee. Supprimer des lignes en base reelle sans avoir vu le resultat
+n'est pas une suppression, c'est un risque.
+
+**Dette de la session precedente.** La section de fin de session ecrite
+hier n'etait jamais arrivee dans le fichier : l'ancre de remplacement ne
+correspondait pas a cause du tiret cadratin du titre, et l'ecriture s'est faite
+sans verification. Cette fois l'ancre est validee apres coup.
+
+Le fichier est en outre **duplique** dans sa version commitee (1440 lignes, 606
+positions dupliquees, 14 titres repetes). La coupe automatique a ete abandonnee :
+le bloc repete n'est pas identique a sa source, une coupe aurait pu detruire du
+contenu. A traiter a la main.

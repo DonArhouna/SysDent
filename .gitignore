@@ -169,3 +169,7 @@ site/
 ehthumbs.db
 Thumbs.db
 desktop.ini
+
+# Sauvegardes PostgreSQL : pg_dump produit du .sql par defaut, non couvert par *.sql.gz
+*.sql
+*.backup
