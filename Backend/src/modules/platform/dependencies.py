@@ -282,13 +282,25 @@ async def get_current_platform_user_soft(
     """
     `get_current_platform_user`, mais `None` si le jeton n'est pas une session.
 
-    Le `except` est volontairement large. Cette dependance sert sur une route
-    qui accepte **deux** types de jeton : toute exception levee ici — controle de
-    l'adresse IP, role, compte desactive — ferait echouer la requete entiere,
-    meme lorsqu'un jeton d'enrolement parfaitement valide est presente.
+    **Contrat des dependances « soft ».** Elles n'existent que pour une route qui
+    accepte **deux** types de jeton : sans cela, une dependance stricte refuserait
+    la requete entiere alors qu'un jeton de l'autre type est parfaitement valide.
 
-    Ce n'est pas une porte de securite : la dependance **stricte** reste celle
-    utilisee partout ailleurs, et elle seule refuse.
+    Trois regles, non negociables :
+
+    1. **Le captage est type, pas large.** Seul `AuthenticationException` est
+       transforme en `None`. Un `except Exception` هنا avalerait un defaut de
+       notre code - une colonne renommee, une conversion qui echoue - et le
+       transformerait en « aucun jeton », donc en 401. Une panne de notre cote
+       deviendrait un refus d'authentification : impossible a diagnostiquer, et
+       impossible a distinguer d'un vrai echec de connexion.
+    2. **Ce n'est pas une porte de securite.** La dependance **stricte** reste
+       celle utilisee partout ailleurs, et elle seule refuse.
+    3. **Le comportement par defaut est le refus.** Si aucun des deux types de
+       jeton ne resout de porteur, la route doit lever une erreur
+       d'authentification explicite. Passer `None` au service le ferait echouer
+       sur un attribut, en 500 - une reponse qui accuse la route d'etre cassee
+       alors que la seule erreur est l'absence d'identite. Voir `preparer_2fa`.
     """
     if payload is None:
         return None

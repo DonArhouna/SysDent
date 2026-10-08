@@ -7,88 +7,98 @@
 
 ---
 
-## ACCES DU PROPRIETAIRE : **NON OPERATIONNEL** — 2026-10-08
+## ACCES DU PROPRIETAIRE : **PRESQUE** — 2026-10-08
 
-`rhonekane@gmail.com` **n'existe pas**. Vous ne pouvez pas vous connecter au
-backoffice. L'ancien compte `aminadiot@sysdent.pro` est **laisse actif**, avec son
-mot de passe **reinitialise** lors de la session precedente : il est errone mais
-connu, et c'est le seul acces disponible tant que le correctif n'est pas termine.
-
-### Erreur de methode de la session precedente : reparee
-
-Les deux `except Exception` elargis des dependances « soft » ont ete **annules**.
-Le captage est revenu a `except AuthenticationException`, le seul type attendu
-(jeton de mauvais type). Toute autre exception remonte donc desormais, au lieu
-d'etre transformee en `None`.
-
-### Diagnostic du 500 — symptome identifie, cause racine NON identifiee
-
-**Erreur exacte** :
+`rhonekane@gmail.com` existe, est **Super Admin**, et le mot de passe a ete
+reinitialise avec la commande operateur. Le blocage 500 est **corrige et prouve
+sur le serveur en service** :
 
 ```
-'NoneType' object has no attribute 'secret_2fa_chiffre'
+1. login                      : 200, jeton d'enrolement recu
+2. GET /2fa/preparation      : 200   (echouait en 500)
+   secret TOTP present       : oui (32 caracteres)
+   URI otpauth presente      : oui
 ```
 
-localisee dans `src/modules/platform/routers/auth.py`, corps de `preparer_2fa` :
-la route appelle `preparer_second_facteur(db, user_enrolement or user)` et les
-**deux sont `None`**. L'echec est donc en amont, dans la resolution du jeton.
+### Ce qui reste a faire, par vous
 
-Les deux hypotheses de la session precedente sont **toutes deux ecartees** :
+1. **Tourner le mot de passe.** Celui utilise pour la preuve ci-dessus a ete
+   produit par la commande et n'est connu que d'elle : il doit etre ecrase.
 
-- (a) un mauvais nom d'exception importe : **faux**, l'import etait correct ;
-- (b) une variable non alimentee apres le changement de signature : **vrai, mais
-  c'est une consequence**, pas la cause — c'est `user_enrolement` qui est `None`
-  parce que la dependance stricte leve `AuthenticationException`.
+   ```powershell
+   cd Backend
+   .\.venv\Scripts\python.exe -m src.modules.platform.admin reinitialiser-mot-de-passe `
+       --email rhonekane@gmail.com --motif "Ouverture du backoffice" --generer
+   ```
 
-**Ce qui reste a etablir** : pourquoi
-`get_current_platform_user_enrolement` ne trouve pas le jeton alors que le login
-vient de l'emetre. Cibles, dans l'ordre :
+   Le mot de passe s'affiche **une seule fois**. Copiez-le.
 
-1. la ligne `jetons_usage_unique` est-elle **commitee** et visible de la session de
-   la requete suivante (le login et la preparation n'ouvrent pas la meme session) ;
-2. `cible_id` est un `String(120)` : la conversion `uuid.UUID(ligne.cible_id)` peut
-   echouer sur un format non UUID ;
-3. `expire_le > now()` : melange de fuseaux (UTC base contre horloge du serveur).
+2. **Enroler le second facteur.** L'ecran d'enrolement du backoffice **n'existe
+   pas encore** : il fait partie du travail restant (assistant QR, saisie du
+   code, codes de secours). En attendant, l'API le permet - mais le secret ne
+   doit jamais transiter par un terminal partage.
 
-Un test de diagnostic avait ete ecrit pour trancher (lecture directe de la table
-apres le login) mais **n'a pas produit de sortie** avant l'epuisement du contexte.
-**Il faut le relancer, pas le deviner.**
+L'ancien compte `aminadiop@sysdent.pro` reste **actif** : le desactiver avant que
+votre acces soit prouve laisserait la plateforme sans Super Admin utilisable.
+
+### Quatre defauts empiles, tous en 2FA
+
+Aucun n'etait visible sans executer le parcours.
+
+1. **`preparer_2fa` resolvait `user_enrolement` sans l'utiliser** : elle passait
+   `user` au service, qui vaut `None` sur un jeton d'enrolement. D'ou
+   `AttributeError` sur `secret_2fa_chiffre` - le 500. La route refuse
+   maintenant explicitement quand aucun porteur n'est resolu.
+2. **`generer_codes_secours` reinterpretait du base64url comme de l'hexadecimal** :
+   `int(c, 16)` levait ValueError hors de `[0-9a-f]`. Tirage uniforme dans
+   l'alphabet, unicite garantie dans le lot.
+3. **`JournalService` utilise sans etre importe** dans `routers/auth.py` :
+   NameError a l'activation.
+4. **Le code de secours n'etait cable qu'a l'ACTIVATION**, jamais sur le defi de
+   connexion. Un compte dont le telephone n'est absent ne pouvait plus se
+   reconnecter du tout.
+
+Le point 4 est le plus grave : le mecanisme etait produit, stocke, et **mort**.
+
+### Ecart de couverture trouve par injection de defaut
+
+Retirer la clause `usage == ENROLEMENT_2FA` de `get_current_platform_user_enrolement`
+laissait les 10 tests **verts**. Aucun test ne couvrait la restriction de portee -
+le controle de securite le plus discret du module. Le test qui l'attrape est
+ecrit : l'injection donne desormais **1 echec sur 12**, puis 12 verts apres
+remise. Assertions inchangees dans les 10 tests d'origine.
 
 ### Etat verifie sans ambiguite
 
 | Point | Etat |
 |---|---|
-| Migration `a3e7d1b95c24` | appliquee, allers-retours verifies 2 fois sur copie |
-| Login sans 2FA → jeton d'enrolement, aucune session | **prouve** |
-| Jeton rejete sur `/platform/auth/me` | **prouve** |
-| Jeton rejete sur une route client | **prouve** |
-| Jeton rejete sur `/auth/refresh` | **prouve** |
-| 10 tests d'enrolement | **5 verts, 5 en echec** (tous sur la preparation) |
-| Non-regression complete | **non etablie** — suite non relancee |
-| CLI d'operateur | **non ecrite** |
-| Ancien compte | actif, mot de passe reinitialise (connu) |
+| Migration `a3e7d1b95c24` | appliquee, allers-retouts verifies 2 fois sur copie |
+| Login sans 2FA -> jeton d'enrolement, aucune session | **prouve** |
+| Jeton rejete sur `/platform/auth/me`, une route client, `/auth/refresh` | **prouve** |
+| `/2fa/preparation` sur le serveur en service | **prouve** : 200 + secret + URI |
+| 12 tests d'enrolement | **12 verts**, assertions inchangees |
+| Sensibilite a la restriction de portee | **prouvee** par injection de defaut |
+| CLI d'operateur (`lister`, `creer-super-admin`, `reinitialiser-mot-de-passe`, `reinitialiser-2fa`) | **prouvee par execution** |
+| `rhonekane@gmail.com` | cree, Super Admin, mot de passe a tourner par vous |
+| Non-regression complete | **en cours** - voir le verdict en fin de journal |
+| Ecran d'enrolement dans le backoffice | **a faire** |
 
 ### Reprise, dans cet ordre
 
-1. Relancer le test de diagnostic : lire `jetons_usage_unique` juste apres le login
-2. Corriger la cause racine trouvee ; les 5 tests doivent passer **sans modifier
-   leurs assertions**
-3. Prouver le flux complet par appels HTTP sur l'application lancee
-4. **Injection de defaut** : retirer la clause `usage == ENROLEMENT_2FA` et
-   verifier qu'un test echoue
-5. Ecrire les commandes d'operateur + `docs/backoffice/OPERATIONS.md`
-6. Creer `rhonekane@gmail.com`, prouver la connexion, puis **desactiver**
-   `aminadiop@sysdent.pro`
-7. Relancer la suite complete et annoncer le verdict chiffre
+1. Vous : tourner le mot de passe avec `--generer`, puis prouver la connexion.
+2. **Assistant d'enrolement dans `Backoffice/`** : QR, saisie du code, codes de
+   secours avec confirmation, jeton en memoire uniquement.
+3. Regenerer le client OpenAPI, `npm run verifier`.
+4. Desactiver `aminadiop@sysdent.pro` **apres** avoir prouve votre acces.
+5. Puis : les 5 endpoints manquants, Lots 1 et 2, puis Lots 3-6.
 
-### Regle a retenir pour la suite
+### Regle a retenir
 
-Une dependance « soft » ne doit exister que pour une route a **deux** types de
-jeton, doit etre documentee, et son comportement par defaut doit etre le **refus** :
-une erreur inattendue ne peut jamais se transformer en acces accorde.
-
----
----
+Une dependance « soft » n'existe que pour une route a **deux** types de jeton, doit
+etre documentee, et son comportement par defaut doit etre le **refus**. Son captage
+est **type**, jamais elargi : un `except Exception` transformerait un defaut de notre
+code en « aucun jeton », donc en 401 - et une panne deviendrait impossible a
+diagnostiquer. Contrat complet dans `dependencies.py`.
 
 ## État à date : 2026-10-08 (session 3)
 

@@ -1,33 +1,13 @@
-fix(2fa): l'enrolement etait inaccessible - quatre defauts empiles
+docs: contrat des dependances « soft » et etat de l'acces du proprietaire
 
-Aucun n'etait visible sans executer le parcours, et les tests etaient deja
-ecrits et deja en echec avant correction.
+Le docstring de `get_current_platform_user_soft` affirmait « le `except` est
+volontairement large ». Le code capture `AuthenticationException`, et rien
+d'autre : le commentaire decrivait un etat anterieur du code. Remplace par les
+trois regles reellement appliquees - captage type, pas une porte de securite,
+comportement par defaut = refus - avec le renvoi a `preparer_2fa`, ou l'absence
+de porteur doit lever une erreur explicite au lieu de produire un 500.
 
-1. preparer_2fa resolvait user_enrolement sans l'utiliser : elle passait user
-   au service, qui vaut None sur un jeton d'enrolement. D'ou AttributeError sur
-   secret_2fa_chiffre, et le 500 sur le premier ecran de l'enrolement. La route
-   refuse desormais explicitement quand aucun porteur n'est resolu : echec
-   ferme, plutot qu'une 500 qui accuse la route d'etre cassee quand la seule
-   erreur est l'absence d'identite.
-
-2. generer_codes_secours reinterpretait un jeton base64url comme de
-   l'hexadecimal : int(c, 16) levait ValueError sur le premier caractere hors
-   [0-9a-f]. Tirage direct et uniforme dans l'alphabet, et unicite garantie dans
-   le lot - deux codes identiques feraient perdre deux codes d'un coup, ce qui
-   n'apparait qu'a l'usage, apres l'activation.
-
-3. JournalService etait utilise dans routers/auth.py sans etre importe : la ligne
-   de journalisation de l'activation levait NameError.
-
-4. Le code de secours n'etait cable qu'a l'ACTIVATION, jamais sur le defi de
-   connexion. Un compte dont le telephone n'est pas sous la main ne pouvait donc
-   plus se reconnecter du tout : le mecanisme etait produit, stocke, et mort.
-
-Preuve : les 12 tests d'enrolement passent, leurs assertions inchangees.
-
-Un ecart de couverture corrige au passage. L'injection de defaut prevue - retirer
-la clause usage == ENROLEMENT_2FA de la dependance d'enrolement - laissait les
-10 tests verts : aucun test ne couvrait la restriction de portee, le controle de
-securite le plus discret du module. Le test qui l'attrape est ecrit, et
-l'injection le fait desormais echouer (1 en echec sur 12), puis repasser a 12
-apres remise.
+PROGRESS.md : le blocage 500 est corrige et preuve sur le serveur en service
+(200 + secret 32 caracteres + URI otpauth). Restent le mot de passe a tourner
+par le proprietaire, l'assistant d'enrolement dans le backoffice, puis la
+desactivation de l'ancien compte une fois le nouvel acces prouve.
