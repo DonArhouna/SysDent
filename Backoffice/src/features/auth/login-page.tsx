@@ -49,31 +49,10 @@ export function LoginPage() {
   // passe : laisser croire que la connexion a echoue pendant que le serveur a
   // emis un jeton d'etape est exactement l'erreur qui a fait perdre du temps sur
   // ce blocage. Le jeton reste en memoire, il n'est ni persiste ni ecrit ailleurs.
-  if (jetonEnrolement) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-6">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Second facteur a configurer</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Vos identifiants sont corrects. Ce compte n'a pas encore de secret
-              TOTP : la connexion exige un second facteur.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              L'assistant d'enrolement n'est pas encore disponible dans cette
-              version. Il reste a ecrire : lecture du QR, saisie du code, et
-              affichage des codes de secours.
-            </p>
-            <Button variant="outline" onClick={() => setErreur('')} className="w-full">
-              Retour a la connexion
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
+  // Le compte n'a encore aucun secret TOTP : l'assistant d'enrolement est
+  // l'etape suivante. Le jeton reste en memoire, il n'est ni persiste ni ecrit
+  // ailleurs.
+  if (jetonEnrolement) return <Navigate to="/enrolement" replace />
 
   const enCours = async (action: () => Promise<unknown>) => {
     setErreur('')

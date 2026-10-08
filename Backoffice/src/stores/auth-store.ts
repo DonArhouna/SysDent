@@ -62,6 +62,33 @@ interface ReponseJeton {
   jeton_enrolement?: string
 }
 
+/**
+ * Formes OpenAPI, relevees dans `openapi.json` sur les schemas
+ * `Activation2FAResponse`, `Activer2FARequest` et `Enrolement2FAResponse`.
+ *
+ * Le nom du champ de la requete est celui du backend : `code`, comme dans
+ * `Activer2FARequest.code`. Un `code_2fa` aurait ete refuse en 422, et rien dans
+ * un appel enveloppe par `api.post` ne l'aurait signale.
+ */
+interface Preparation2FA {
+  /** Secret TOTP base32. Affichable une fois : il est renvoye ici et nulle part ailleurs. */
+  secret: string
+  /** URI `otpauth://` a encoder en QR code par le client. */
+  uri: string
+  instruction: string
+}
+
+/** Reponse de `/platform/auth/2fa/activation`. */
+interface EnrolementTermine extends ReponseJeton {
+  /**
+   * Codes de secours, **une seule fois**.
+   *
+   * Ni la base ni le journal ne les conservent en clair. Perdus, ils imposent de
+   * repasser par un operateur.
+   */
+  codes_secours: string[]
+}
+
 interface AuthState {
   token: string | null
   refreshToken: string | null
@@ -80,6 +107,10 @@ interface AuthState {
   valider2fa: (code: string) => Promise<void>
   annuler2fa: () => void
   annulerEnrolement: () => void
+  /** Preparation affichee a l'ecran. `null` tant que le QR n'a pas ete demande. */
+  preparation2fa: Preparation2FA | null
+  preparerEnrolement: () => Promise<void>
+  activerEnrolement: (code: string) => Promise<string[]>
   chargerProfil: () => Promise<void>
   deconnexion: () => void
 }
@@ -92,6 +123,7 @@ export const useAuthStore = create<AuthState>()(
       profil: null,
       challenge2fa: null,
         jetonEnrolement: null,
+        preparation2fa: null,
 
       connexion: async (email, password) => {
         const reponse = await api.post<ApiReponse<ReponseJeton>>('/platform/auth/login', {
@@ -166,7 +198,64 @@ export const useAuthStore = create<AuthState>()(
       },
 
       annuler2fa: () => set({ challenge2fa: null }),
-    annulerEnrolement: () => set({ jetonEnrolement: null }),
+    annulerEnrolement: () => set({ jetonEnrolement: null, preparation2fa: null }),
+
+    /**
+     * Demande le secret TOTP au serveur.
+     *
+     * Le jeton d'enrolement ouvre cette route et **l'activation** : rien d'autre.
+     * Il ne vaut pas session, et le backend le consomme a l'activation.
+     *
+     * Le secret transite par l'etat du store, donc par la **memoire seule** :
+     * `preparation2fa` ne fait pas partie du `partialize`, il disparait a la
+     * fermeture de l'onglet. Persiste, il resterait lisible sur le poste et
+     * permettrait de fabriquer un code TOTP valide sans jamais l'avoir vu scanner.
+     */
+    preparerEnrolement: async () => {
+      const jeton = get().jetonEnrolement
+      if (!jeton) throw new Error("Session de connexion expiree.")
+      // `bearer` explicite : ce jeton d'etape n'est pas une session, et il n'y a
+      // aucun jeton de session a prendre. Sans lui, la requete partirait sans
+      // en-tete et le backend reponderait « jeton invalide ».
+      const reponse = await api.get<ApiReponse<Preparation2FA>>('/platform/auth/2fa/preparation', {
+        bearer: jeton,
+      })
+      set({ preparation2fa: reponse.data })
+    },
+
+    /**
+     * Confirme le code TOTP : active le second facteur, rend les codes de secours
+     * **une seule fois**, et ouvre la session.
+     *
+     * Les codes sont renvoyes a l'appelant plutot que stockes : personne ne doit
+     * pouvoir les relire apres coup depuis le store, ni les找回 apres rechargement.
+     */
+    activerEnrolement: async (code) => {
+      const jeton = get().jetonEnrolement
+      if (!jeton) throw new Error("Session de connexion expiree.")
+      const reponse = await api.post<ApiReponse<EnrolementTermine>>('/platform/auth/2fa/activation', {
+        code,
+        bearer: jeton,
+      })
+      const { codes_secours, ...jetons } = reponse.data
+      if (!jetons.access_token || !jetons.refresh_token) {
+        // L'activation a reussi cote serveur : impossible d'ecrire un etat
+        // « connecte » sans jeton. Le dire, plutot que laisser l'ecran pretendre.
+        throw new Error("Activation effectuee, mais le serveur n a renvoye aucune session.")
+      }
+      sessionVivante()
+      set({
+        token: jetons.access_token,
+        refreshToken: jetons.refresh_token,
+        // Le jeton d'enrolement a ete consomme par le serveur : le garder
+        // permettrait de rejouer une activation, et de trailer un secret dans l'etat.
+        jetonEnrolement: null,
+        preparation2fa: null,
+        challenge2fa: null,
+      })
+      await get().chargerProfil()
+      return codes_secours
+    },
 
       chargerProfil: async () => {
         const reponse = await api.get<ApiReponse<ProfilPlateforme>>('/platform/auth/me')

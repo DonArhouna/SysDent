@@ -93,6 +93,17 @@ export interface OptionsAppel {
   /** Ne remonte pas l'erreur en toast : l'appelant gère son propre état. */
   silencieux?: boolean
   signal?: AbortSignal
+  /**
+   * Jeton `Bearer` a employer pour CET appel, par-dessus la session.
+   *
+   * L'enrolement 2FA est le cas qui le necessite : il passe par un jeton
+   * d'etape, pas par une session - il n'y a donc **aucun jeton de session** a
+   * prendre. S'appuyer sur cette absence serait fragile : des la qu'un Super
+   * Admin dispose d'une session, l'en-tete de session ecraserait en silence le
+   * jeton d'etape, et la requete partirait avec le mauvais identifiant, sans
+   * erreur visible.
+   */
+  bearer?: string
 }
 
 function buildQueryString(params?: Record<string, unknown>): string {
@@ -109,15 +120,16 @@ function buildQueryString(params?: Record<string, unknown>): string {
 
 async function request<T>(
   path: string,
-  options: RequestInit & { silencieux?: boolean; _reessai?: boolean } = {},
+  options: RequestInit & { silencieux?: boolean; _reessai?: boolean; bearer?: string } = {},
 ): Promise<T> {
-  const token = getToken()
-  const headers = new Headers(options.headers)
+  const { bearer, ...reste } = options
+  const token = bearer ?? getToken()
+  const headers = new Headers(reste.headers)
   headers.set('Content-Type', 'application/json')
   if (token) headers.set('Authorization', `Bearer ${token}`)
 
   const reponse = await fetch(`${BASE}${PREFIXE}${path}`, {
-    ...options,
+    ...reste,
     headers,
     credentials: 'include',
   })
@@ -128,7 +140,7 @@ async function request<T>(
   if (reponse.status === 401 && !options._reessai && !path.startsWith('/platform/auth/')) {
     const nouveau = await renouvelerTokenAcces()
     if (nouveau) {
-      return request<T>(path, { ...options, _reessai: true })
+      return request<T>(path, { ...reste, _reessai: true, bearer })
     }
     // Session morte : on purge et on ne **rejoue pas**. Rejouer avec le jeton
     // mort produit une cascade de 401 puis de 403 qui ne parlent d'aucune

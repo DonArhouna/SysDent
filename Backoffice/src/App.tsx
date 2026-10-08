@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
 import { RouteGuard } from '@/guards/route-guard'
 import { LoginPage } from '@/features/auth/login-page'
+import { EnrolementPage } from '@/features/auth/enrolement-page'
 import { ForbiddenPage } from '@/pages/forbidden'
 import { NotFoundPage } from '@/pages/not-found'
 
@@ -19,6 +20,7 @@ export default function App() {
     <ErrorBoundary>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/enrolement" element={<EnrolementPage />} />
         <Route
           path="/403"
           element={
