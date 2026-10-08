@@ -236,3 +236,63 @@ Chaque lot : backend si nécessaire → frontend → tests → non-régression �
 | B | Endpoint d'agrégats pour le tableau de bord | **Ajouter** `GET /platform/stats/dashboard` : 9 requêtes au chargement sont un défaut, pas une optimisation |
 | C | Stockage du jeton plateforme | cookie `httpOnly` si le backend le pose ; sinon mémoire + refresh — **à vérifier** |
 | D | Codes de secours 2FA | le backend似乎 ne les prévoit pas ; à ajouter si le propriétaire les veut |
+
+---
+
+## 11. État à date — 2026-10-08
+
+### Socle écrit et vérifié
+
+| Contrôle | Résultat |
+|---|---|
+| `npx tsc -b --force` | **propre** |
+| `npm run build` | **réussi** |
+| Structure | 34 fichiers TS/TSX |
+
+### Réserves ouvertes
+
+| Réserve | Détail |
+|---|---|
+| **`oxlint` ne s'exécute pas** | le binding natif n'est pas résolu (`Cannot find native binding`) : l'installation a dû passer par `--legacy-peer-deps`, qui **saute les dépendances optionnelles**. Le build et le type-check passent ; le lint est donc **non vérifié** sur ce projet. À reprendre. |
+| **`openapi-typescript@7` exige TypeScript 5**, le projet est en TS 6. Écart de peer accepté : l'outil ne fait que **générer** des types à la construction, il n'est jamais chargé à l'exécution. **Décision à valider.** |
+| **`baseUrl` déprécié en TS 6** | retiré ; les `paths` relatifs suffisent. |
+| CORS backend | l'origine `http://127.0.0.1:5174` doit être ajoutée à la liste blanche du backend — **non fait**. |
+
+### Fichiers écrits
+
+**Configurations** : `package.json`, `vite.config.ts` (port 5174), `tsconfig.{json,app,node}`,
+`tailwind.config.js` (+ accent plateforme), `postcss.config.js`, `.env.example`,
+`index.html`, `src/vite-env.d.ts`.
+
+**Design system** : 20 composants copiés depuis l'application client — `button`, `card`,
+`modal`, `drawer`, `dialog`, `table`, `tabs`, `pagination`, `empty-state`, `status-badge`,
+`page-header`, `kpi-card`, `data-table`, `confirm-dialog`, `select`, `input`, `label`,
+`textarea`, `badge`, `avatar`, `skeleton`, `toast`, `floating-action-button`,
+`error-boundary`. Plus `theme-provider` et `toast-store`.
+
+**Écrit pour le backoffice** :
+
+| Fichier | Rôle |
+|---|---|
+| `src/lib/api.ts` | client HTTP unique, déduplication du renouvellement, refus de rejouer avec un jeton mort |
+| `src/stores/auth-store.ts` | session plateforme, **2FA obligatoire**, purge idempotente, propagation multi-onglets |
+| `src/stores/tenant-store.ts` | cabinet consulté, purgé à la déconnexion |
+| `src/providers/query-provider.tsx` | cache vidé à la purge — **sans `useNavigate`**, le composant étant au-dessus du routeur |
+| `src/guards/can.tsx` | `<Can>` et `usePermission`, pilotés par `/platform/auth/me` |
+| `src/guards/route-guard.tsx` | garde de session et de permission |
+| `src/features/auth/login-page.tsx` | connexion + saisie du code TOTP, message d'erreur unique |
+| `src/pages/{forbidden,not-found}.tsx` | 403 et 404 |
+
+### Non fait
+
+Écrans des Lots 1 et 2 (tableau de bord, cabinets), types OpenAPI générés, layout
+(sidebar et navbar flottantes), `GET /platform/stats/dashboard`, et les 5 endpoints
+manquants relevés au tableau.
+
+### Parcours à vérifier manuellement
+
+Aucun rendu n'a pu être observé : **il n'y a pas de navigateur dans cette session**.
+- `npm run dev` dans `Backoffice/` — l'écran de connexion s'affiche, badge « Plateforme »
+  visible, thème sombre et clair.
+- Erreur de connexion : un seul message, quelle que soit la cause.
+- Flux 2FA : compte sans 2FA → écran de code ; mauvais code → refus.
