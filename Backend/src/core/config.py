@@ -143,7 +143,15 @@ class Settings(BaseSettings):
     REDIS_DB: int = 0
 
     # CORS & Domaines autorisés
-    CORS_ORIGINS: Union[List[str], str] = ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000"]
+    # Liste blanche explicite. `5174` est le port du BACKOFFICE : c'est une
+    # application distincte, avec son propre jeu de comptes.
+    CORS_ORIGINS: Union[List[str], str] = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
+    ]
     ALLOWED_HOSTS: Union[List[str], str] = ["*"]
 
     # Logging
