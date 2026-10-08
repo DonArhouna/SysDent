@@ -294,7 +294,7 @@ async def get_current_platform_user_soft(
         return None
     try:
         return await get_current_platform_user(request, payload, db)
-    except Exception:  # noqa: BLE001 - cf. docstring
+    except AuthenticationException:
         return None
 
 
@@ -311,6 +311,6 @@ async def get_current_platform_user_enrolement_soft(
     """
     try:
         return await get_current_platform_user_enrolement(request, db)
-    except Exception:  # noqa: BLE001 - route a deux types de jeton
+    except AuthenticationException:
         return None
 

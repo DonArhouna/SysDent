@@ -15,7 +15,89 @@ file d'attente reste donc bloquée.
 
 ---
 
-## ENROLEMENT 2FA — À 50 %, À REPRENDRE (2026-10-08)
+## ACCES DU PROPRIETAIRE : **NON OPERATIONNEL** — 2026-10-08
+
+`rhonekane@gmail.com` **n'existe pas**. Vous ne pouvez pas vous connecter au
+backoffice. L'ancien compte `aminadiot@sysdent.pro` est **laisse actif**, avec son
+mot de passe **reinitialise** lors de la session precedente : il est errone mais
+connu, et c'est le seul acces disponible tant que le correctif n'est pas termine.
+
+### Erreur de methode de la session precedente : reparee
+
+Les deux `except Exception` elargis des dependances « soft » ont ete **annules**.
+Le captage est revenu a `except AuthenticationException`, le seul type attendu
+(jeton de mauvais type). Toute autre exception remonte donc desormais, au lieu
+d'etre transformee en `None`.
+
+### Diagnostic du 500 — symptome identifie, cause racine NON identifiee
+
+**Erreur exacte** :
+
+```
+'NoneType' object has no attribute 'secret_2fa_chiffre'
+```
+
+localisee dans `src/modules/platform/routers/auth.py`, corps de `preparer_2fa` :
+la route appelle `preparer_second_facteur(db, user_enrolement or user)` et les
+**deux sont `None`**. L'echec est donc en amont, dans la resolution du jeton.
+
+Les deux hypotheses de la session precedente sont **toutes deux ecartees** :
+
+- (a) un mauvais nom d'exception importe : **faux**, l'import etait correct ;
+- (b) une variable non alimentee apres le changement de signature : **vrai, mais
+  c'est une consequence**, pas la cause — c'est `user_enrolement` qui est `None`
+  parce que la dependance stricte leve `AuthenticationException`.
+
+**Ce qui reste a etablir** : pourquoi
+`get_current_platform_user_enrolement` ne trouve pas le jeton alors que le login
+vient de l'emetre. Cibles, dans l'ordre :
+
+1. la ligne `jetons_usage_unique` est-elle **commitee** et visible de la session de
+   la requete suivante (le login et la preparation n'ouvrent pas la meme session) ;
+2. `cible_id` est un `String(120)` : la conversion `uuid.UUID(ligne.cible_id)` peut
+   echouer sur un format non UUID ;
+3. `expire_le > now()` : melange de fuseaux (UTC base contre horloge du serveur).
+
+Un test de diagnostic avait ete ecrit pour trancher (lecture directe de la table
+apres le login) mais **n'a pas produit de sortie** avant l'epuisement du contexte.
+**Il faut le relancer, pas le deviner.**
+
+### Etat verifie sans ambiguite
+
+| Point | Etat |
+|---|---|
+| Migration `a3e7d1b95c24` | appliquee, allers-retours verifies 2 fois sur copie |
+| Login sans 2FA → jeton d'enrolement, aucune session | **prouve** |
+| Jeton rejete sur `/platform/auth/me` | **prouve** |
+| Jeton rejete sur une route client | **prouve** |
+| Jeton rejete sur `/auth/refresh` | **prouve** |
+| 10 tests d'enrolement | **5 verts, 5 en echec** (tous sur la preparation) |
+| Non-regression complete | **non etablie** — suite non relancee |
+| CLI d'operateur | **non ecrite** |
+| Ancien compte | actif, mot de passe reinitialise (connu) |
+
+### Reprise, dans cet ordre
+
+1. Relancer le test de diagnostic : lire `jetons_usage_unique` juste apres le login
+2. Corriger la cause racine trouvee ; les 5 tests doivent passer **sans modifier
+   leurs assertions**
+3. Prouver le flux complet par appels HTTP sur l'application lancee
+4. **Injection de defaut** : retirer la clause `usage == ENROLEMENT_2FA` et
+   verifier qu'un test echoue
+5. Ecrire les commandes d'operateur + `docs/backoffice/OPERATIONS.md`
+6. Creer `rhonekane@gmail.com`, prouver la connexion, puis **desactiver**
+   `aminadiop@sysdent.pro`
+7. Relancer la suite complete et annoncer le verdict chiffre
+
+### Regle a retenir pour la suite
+
+Une dependance « soft » ne doit exister que pour une route a **deux** types de
+jeton, doit etre documentee, et son comportement par defaut doit etre le **refus** :
+une erreur inattendue ne peut jamais se transformer en acces accorde.
+
+---
+
+## ENROLEMENT 2FA — À 50 %, À REPRENDRE (2026-08-07)
 
 ### Ce qui est fait et vérifié
 
