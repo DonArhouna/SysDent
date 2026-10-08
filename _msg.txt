@@ -1,20 +1,33 @@
-perf(tests): une garde unique supprime les bases laisseees par les tests
+fix(tests): garde de purge durcie - registre, liste de protection, 46 tests
 
-Trois mesures consecutives : 13 min 06, puis 17 min 51, puis 21 min 23 - pour
-deux tests ajoutes. La croissance est monotone : elle ne venait pas des tests.
+La garde d'origine supprimait sur un motif de nom trop permissif. Elle a
+supprime 80 bases le 08/10, dont **119 lignes du registre `tenants_db` sont
+restees orphelines** : le registre ne faisait pas autorite.
 
-Le conteneur de developpement portait 89 bases (~700 Mo) au lieu de 10. Les
-tests creent des bases par plusieurs chemins - nom_jetable, creation de tenant par
-l'API, clones d'isolation - et chacun avait sa propre suppression, ou aucune.
-Postgres cumule, et la suite paie l'accumulation a chaque test.
+**Registre de session.** Toute base creee par un test y est notee. Elle est
+supprimee sur certitude, pas sur indice : elle n'existait pas au depart.
 
-La correction est une garde unique de fin de session dans conftest.py, plutot
-qu'un finally par fichier : elle rattrape les chemins oublies et ceux d'un test
-ecrit apres aujourd'hui.
+**Liste de protection non contournable.** `postgres`, `template0`, `template1`,
+`sysdent_master`, `sysdent_modele_tenant`, `sysdent_platform`, `sysdent_tenant_ref`,
+plus **toute base referencee par `tenants_db`**. Le registre est lu avant toute
+decision : c'est la seule source qui dise si une base est un tenant reel.
 
-Les prefixes jetables sont explicites. Un motif sysdent_% supprimerait
-sysdent_platform et sysdent_tenant_ref, donc la plateforme et son tenant de
-reference : un nettoyage qui massacre la base de travail n'est pas un nettoyage,
-c'est un accident. Seule une base dont le nom se termine par un fragment
-hexadecimal est traitee comme jetable - une base nommee a la main n'en a pas, ce
-qui laisse intactes les bases de demonstration du proprietaire.
+**Le cas par defaut est `conserve`.** Une garde destructive doit etablir par
+l'absence de doute, jamais par l'absence de preuve. Une base inconnue est une
+base gardee.
+
+**Motif par prefixe, forme fixee.** Une longueur unique aurait ete fausse :
+`nom_jetable` fait 12 caracteres, l'isolation 8, le partage 6, et les cabinets
+`lettre_hex8_hex6`. Quatre formes, chacune verifiable. Les 53 residus reels ont
+ete recalibres dessus, et les 6 bases de demonstration verifiees hors motif -
+dont `d_mo_dakar_69a2de`, que le motif attrapait et qui est une base utilisee.
+
+**Purge armee.** `SYSDENT_TESTS_PURGE=1` est requis. Une purge sur le mauvais
+serveur est irrattrapable ; une purge qui ne s'execute pas se relance. Armer la
+purge n elargit pas son pouvoir : la liste de protection prime sur l autorisation.
+
+**46 tests.** Injection de defaut dans les deux sens : longueur de suffixe non
+fixee -> 3 echecs ; registre neutralise -> 3 echecs ; restaure -> 46 verts.
+
+Reserve, non traite ici : la suite ecrit dans la **vraie base master** (voir
+PROGRESS.md). Une instance Postgres dediee aux tests reste recommandee.

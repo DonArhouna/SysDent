@@ -15,6 +15,7 @@ import gc
 import hashlib
 import hmac
 import os
+import re
 import sys
 import uuid
 from datetime import date
@@ -103,12 +104,23 @@ async def master_db() -> AsyncGenerator[AsyncSession, None]:
         await engine.dispose()
 
 
+#: Registre des bases creees **par cette session de tests**. Une base qui y
+#: figure est de la peine a jetter : aucun doute possible. Le motif de nom, lui,
+#: n'est qu'un indice.
+BASES_CREEES_PAR_LA_SESSION: set[str] = set()
+
+
+def _enregistrer(nom: str) -> None:
+    BASES_CREEES_PAR_LA_SESSION.add(nom)
+
+
 async def _creer_base(db_name: str) -> None:
     """Crée une base jetable sur l'instance de maintenance `postgres`."""
     admin_engine = create_async_engine(_async_url("postgres"), isolation_level="AUTOCOMMIT")
     try:
         async with admin_engine.connect() as conn:
             await conn.execute(text(f'CREATE DATABASE "{db_name}"'))
+        _enregistrer(db_name)
     finally:
         await admin_engine.dispose()
 
@@ -122,79 +134,208 @@ async def _supprimer_base(db_name: str) -> None:
         await admin_engine.dispose()
 
 
-#: Prefixes produits par les tests, chacun suivi d'un fragment aleatoire.
-#: La liste est **explicite** : un motif trop large (`sysdent_%`) supprimerait
-#: `sysdent_platform` et `sysdent_tenant_ref`, c'est-a-dire la plateforme et son
-#: tenant de reference. Un nettoyage qui massacre la base de travail n'est pas un
-#: nettoyage, c'est un accident.
-PREFIXES_JETABLES = (
-    "sysdent_test_",
-    "sysdent_iso_a_",
-    "sysdent_iso_b_",
-    "sysdent_tenant_cabinet_verif_",
-    "sysdent_tenant_cabinet_recette_",
-    "sysdent_tenant_cabinet_onboarding_",
-    "sysdent_tenant_clinique_partage_",
-    "sysdent_tenant_clinique_cabinet_sn_",
-    "sysdent_tenant_clinique_d_mo_",
-    "sysdent_tenant_clinique_diagnostic_",
-    "sysdent_tenant_clinique_essai_",
-    "sysdent_platform_enrolement_",
+#: Prefixe -> forme du suffixe, **calibre sur les noms reellement produits**.
+#:
+#: Une longueur fixe unique aurait ete fausse : `nom_jetable` fait
+#: `uuid4().hex[:12]`, l'isolation de patients fait 8 caracteres, le partage de
+#: tenant 6, et les cabinets de recette `lettre_hex8_hex8`. Quatre formes, pas
+#: une. Un motif trop permissif (`se terminait par de l'hexa`) laissait passer
+#: des noms tapes a la main ; un motif trop strict laissait 80 bases sur place.
+#:
+#: Chaque forme est **fixe** : c'est ce qui rend la regle verifiable plutot que
+#: devinable.
+#: **Liste de protection absolue.** Verifiee en premier, jamais contournable, meme
+#: si le motif de nom devait un jour considerer `postgres` comme jetable.
+#:
+#: `sysdent_platform` est la plateforme, `sysdent_master` son registre de controle,
+#: `sysdent_modele_tenant` le modele clone a chaque test, `sysdent_tenant_ref` le
+#: tenant de reference. Les perdre, c'est perdre le travail.
+BASES_PROTEGEES = frozenset(
+    {
+        "postgres",
+        "template0",
+        "template1",
+        "sysdent_master",
+        "sysdent_modele_tenant",
+        "sysdent_platform",
+        "sysdent_tenant_ref",
+    }
 )
 
+#: Variable d'environnement exigee pour que la purge s'execute. Sans elle, la
+#: garde ne fait rien et le dit : une purge qui s'execute sur le mauvais serveur
+#: est irrattrapable, une purge qui ne s'execute pas se relance.
+VARS_PURGE = "SYSDENT_TESTS_PURGE"
 
-def _est_jetable(nom: str) -> bool:
-    """Une base est jetable si elle est nee d'un test, jamais si elle est vivante.
 
-    Le nom suffit, et le fragment aleatoire derriere le prefixe est ce qui
-    distingue une base de test d'une base nommee a la main : un administrateur
-    qui cree `sysdent_tenant_clinique_demo` n'a pas de fragment hexadecimal
-    derriere.
-    """
-    for prefixe in PREFIXES_JETABLES:
-        if nom.startswith(prefixe):
-            suffixe = nom[len(prefixe):]
-            if suffixe and all(c in "0123456789abcdef_" for c in suffixe):
-                return True
+MOTIFS_JETABLES: dict[str, re.Pattern[str]] = {
+    # `nom_jetable()` : uuid4().hex[:12]
+    "sysdent_test_": re.compile(r"^[0-9a-f]{12}$"),
+    "sysdent_platform_enrolement_": re.compile(r"^[0-9a-f]{12}$"),
+    # Isolation : 8 caracteres.
+    "sysdent_iso_a_": re.compile(r"^[0-9a-f]{8}$"),
+    "sysdent_iso_b_": re.compile(r"^[0-9a-f]{8}$"),
+    # Cabinet : `lettre_hex8_hex8` (verif b/c/d/e) et `onboarding_hex8_hex8`.
+    "sysdent_tenant_cabinet_verif_": re.compile(r"^[a-z]_[0-9a-f]{8}_[0-9a-f]{6}$"),
+    "sysdent_tenant_cabinet_onboarding_": re.compile(r"^[0-9a-f]{8}_[0-9a-f]{6}$"),
+    # Recette et essai : 6 caracteres.
+    "sysdent_tenant_cabinet_recette_": re.compile(r"^[0-9a-f]{6}$"),
+    "sysdent_tenant_clinique_essai_": re.compile(r"^[0-9a-f]{6}$"),
+    # Partage de tenant : `a` ou `b` puis 6 caracteres.
+    "sysdent_tenant_clinique_partage_": re.compile(r"^[ab]_[0-9a-f]{6}$"),
+    "sysdent_tenant_clinique_cabinet_sn_": re.compile(r"^[0-9a-f]{6}$"),
+    # Les cabinets modifies gardent leur slug lisible **avant** du fragment.
+    # `d_mo_dakar_69a2de` et `demo_dakar_050843` sont des bases de demonstration
+    # REELLEMENT utilisees : hors motif, elles ne sont protegees que par le
+    # registre. C est deliberement plus prudent que l inverse.
+    "sysdent_tenant_clinique_diagnostic_": re.compile(r"^dakar_[0-9a-f]{8}$"),
+}
+
+
+def _motif_jetable(nom: str) -> bool:
+    """Le nom ressemble-t-il a une base de test ? Preuve **faible**."""
+    for prefixe, motif in MOTIFS_JETABLES.items():
+        if nom.startswith(prefixe) and motif.match(nom[len(prefixe) :]):
+            return True
     return False
 
 
+def classer_base(nom: str, avant_session: frozenset[str], tenants_reels: frozenset[str]) -> str:
+    """
+    Renvoie la categorie d'une base. L'ordre des tests **est** la securite.
+
+    ``protege``  jamais supprimee, quelle que soit la suite du nom ;
+    ``session``  creee par cette session : certitude, pas indice ;
+    ``indice``   ressemble a une base de test, a verifier ;
+    ``conserve`` on ne sait pas : on ne touche pas.
+
+    La derniere branche est la plus importante : **une base qu'on ne reconnait
+    pas est une base qu'on garde.** Une garde destructive doit etablir par
+    l'absence de doute, jamais par l'absence de preuve.
+    """
+    if nom in BASES_PROTEGEES:
+        return "protege"
+    if nom in tenants_reels:
+        # Reference par le registre des tenants, et presente avant la session :
+        # c'est un tenant reel, pas un residu.
+        return "protege"
+    if nom in BASES_CREEES_PAR_LA_SESSION:
+        return "session"
+    if nom in avant_session:
+        # Presente avant la session et inconnue du registre : laissee en place.
+        # Elle peut venir d'un usage manuel ; on ne devine pas.
+        return "conserve"
+    if _motif_jetable(nom):
+        return "indice"
+    return "conserve"
+
+
 @pytest.fixture(scope="session", autouse=True)
-def _nettoyer_les_bases_jetables():
+def _garder_la_purge():
     """
     Supprime, en fin de session, les bases laissees derriere par les tests.
 
     **Pourquoi une garde globale plutot qu'un `finally` par test.** Les tests
     creent des bases par plusieurs chemins - `nom_jetable`, creation de tenant par
     l'API, clones d'isolation - et chacun avait sa propre suppression, ou pas du
-    tout. Resultat : 89 bases accumulees, soit pres de 700 Mo, et une suite dont
-    la duree cresait de facon monotone avec le nombre de bases (13 min, puis 18,
-    puis 21). Le cout venait de l'accumulation, pas des tests ajoutes.
+    tout. 89 bases s'etaient accumulees, et la duree de la suite cresait avec
+    (13 min, puis 18, puis 21).
 
-    Une garde unique rattrape tout, y compris les oublis de demain. Elle ne
-    touche qu'a ce qui est demonstrablement ne d'un test : les bases de travail
-    (`sysdent_platform`, `sysdent_master`, `sysdent_modele_tenant`,
-    `sysdent_tenant_ref`) et les modeles sont hors liste.
+    **La garde est un `try/finally` sur la session, pas sur le monde.** Si la
+    session est interrompue, la purge n'a pas lieu et les bases restent : mieux
+    vaut des residus qu'une suppression sur un serveur qui n'est pas celui des
+    tests.
     """
-    async def _nettoyer() -> None:
-        admin_engine = create_async_engine(_async_url("postgres"), isolation_level="AUTOCOMMIT")
+    etat: dict[str, object] = {}
+
+    async def _inventaire() -> tuple[list[str], frozenset[str]]:
+        engine = create_async_engine(_async_url("postgres"), isolation_level="AUTOCOMMIT")
         try:
-            async with admin_engine.connect() as conn:
-                lignes = await conn.execute(
-                    text("SELECT datname FROM pg_database WHERE datistemplate = false")
+            async with engine.connect() as conn:
+                noms = [
+                    r[0]
+                    for r in (
+                        await conn.execute(
+                            text(
+                                "SELECT datname FROM pg_database "
+                                "WHERE datistemplate = false"
+                            )
+                        )
+                    ).fetchall()
+                ]
+                tenants: set[str] = set()
+                existe = await conn.execute(
+                    text("SELECT 1 FROM pg_database WHERE datname = 'sysdent_master'")
                 )
-                noms = [r[0] for r in lignes.fetchall()]
-            a_supprimer = [n for n in noms if _est_jetable(n)]
-            if not a_supprimer:
-                return
-            async with admin_engine.connect() as conn:
-                for nom in a_supprimer:
-                    await conn.execute(text(f'DROP DATABASE IF EXISTS "{nom}" WITH (FORCE)'))
+                if existe.scalar_one_or_none():
+                    lignes = await conn.execute(
+                        text("SELECT db_name FROM tenants_db")  # noqa: S608
+                    )
+                    tenants = {r[0] for r in lignes.fetchall()}
         finally:
-            await admin_engine.dispose()
+            await engine.dispose()
+        return noms, frozenset(tenants)
+
+    async def _nettoyer() -> tuple[list[str], list[str]]:
+        noms, tenants = await _inventaire()
+        avant = etat.get("avant") or frozenset()
+        categorise = {
+            n: classer_base(n, avant, tenants) for n in noms  # type: ignore[arg-type]
+        }
+        cibles = [n for n in noms if categorise[n] in ("session", "indice")]
+        for nom in cibles:
+            engine = create_async_engine(_async_url("postgres"), isolation_level="AUTOCOMMIT")
+            try:
+                async with engine.connect() as conn:
+                    await conn.execute(
+                        text(f'DROP DATABASE IF EXISTS "{nom}" WITH (FORCE)')
+                    )
+            finally:
+                await engine.dispose()
+        return cibles, [n for n in noms if categorise[n] == "protege"]
+
+    async def _constat() -> tuple[int, int]:
+        noms, _ = await _inventaire()
+        avant = etat.get("avant") or frozenset()
+        return len(avant), len(noms)
+
+    async def _depart() -> None:
+        noms, _ = await _inventaire()
+        etat["avant"] = frozenset(noms)
+
+    # L'instantane « avant » est pris **avant** le premier test : c'est la seule
+    # reference qui permette de distinguer une base de travail d'un residu.
+    try:
+        asyncio.run(_depart())
+    except Exception as e:  # noqa: BLE001
+        print(f"\n  [garde] inventaire initial impossible : {e}")
 
     yield
-    asyncio.run(_nettoyer())
+
+    if os.environ.get(VARS_PURGE) != "1":
+        print(
+            f"\n  [garde] purge non executee : {VARS_PURGE}=1 est requis. "
+            f"Les bases de test resteront apres cette session."
+        )
+        return
+    try:
+        supprimees, protegees = asyncio.run(_nettoyer())
+        avant_n, apres_n = asyncio.run(_constat())
+        print(
+            f"\n  [garde] {len(supprimees)} base(s) supprimee(s), "
+            f"{len(protegees)} protegee(s). "
+            f"Inventaire : {avant_n} au depart -> {apres_n} a la fin."
+        )
+        if apres_n > avant_n:
+            print(
+                f"  [garde] FUITE : {apres_n - avant_n} base(s) de plus qu au "
+                f"depart. La purge a ete contournee."
+            )
+    except Exception as e:  # noqa: BLE001
+        # Une purge qui leve ferait echouer une suite pourtant verte, et l'erreur
+        #aurait etre sans rapport avec le test qui l'a provoquee. Elle doit
+        # rester visible, pas bloquante.
+        print(f"\n  [garde] purge impossible : {e}")
 
 
 # ---------------------------------------------------------------------------
