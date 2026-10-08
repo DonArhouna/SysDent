@@ -618,7 +618,7 @@ class OdontogrammeService:
 
     @staticmethod
     async def historique_global(
-        db: AsyncSession, patient_id: uuid.UUID, limite: int = 100
+        db: AsyncSession, patient_id: uuid.UUID, limit: int = 100
     ) -> List[EtatDentHistorique]:
         """Historique du patient, toutes dents confondues, du plus récent au plus ancien."""
         odontogramme = await OdontogrammeService.obtenir_ou_creer(db, patient_id)
@@ -630,7 +630,7 @@ class OdontogrammeService:
             select(EtatDentHistorique)
             .where(EtatDentHistorique.dent_id.in_(ids_dents))
             .order_by(EtatDentHistorique.date_constat.desc())
-            .limit(limite)
+            .limit(limit)
         )
         return list((await db.execute(stmt)).scalars().all())
 
