@@ -6,6 +6,7 @@ import { LoginPage } from '@/features/auth/login-page'
 import { EnrolementPage } from '@/features/auth/enrolement-page'
 import { ForbiddenPage } from '@/pages/forbidden'
 import { NotFoundPage } from '@/pages/not-found'
+import { ConnexionEtabliePage } from '@/pages/connexion-etablie'
 
 /**
  * Racine du backoffice.
@@ -26,6 +27,14 @@ export default function App() {
           element={
             <RouteGuard>
               <ForbiddenPage />
+            </RouteGuard>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <RouteGuard>
+              <ConnexionEtabliePage />
             </RouteGuard>
           }
         />

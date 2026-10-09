@@ -1,26 +1,33 @@
-fix(backoffice): le jeton d activation partait dans le corps JSON, pas dans l en-tete
+docs(backoffice): une vraie page d arrivee, et un defaut de securite signale
 
-Le store appelait
-`api.post('/platform/auth/2fa/activation', { code, bearer: jeton })`.
-Or la signature est `api.post(chemin, corps, options)` : `bearer` tombait dans le
-**corps**. L en-tete `Authorization` n etait donc jamais pose, et le backend
-repondait « Authentification requise. ».
+**Page d arrivee.** Apres l enrollement reussi, le store renvoyait vers
+`/dashboard`, qui tombait sur la 404 : l utilisateur venait d activer son second
+facteur et d obtenir sa session, et l application lui affirmait que l adresse
+demandee n existait pas. Une 404 apres une connexion reussie se lit comme un
+echec de la connexion.
 
-La preparation, elle, fonctionnait : `api.get(chemin, options)` - son second
-argument *est* les options. D ou le symptome exacte : QR code affiche, puis
-activation refusee.
+`/dashboard` rend desormais un ecran qui confirme la session ouverte et **nomme ce
+qui reste a ecrire** - tableau de bord et cabinets ne sont pas faits. Il ne
+pretend rien et n'invente aucun chiffre. 22 tests verts, `verifier` vert.
 
-**Les tests validaient le defaut.** Deux assertions affirmaient
-`toHaveBeenCalledWith(chemin, { code, bearer })` : la forme du defaut. Elles
-passaient donc depuis que la fonction avait ete ecrite, en attestant qu un jeton
-envoye dans le JSON et un en-tete absent etaient le comportement attendu. C est
-la limite de mocker `api` : on verifie l intention de l appelant, pas la requete.
+**Defaut de securite NON CORRIGE, signale.** Le journal de la connexion du
+proprietaire :
 
-Les deux assertions sont recalees sur le vrai contrat - `bearer` dans le
-**troisieme** argument - et une troisieme couche existe deja : `api.test.ts`
-intercepte `fetch` et lit l en-tete reellement emis, ce que le mock de store ne
-peut pas faire.
+    10:59:32  PLATFORM_2FA_DEFI     {"activation_requise": true}
+    11:00:11  PLATFORM_2FA_ACTIVATE {"deux_facteurs_actif": true}
 
-Preuve par injection de defaut : remettre `bearer` dans le corps fait echouer 2
-tests sur 22 ; restaure, 22 verts. `npm run verifier` vert : contrat a jour, 0
-warning, 0 erreur.
+Il est passe par le **defi**, pas par l enrollement, parce que le compte avait
+deja un secret - obtenu en cliquant « Afficher le QR code ». Or le chemin du
+defi active la 2FA **sans emettre de codes de secours** : pas de
+`codes_secours_emus` dans l entree du journal, et `codes_secours_haches` a NULL
+en base apres coup.
+
+Consequence : le compte est en 2FA active **sans aucun code de secours**. Un
+telephone perdu ou reinstalle ne laisse plus aucune voie de recours - exactement
+l impasse que `reinitialiser-2fa` vient de reparer.
+
+La cause est qu'il existe **deux voies d activation** : `/2fa/activation`, qui
+emett les codes, et le defi, qui ne les emet pas. Le correctif est de n en garder
+qu une : le defi doit refuser quand la 2FA n est pas encore active, et renvoyer
+vers l enrollement. Non applique ici : c est un chemin de securite, et aucune
+serie backend n'a pu etre lancee dans cette session pour le valider.
