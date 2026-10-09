@@ -2392,6 +2392,38 @@
         "title": "APIResponse[ReferentielJoursResponse]",
         "type": "object"
       },
+      "APIResponse_RegenererCodesSecoursResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RegenererCodesSecoursResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "title": "APIResponse[RegenererCodesSecoursResponse]",
+        "type": "object"
+      },
       "APIResponse_RendezVousResponse_": {
         "properties": {
           "data": {
@@ -5607,22 +5639,6 @@
           "date_commande"
         ],
         "title": "CommandeResponse",
-        "type": "object"
-      },
-      "Confirmer2FARequest": {
-        "properties": {
-          "code": {
-            "description": "Code TOTP à 6 chiffres",
-            "maxLength": 8,
-            "minLength": 6,
-            "title": "Code",
-            "type": "string"
-          }
-        },
-        "required": [
-          "code"
-        ],
-        "title": "Confirmer2FARequest",
         "type": "object"
       },
       "ConsultationAnnuler": {
@@ -12778,6 +12794,11 @@
       },
       "PlatformProfilResponse": {
         "properties": {
+          "codes_secours_a_regenerer": {
+            "default": false,
+            "title": "Codes Secours A Regenerer",
+            "type": "boolean"
+          },
           "cree_le": {
             "format": "date-time",
             "title": "Cree Le",
@@ -13443,6 +13464,48 @@
           "refresh_token"
         ],
         "title": "RefreshTokenRequest",
+        "type": "object"
+      },
+      "RegenererCodesSecoursRequest": {
+        "description": "Régénération des codes de secours : session + TOTP actif + motif obligatoire.",
+        "properties": {
+          "code": {
+            "description": "Code TOTP courant de l'application d'authentification (secret ACTIF)",
+            "maxLength": 8,
+            "minLength": 6,
+            "title": "Code",
+            "type": "string"
+          },
+          "motif": {
+            "description": "Motif de la régénération, consigné au journal d'audit",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Motif",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "motif"
+        ],
+        "title": "RegenererCodesSecoursRequest",
+        "type": "object"
+      },
+      "RegenererCodesSecoursResponse": {
+        "description": "Les dix nouveaux codes, renvoyés **une seule fois** — jamais stockés en clair.",
+        "properties": {
+          "codes_secours": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Codes Secours",
+            "type": "array"
+          }
+        },
+        "required": [
+          "codes_secours"
+        ],
+        "title": "RegenererCodesSecoursResponse",
         "type": "object"
       },
       "RegleContreIndication": {
@@ -23247,7 +23310,7 @@
     },
     "/api/v1/platform/auth/2fa": {
       "post": {
-        "description": "Valide le code TOTP et ouvre la session (jeton d'accès 10 min, refresh 8 h).",
+        "description": "Valide le code TOTP (ou un code de secours) et ouvre la session.\n\n**Seulement pour un compte déjà enrôlé** : un compte dont la 2FA n'est pas\nactive reçoit un jeton d'enrôlement au login, jamais un défi ; et si un défi\nlui parvient quand même, ce chemin refuse avec le message d'un code\ninvalide — il n'active jamais le second facteur.",
         "operationId": "confirmer_2fa_api_v1_platform_auth_2fa_post",
         "requestBody": {
           "content": {
@@ -23295,7 +23358,7 @@
     },
     "/api/v1/platform/auth/2fa/activation": {
       "post": {
-        "description": "Troisieme etape : le code TOTP confirme l'activation, la session s'ouvre.\n\nC'est la **seule** voie qui emet une session pour un compte dont la 2FA\nvient d'etre activee. Le jeton d'enrolement est consomme ici et ne vaut plus\nrien : il ne reutilise pas le jeton de session, il disparait.\n\nLes codes de secours sont renvoyes **une seule fois**. Ni la base ni le\njournal ne les conservent en clair.",
+        "description": "Troisieme etape : le code TOTP confirme l'activation, la session s'ouvre.\n\nC'est la **seule** voie qui emet une session pour un compte dont la 2FA\nvient d'etre activee. Le jeton d'enrolement est consomme ici et ne vaut plus\nrien : il ne reutilise pas le jeton de session, il disparait.\n\nLe code est verifie **sur le secret en attente** — celui que le compte vient\nde scanner — et le secret est ensuite promu secret actif. Un code de secours\nne peut pas activer : il ouvre une session, il n'enrole pas.\n\nLes codes de secours sont renvoyes **une seule fois**. Ni la base ni le\njournal ne les conservent en clair.",
         "operationId": "activer_2fa_api_v1_platform_auth_2fa_activation_post",
         "requestBody": {
           "content": {
@@ -23331,15 +23394,15 @@
         ]
       }
     },
-    "/api/v1/platform/auth/2fa/confirmation": {
+    "/api/v1/platform/auth/2fa/codes-secours/regenerer": {
       "post": {
-        "description": "Active le second facteur à partir d'un code valide. Le compte est verrouillé tant que ce n'est pas fait.",
-        "operationId": "confirmer_activation_2fa_api_v1_platform_auth_2fa_confirmation_post",
+        "description": "Remplace les codes de secours d'un compte déjà enrôlé par dix nouveaux.\n\n**Seule voie de recours après la perte des codes.** Garde-fous identiques au\nlogin : limitation de débit sur (e-mail, IP), message générique en cas\nd'échec, et une session ouverte ne suffit pas — un **TOTP valide sur le\nsecret actif** et un **motif** sont exigés. Les anciens codes sont invalidés\ndans la même transaction, les dix nouveaux ne sont renvoyés qu'ici, et le\njournal ne contient que leur nombre.",
+        "operationId": "regenerer_codes_secours_api_v1_platform_auth_2fa_codes_secours_regenerer_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Confirmer2FARequest"
+                "$ref": "#/components/schemas/RegenererCodesSecoursRequest"
               }
             }
           },
@@ -23350,14 +23413,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/APIResponse_NoneType_"
+                  "$ref": "#/components/schemas/APIResponse_RegenererCodesSecoursResponse_"
                 }
               }
             },
             "description": "Successful Response"
           },
           "401": {
-            "description": "Code incorrect"
+            "description": "TOTP invalide, ou compte sans second facteur actif"
           },
           "422": {
             "content": {
@@ -23368,9 +23431,12 @@
               }
             },
             "description": "Validation Error"
+          },
+          "429": {
+            "description": "Trop de tentatives (limitation de débit)"
           }
         },
-        "summary": "Confirmer le secret TOTP",
+        "summary": "Régénérer les codes de secours",
         "tags": [
           "Platform · Authentification"
         ]
@@ -23400,7 +23466,7 @@
     },
     "/api/v1/platform/auth/login": {
       "post": {
-        "description": "Vérifie l'e-mail et le mot de passe d'un compte de la console.\n\nRetourne systématiquement un **défi 2FA** : un compte dont le second\nfacteur n'est pas actif ne reçoit PAS de jeton de session, seulement une\nerreur explicite (`DEUX_FACTEURS_NON_ACTIVE`). Le second facteur n'est donc\npas une option, il est une condition d'accès.",
+        "description": "Vérifie l'e-mail et le mot de passe d'un compte de la console.\n\n**La décision porte sur l'état actif du second facteur** :\n\n- 2FA inactive → un **jeton d'enrôlement**, jamais une session ni un défi.\n  Le chemin du défi refuse un compte non actif : l'enrôlement ne se fait\n  que par `/2fa/preparation` puis `/2fa/activation`, la seule voie qui\n  émette les codes de secours ;\n- 2FA active → un **défi** à saisir dans l'application d'authentification.\n\nDans les deux cas, aucun jeton de session n'est émis à cette étape : la\nsession ne s'ouvre qu'après le second facteur.",
         "operationId": "login_api_v1_platform_auth_login_post",
         "requestBody": {
           "content": {

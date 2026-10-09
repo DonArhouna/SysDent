@@ -4,6 +4,7 @@ import { ErrorBoundary } from '@/components/ui/error-boundary'
 import { RouteGuard } from '@/guards/route-guard'
 import { LoginPage } from '@/features/auth/login-page'
 import { EnrolementPage } from '@/features/auth/enrolement-page'
+import { CodesSecoursPage } from '@/features/auth/codes-secours-page'
 import { ForbiddenPage } from '@/pages/forbidden'
 import { NotFoundPage } from '@/pages/not-found'
 import { ConnexionEtabliePage } from '@/pages/connexion-etablie'
@@ -22,6 +23,17 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/enrolement" element={<EnrolementPage />} />
+        {/* Regeneration des codes de secours : ouverte a toute session, cote
+            compte propre. Une session seule ne suffit pas — le serveur exige en
+            plus un TOTP valide sur le secret actif et un motif journalise. */}
+        <Route
+          path="/codes-secours"
+          element={
+            <RouteGuard>
+              <CodesSecoursPage />
+            </RouteGuard>
+          }
+        />
         <Route
           path="/403"
           element={

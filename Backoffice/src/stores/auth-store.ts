@@ -8,7 +8,7 @@ import {
   setGestionnaireSessionMorte,
   type ApiReponse,
 } from '@/lib/api'
-import type { ReponseDe } from '@/lib/api'
+import type { CorpsDe, ReponseDe } from '@/lib/api'
 import { useCabinetStore } from '@/stores/tenant-store'
 
 /**
@@ -42,6 +42,14 @@ export interface ProfilPlateforme {
   /** `true` tant que le compte n'a pas confirmé son secret TOTP. */
   deux_facteurs_actif?: boolean
   deux_facteurs_prevu?: boolean
+  /**
+   * Second facteur actif mais **aucun code de secours utilisable** : compte
+   * préexistant sans codes (état legacy) ou liste épuisée.
+   *
+   * C'est lui qui pilote la bannière du tableau de bord : un téléphone perdu
+   * sans codes ne laisse aucune voie de recours.
+   */
+  codes_secours_a_regenerer?: boolean
 }
 
 /**
@@ -93,6 +101,22 @@ interface EnrolementTermine extends NonNullable<Activation['data']> {
   codes_secours: string[]
 }
 
+/** Reponse de `/platform/auth/2fa/codes-secours/regenerer`, tiree du schema. */
+type CodesRegeneres = NonNullable<
+  ReponseDe<'/api/v1/platform/auth/2fa/codes-secours/regenerer', 'post'>['data']
+>
+
+/**
+ * Corps de la regeneration, **tire du schema** : `code` et `motif`, rien d'autre.
+ *
+ * Un champ ecrit a la main mais absent du backend donnerait un 422 sans que
+ * rien, ni au compilateur ni a l'ecran, ne le signale.
+ */
+export type CorpsRegeneration = CorpsDe<
+  '/api/v1/platform/auth/2fa/codes-secours/regenerer',
+  'post'
+>
+
 interface AuthState {
   token: string | null
   refreshToken: string | null
@@ -115,6 +139,14 @@ interface AuthState {
   preparation2fa: Preparation2FA | null
   preparerEnrolement: () => Promise<void>
   activerEnrolement: (code: string) => Promise<string[]>
+  /**
+   * Remplace les codes de secours, apres une session ouverte.
+   *
+   * Le backend exige en plus un TOTP valide sur le secret **actif** et un motif,
+   * consigne au journal : une session seule ne suffit pas. Renvoie les dix
+   * nouveaux codes, a afficher une seule fois.
+   */
+  regenererCodesSecours: (code: string, motif: string) => Promise<string[]>
   chargerProfil: () => Promise<void>
   deconnexion: () => void
 }
@@ -232,7 +264,7 @@ export const useAuthStore = create<AuthState>()(
      * **une seule fois**, et ouvre la session.
      *
      * Les codes sont renvoyes a l'appelant plutot que stockes : personne ne doit
-     * pouvoir les relire apres coup depuis le store, ni les找回 apres rechargement.
+     * pouvoir les relire apres coup depuis le store, ni les retrouver apres rechargement.
      */
     activerEnrolement: async (code) => {
       const jeton = get().jetonEnrolement
@@ -265,6 +297,27 @@ export const useAuthStore = create<AuthState>()(
       })
       await get().chargerProfil()
       return codes_secours
+    },
+
+    /**
+     * Regenere les codes de secours : session + TOTP actif + motif.
+     *
+     * Les dix nouveaux codes reviennent a l'appelant et **jamais dans le store** —
+     * comme a l'activation, personne ne doit pouvoir les relire apres coup. Le
+     * profil est relu juste apres : le serveur a repasse
+     * `codes_secours_a_regenerer` a `false`, et une banniere qui survivrait a la
+     * regeneration dirait un mensonge a l'ecran.
+     */
+    regenererCodesSecours: async (code, motif) => {
+      // `corps` est tape par le schema ouvert : un champ absent du backend
+      // n'est pas un 422 silencieux, c'est une erreur de compilation ici.
+      const corps: CorpsRegeneration = { code, motif }
+      const reponse = await api.post<ApiReponse<CodesRegeneres>>(
+        '/platform/auth/2fa/codes-secours/regenerer',
+        corps,
+      )
+      await get().chargerProfil()
+      return reponse.data.codes_secours
     },
 
       chargerProfil: async () => {

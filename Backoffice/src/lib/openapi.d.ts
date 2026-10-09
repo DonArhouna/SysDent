@@ -1882,7 +1882,12 @@ export interface paths {
         put?: never;
         /**
          * Deuxième étape : code TOTP
-         * @description Valide le code TOTP et ouvre la session (jeton d'accès 10 min, refresh 8 h).
+         * @description Valide le code TOTP (ou un code de secours) et ouvre la session.
+         *
+         *     **Seulement pour un compte déjà enrôlé** : un compte dont la 2FA n'est pas
+         *     active reçoit un jeton d'enrôlement au login, jamais un défi ; et si un défi
+         *     lui parvient quand même, ce chemin refuse avec le message d'un code
+         *     invalide — il n'active jamais le second facteur.
          */
         post: operations["confirmer_2fa_api_v1_platform_auth_2fa_post"];
         delete?: never;
@@ -1908,6 +1913,10 @@ export interface paths {
          *     vient d'etre activee. Le jeton d'enrolement est consomme ici et ne vaut plus
          *     rien : il ne reutilise pas le jeton de session, il disparait.
          *
+         *     Le code est verifie **sur le secret en attente** — celui que le compte vient
+         *     de scanner — et le secret est ensuite promu secret actif. Un code de secours
+         *     ne peut pas activer : il ouvre une session, il n'enrole pas.
+         *
          *     Les codes de secours sont renvoyes **une seule fois**. Ni la base ni le
          *     journal ne les conservent en clair.
          */
@@ -1918,7 +1927,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/platform/auth/2fa/confirmation": {
+    "/api/v1/platform/auth/2fa/codes-secours/regenerer": {
         parameters: {
             query?: never;
             header?: never;
@@ -1928,10 +1937,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Confirmer le secret TOTP
-         * @description Active le second facteur à partir d'un code valide. Le compte est verrouillé tant que ce n'est pas fait.
+         * Régénérer les codes de secours
+         * @description Remplace les codes de secours d'un compte déjà enrôlé par dix nouveaux.
+         *
+         *     **Seule voie de recours après la perte des codes.** Garde-fous identiques au
+         *     login : limitation de débit sur (e-mail, IP), message générique en cas
+         *     d'échec, et une session ouverte ne suffit pas — un **TOTP valide sur le
+         *     secret actif** et un **motif** sont exigés. Les anciens codes sont invalidés
+         *     dans la même transaction, les dix nouveaux ne sont renvoyés qu'ici, et le
+         *     journal ne contient que leur nombre.
          */
-        post: operations["confirmer_activation_2fa_api_v1_platform_auth_2fa_confirmation_post"];
+        post: operations["regenerer_codes_secours_api_v1_platform_auth_2fa_codes_secours_regenerer_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1975,10 +1991,16 @@ export interface paths {
          * Première étape : e-mail + mot de passe
          * @description Vérifie l'e-mail et le mot de passe d'un compte de la console.
          *
-         *     Retourne systématiquement un **défi 2FA** : un compte dont le second
-         *     facteur n'est pas actif ne reçoit PAS de jeton de session, seulement une
-         *     erreur explicite (`DEUX_FACTEURS_NON_ACTIVE`). Le second facteur n'est donc
-         *     pas une option, il est une condition d'accès.
+         *     **La décision porte sur l'état actif du second facteur** :
+         *
+         *     - 2FA inactive → un **jeton d'enrôlement**, jamais une session ni un défi.
+         *       Le chemin du défi refuse un compte non actif : l'enrôlement ne se fait
+         *       que par `/2fa/preparation` puis `/2fa/activation`, la seule voie qui
+         *       émette les codes de secours ;
+         *     - 2FA active → un **défi** à saisir dans l'application d'authentification.
+         *
+         *     Dans les deux cas, aucun jeton de session n'est émis à cette étape : la
+         *     session ne s'ouvre qu'après le second facteur.
          */
         post: operations["login_api_v1_platform_auth_login_post"];
         delete?: never;
@@ -5014,6 +5036,17 @@ export interface components {
              */
             success: boolean;
         };
+        /** APIResponse[RegenererCodesSecoursResponse] */
+        APIResponse_RegenererCodesSecoursResponse_: {
+            data?: components["schemas"]["RegenererCodesSecoursResponse"] | null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
         /** APIResponse[RendezVousResponse] */
         APIResponse_RendezVousResponse_: {
             data?: components["schemas"]["RendezVousResponse"] | null;
@@ -5704,14 +5737,6 @@ export interface components {
             /** Numero */
             numero: string;
             statut: components["schemas"]["StatutCommandeEnum"];
-        };
-        /** Confirmer2FARequest */
-        Confirmer2FARequest: {
-            /**
-             * Code
-             * @description Code TOTP à 6 chiffres
-             */
-            code: string;
         };
         /** ConsultationAnnuler */
         ConsultationAnnuler: {
@@ -8455,6 +8480,11 @@ export interface components {
         /** PlatformProfilResponse */
         PlatformProfilResponse: {
             /**
+             * Codes Secours A Regenerer
+             * @default false
+             */
+            codes_secours_a_regenerer: boolean;
+            /**
              * Cree Le
              * Format: date-time
              */
@@ -8732,6 +8762,30 @@ export interface components {
         RefreshTokenRequest: {
             /** Refresh Token */
             refresh_token: string;
+        };
+        /**
+         * RegenererCodesSecoursRequest
+         * @description Régénération des codes de secours : session + TOTP actif + motif obligatoire.
+         */
+        RegenererCodesSecoursRequest: {
+            /**
+             * Code
+             * @description Code TOTP courant de l'application d'authentification (secret ACTIF)
+             */
+            code: string;
+            /**
+             * Motif
+             * @description Motif de la régénération, consigné au journal d'audit
+             */
+            motif: string;
+        };
+        /**
+         * RegenererCodesSecoursResponse
+         * @description Les dix nouveaux codes, renvoyés **une seule fois** — jamais stockés en clair.
+         */
+        RegenererCodesSecoursResponse: {
+            /** Codes Secours */
+            codes_secours: string[];
         };
         /**
          * RegleContreIndication
@@ -13699,7 +13753,7 @@ export interface operations {
             };
         };
     };
-    confirmer_activation_2fa_api_v1_platform_auth_2fa_confirmation_post: {
+    regenerer_codes_secours_api_v1_platform_auth_2fa_codes_secours_regenerer_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -13708,7 +13762,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Confirmer2FARequest"];
+                "application/json": components["schemas"]["RegenererCodesSecoursRequest"];
             };
         };
         responses: {
@@ -13718,10 +13772,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["APIResponse_NoneType_"];
+                    "application/json": components["schemas"]["APIResponse_RegenererCodesSecoursResponse_"];
                 };
             };
-            /** @description Code incorrect */
+            /** @description TOTP invalide, ou compte sans second facteur actif */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -13736,6 +13790,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Trop de tentatives (limitation de débit) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
