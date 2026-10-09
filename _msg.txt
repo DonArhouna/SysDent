@@ -1,5 +1,8 @@
-docs: etat reel a jour - 5 tests en echec, correctif non ecrit
+docs: verdict de non-regression - 442 passes, 1 echec, 17 min 33
 
-PROGRESS.md annonait encore « suite non lancee » et « blocage d environnement »,
-tandis que le blocage est leve et que le defaut est reproductible. Corrige.
-Suite complete encore en cours : aucun verdict annonce.
+Ligne de base etablie apres le passage des migrations sur asyncpg : les 442 tests
+qui ne visent pas le defaut de securite passent tous.
+
+Objectif de 15 min non atteint. Les 30 durees sont dans docs/journal/ ; la cause
+de l ecart n est pas etablie, et ce que les durees montrent (un cout reparti sur
+des centaines de fixtures, pas un test lent) reste une hypothese.

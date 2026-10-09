@@ -1,0 +1,50 @@
+Verdict de non-regression - 2026-10-09
+======================================
+442 passed, 1 failed, 4 warnings in 17 min 33 s
+
+L echec unique est
+tests/test_enrolement_2fa.py::test_apres_preparation_un_nouveau_login_redonne_un_jeton_enrolement
+: le defaut de securite 2FA, volontairement laisse en l etat jusqu au correctif.
+
+Cette mesure est la **ligne de base** apres le passage des migrations sur
+asyncpg (psycopg2 sorti du chemin d execution). 442 tests passent : le changement
+de pilote n a casse aucun autre test.
+
+Duree : 17 min 33 s. Reference historique : 13 min 06 s. **Objectif de 15 min non
+atteint** ; cause de l ecart non etablie.
+
+Note : cette execution a demarre avant la reecriture des tests de la voie
+d activation. La sortie ci-dessous ne contient que les durees, unaffectedes par
+cette reecriture.
+
+Durees (les plus lents d abord)
+--------------------------------9.00s setup    tests/platform/test_auth_et_roles.py::test_jeton_tenant_refuse_sur_route_plateforme
+7.96s call     tests/test_security_master_auth.py::test_provisioning_refuse_email_deja_utilise
+5.39s call     tests/test_security_master_auth.py::test_provisioning_cree_base_rbac_et_index
+3.46s setup    tests/platform/test_auth_et_roles.py::test_jeton_plateforme_refuse_sur_route_tenant
+3.44s setup    tests/test_odontogramme.py::test_adulte_a_32_dents
+3.12s setup    tests/platform/test_auth_et_roles.py::test_jeton_platform_ne_passe_pas_le_decodeur_tenant
+3.02s setup    tests/platform/test_perimetre_support.py::test_liste_blanche_est_bien_restreinte
+3.01s setup    tests/platform/test_auth_et_roles.py::test_signature_alteree_refusee
+2.97s teardown tests/test_security_master_auth.py::test_echecs_login_sont_journalises
+2.91s setup    tests/platform/test_auth_et_roles.py::test_support_ne_peut_pas_facturer
+2.89s setup    tests/test_rendezvous.py::test_agenda_renvoie_rendez_vous_et_indisponibilites
+2.85s teardown tests/platform/test_auth_et_roles.py::test_jeton_tenant_refuse_sur_route_plateforme
+2.83s setup    tests/test_cabinets.py::test_fauteuil_desactive_retire_du_planning_mais_reste_consultable
+2.79s setup    tests/test_enrolement_2fa.py::test_login_sans_2fa_rend_un_jeton_enrolement_pas_une_session
+2.78s setup    tests/platform/test_perimetre_support.py::test_jeton_support_na_change_rien_sur_les_routes_publiques
+2.76s setup    tests/platform/test_auth_et_roles.py::test_401_403_200_par_role[SUPER_ADMIN_PLATEFORME]
+2.72s setup    tests/platform/test_auth_et_roles.py::test_401_403_200_par_role[FACTURATION]
+2.70s teardown tests/test_garde_purge.py::test_une_base_de_demonstration_nest_pas_un_residu[sysdent_tenant_clinique_diagnostic_dakar_d22db3]
+2.65s setup    tests/platform/test_auth_et_roles.py::test_401_403_200_par_role[COMMERCIAL]
+2.60s setup    tests/platform/test_perimetre_support.py::test_ecriture_refusee_meme_sur_une_route_listee
+2.55s setup    tests/platform/test_auth_et_roles.py::test_401_403_200_par_role[AUDITEUR]
+2.53s setup    tests/test_enrolement_2fa.py::test_activation_par_le_defi_est_impossible
+2.53s setup    tests/test_rendezvous.py::test_consultation_refusee_si_rdv_annule
+2.49s setup    tests/test_enrolement_2fa.py::test_message_erreur_ne_rivale_pas_que_la_2fa_est_inactive
+2.48s teardown tests/test_security_master_auth.py::test_provisioning_cree_base_rbac_et_index
+2.47s setup    tests/test_enrolement_2fa.py::test_absence_de_jeton_refusee_sans_erreur_interne
+2.46s setup    tests/test_enrolement_2fa.py::test_apres_preparation_un_nouveau_login_redonne_un_jeton_enrolement
+2.46s teardown tests/test_odontogramme.py::test_mise_a_jour_dent_change_l_etat
+2.44s setup    tests/platform/test_auth_et_roles.py::test_auditeur_ne_peut_pas_ecrire
+2.42s call     tests/test_contrat_pagination.py::test_parcours_complet_sans_perte_ni_doublon[/api/v1/stock/fournisseurs]

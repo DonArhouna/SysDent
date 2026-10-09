@@ -8,6 +8,57 @@
 ---
 ## ACCES : **FONCTIONNEL, 2FA sans codes de secours, CORRECTIF NON ECRIT** - 2026-10-09
 
+Non-regression **verifiee** : **442 passes, 1 echec** en 17 min 33 s. L unique
+echec est le test du defaut de securite, volontairement laisse en l etat. Les
+442 autres prouvent que le passage des migrations sur `asyncpg` n a casse rien.
+
+## ETAT DE FIN DE SESSION - 2026-10-09 (3e session)
+
+**Prouve**
+- **Non-regression : 442 passes, 1 echec, 0 ignore, 17 min 33 s.** L echec est
+  `test_apres_preparation_un_nouveau_login_redonne_un_jeton_enrolement` : le
+  defaut de securite. C est la ligne de base apres le passage sur `asyncpg`.
+- **5 tests ecruts echouent, chacun pour la bonne raison**, avant tout correctif.
+  Les quatre precedents passaient : ils forgeaient un jeton de defi et envoyaient
+  `000000` - un code faux echoue pour une raison triviale.
+  Messages : `le defi a repondu 200 sur un compte non enrole, avec le bon code`,
+  `le defi a active la 2FA`, `2FA active sans codes de secours en base`,
+  `la preparation a ecrit le secret ACTIF` - la racine du defaut.
+  Sortie : `docs/journal/2026-10-09-tests-voie-activation-avant-correctif.txt`.
+- Aller-retour de migration sur une **copie** ; base reelle intacte.
+
+**Non verifie**
+- **Objectif de 15 min non atteint : 17 min 33 s**, contre 13 min 06 s de
+  reference. Les 30 durees sont conservees dans
+  `docs/journal/2026-10-09-durees-suite.txt`, **la cause de l ecart n est pas
+  etablie**.
+  Ce que les durees montrent : le pire test (`test_auth_et_roles`, setup 9 s) est
+  loin d'expliquer l'ecart. Le cout est **reparti** sur des centaines de tests -
+  des `setup` de 2,8 a 3,4 s, dont la creation de base jetable. C'est
+  l'accumulation des fixtures, pas un test lent. A confirmer par la suite.
+- Le cinquieme test ecrit echoue **avant** son assertion : sa seconde
+  preparation ne recoit plus de jeton d enrollement. Meme cause racine, message
+  non vise. A resserrer apres le correctif.
+
+**Non fait - le correctif de fond**
+Colonne `secret_2fa_en_attente`, decision de chemin sur l etat actif, voie
+d activation unique, migration, `POST /platform/auth/2fa/codes-secours/regenerer`,
+banniere backoffice. **Aucun changement d authentification** : les tests sont
+ecrits et vus en echec ; le correctif exige une migration, donc plan, sauvegarde
+et aller-retour sur copie.
+Etapes 3 et 4 (typage, `GET /platform/stats/dashboard`, ecrans) non commencees.
+Isolation des tests et suppression des 83 lignes : **ne pas y toucher**, les
+tests ecrivent encore dans la vraie base master.
+`PROGRESS.md` reste duplique.
+
+**A faire par le proprietaire**
+Les codes de secours restent absents ; telephone perdu = aucun recours :
+`python -m src.modules.platform.admin reinitialiser-2fa --email rhonekane@gmail.com --motif "Codes de secours"`.
+
+---
+
+## ACCES : **FONCTIONNEL, 2FA sans codes de secours, CORRECTIF NON ECRIT** - 2026-10-09
+
 Le blocage de tests est **leve par le code** : psycopg2 sorti du chemin
 d execution, migrations par `asyncpg`. Les tests qui prouvent le defaut de
 securite **echouent**, chacun pour la bonne raison. Le correctif n est pas
