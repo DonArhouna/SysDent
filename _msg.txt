@@ -1,33 +1,19 @@
-docs(backoffice): une vraie page d arrivee, et un defaut de securite signale
+docs: etat arrete par la politique AppLocker, tests 2FA ecrits mais non executes
 
-**Page d arrivee.** Apres l enrollement reussi, le store renvoyait vers
-`/dashboard`, qui tombait sur la 404 : l utilisateur venait d activer son second
-facteur et d obtenir sa session, et l application lui affirmait que l adresse
-demandee n existait pas. Une 404 apres une connexion reussie se lit comme un
-echec de la connexion.
+Une politique de controle d application Windows bloque la DLL `_psycopg` du
+venv. `postgresql+psycopg2` est cable en dur dans les fixtures de test et dans
+`src/core/migrations.py` ; Alembic ne peut plus migrer, et la totalite des tests
+plateforme echoue a la collection. `asyncpg` passe : c est le pilote qui n est
+pas bloque.
 
-`/dashboard` rend desormais un ecran qui confirme la session ouverte et **nomme ce
-qui reste a ecrire** - tableau de bord et cabinets ne sont pas faits. Il ne
-pretend rien et n'invente aucun chiffre. 22 tests verts, `verifier` vert.
+Ce n est pas une erreur de code et aucun correctif de code ne le resoudra.
 
-**Defaut de securite NON CORRIGE, signale.** Le journal de la connexion du
-proprietaire :
+Cinq tests sont ecrits pour la voie d activation unique 2FA : preparation puis
+nouveau login doit rendre un jeton d enrollement et jamais un defi, le defi doit
+refuser un compte non enrole, une 2FA active doit toujours avoir des codes en
+base, la contrainte CHECK doit relier les deux, et le defi ne doit plus pouvoir
+activer la 2FA. **Ils n ont pas pu etre executes** : ils n ont donc pas encore
+demontre qu ils echouent, et le correctif de fond n est pas commence.
 
-    10:59:32  PLATFORM_2FA_DEFI     {"activation_requise": true}
-    11:00:11  PLATFORM_2FA_ACTIVATE {"deux_facteurs_actif": true}
-
-Il est passe par le **defi**, pas par l enrollement, parce que le compte avait
-deja un secret - obtenu en cliquant « Afficher le QR code ». Or le chemin du
-defi active la 2FA **sans emettre de codes de secours** : pas de
-`codes_secours_emus` dans l entree du journal, et `codes_secours_haches` a NULL
-en base apres coup.
-
-Consequence : le compte est en 2FA active **sans aucun code de secours**. Un
-telephone perdu ou reinstalle ne laisse plus aucune voie de recours - exactement
-l impasse que `reinitialiser-2fa` vient de reparer.
-
-La cause est qu'il existe **deux voies d activation** : `/2fa/activation`, qui
-emett les codes, et le defi, qui ne les emet pas. Le correctif est de n en garder
-qu une : le defi doit refuser quand la 2FA n est pas encore active, et renvoyer
-vers l enrollement. Non applique ici : c est un chemin de securite, et aucune
-serie backend n'a pu etre lancee dans cette session pour le valider.
+Le defaut reste ouvert : le compte du proprietaire est en 2FA active sans aucun
+code de secours. Telephone perdu, aucun recours.

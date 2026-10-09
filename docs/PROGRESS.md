@@ -6,6 +6,69 @@
 
 
 ---
+## ACCES : **FONCTIONNEL cote backoffice, BLOQUANT cote tests** - 2026-10-09
+
+Le proprietaire a enrole son second facteur et s est connecte. Deux defauts ont
+ete corriges cote front : le jeton d etape persiste, puis envoye dans le corps
+JSON au lieu de l en-tete. **Un defaut de securite reste ouvert et n est pas
+corrige** : le defi peut activer la 2FA sans emettre de codes de secours
+(voir plus bas).
+
+**Tout travail backend est arrete par une politique Windows.** AppLocker bloque
+la DLL `_psycopg` du venv. `postgresql+psycopg2` est cable en dur dans les
+fixtures de test et dans `src/core/migrations.py` ; Alembic ne peut donc pas
+migrer, et **la totalite des tests plateforme echoue a la collection** avant
+meme d executer un test. `asyncpg` passe : c est le pilote async qui n est pas
+bloque. Constat reproduit par `import psycopg2` puis `import asyncpg`.
+
+Ce n est pas une erreur de code et aucun correctif de code ne le resoudra : il
+faut soit autoriser la DLL, soit basculer Alembic sur un pilote autorise.
+
+## ETAT DE FIN DE SESSION - 2026-10-09
+
+**Prouve**
+- Defaut de securite **identifie et localise au journal** : `PLATFORM_2FA_DEFI`
+  puis `PLATFORM_2FA_ACTIVATE` sans `codes_secours_emus`. Le compte du
+  proprietaire est en 2FA active **sans aucun code de secours**.
+- Front : page d arrivee reelle a `/dashboard` (plus de 404 apres connexion
+  reussie), 22 tests verts, `verifier` vert.
+- Inventaire du registre `tenants_db` : 3 a conserver, **83 prouvées d origine
+  test**, **39 ambigues**. Sauvegarde de `sysdent_master` faite et verifiee.
+
+**Ecrit mais NON executable**
+- 5 tests ajoutes dans `tests/test_enrolement_2fa.py` pour la voie d activation
+  unique : preparation puis nouveau login doit rendre un **jeton d enrollement**
+  et jamais un defi ; le defi doit refuser un compte non enrole ; la 2FA active
+  doit toujours avoir des codes en base ; la contrainte `CHECK` doit relier les
+  deux. **Ils n'ont pas pu etre executes** : la session echoue a la collection
+  sur `_psycopg`. Ils n'ont donc pas encore demontre qu'ils echouent.
+
+**Non fait**
+- Le correctif de fond de la 2FA : separation `secret_2fa_en_attente` /
+  `secret_2fa_chiffre`, decision de chemin sur l etat actif, voie d activation
+  unique, migration, et `POST /platform/auth/2fa/codes-secours/regenerer`.
+- Suppression des 83 lignes d origine test : toujours **non faite**, et elle ne
+  doit pas l etre avant l isolation des tests, puisque ceux-ci ecrivent dans la
+  vraie base master et en recreeraient.
+- Instance de test dediee et garde de demarrage.
+- Duree de suite (`--durations=30`), defauts JSONB, 8 routes `APIResponse[dict]`,
+  5 endpoints, Lots 1 et 2.
+- `PROGRESS.md` reste duplique (1440 lignes, 606 positions repetees) : a
+  reecrire a la main, l archive `docs/journal/` n existe pas encore.
+
+**A faire par le proprietaire, dans cet ordre**
+1. **Debloquer la suite** : autoriser dans la politique AppLocker le fichier
+   `Backend\.venv\Lib\site-packages\psycopg2\_psycopg*.pyd`, ou installer une
+   version de `psycopg` dont la DLL est autorisee. Sans cela, aucun travail
+   backend n'est possible : la suite echoue a la collection.
+2. Reconnecter le backoffice avec le code TOTP du telephone (il fonctionne : la
+   2FA est activee).
+3. Regenerer les codes de secours, aujourd'hui par la ligne de commande :
+   `python -m src.modules.platform.admin reinitialiser-2fa --email rhonekane@gmail.com --motif "Codes de secours"`.
+   Le telephone est perdu = plus aucun recours.
+
+---
+
 ## ACCES : **FONCTIONNEL sur le fond, pas encore utilise par le proprietaire** - 2026-10-08
 
 Le parcours reste **prouve par HTTP reel** (session precedente). `rhonekane@gmail.com`

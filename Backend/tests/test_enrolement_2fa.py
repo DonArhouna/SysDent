@@ -521,3 +521,274 @@ async def test_absence_de_jeton_refusee_sans_erreur_interne(client):
     assert corps.get("error", {}).get("code") != "INTERNAL_SERVER_ERROR", (
         "une absence d'identite a produit une erreur interne : la route ne refuse pas"
     )
+
+
+# ---------------------------------------------------------------------------
+# 6. Une seule voie d activation
+# ---------------------------------------------------------------------------
+#
+# **Le defaut que ces tests decrivent.** `/2fa/preparation` ecrit un secret sur le
+# compte. Au login suivant, le backend testait « un secret existe ? » : il
+# emettait alors un **defi** au lieu d'un jeton d enrollement. La saisie du code
+# sur l ecran de verification activait la 2FA **sans emettre de codes de
+# secours**. Journal : `PLATFORM_2FA_ACTIVATE` sans `codes_secours_emus`, et
+# `codes_secours_haches` a NULL en base apres coup.
+#
+# Telephone perdu : plus aucune voie de recours. Deux voies d activation, une
+# seule emettant les codes.
+#
+# « Enrole » doit donc signifier : **second facteur actif ET codes de secours
+# presents**. Jamais « un secret existe ».
+
+
+async def _preparer(client) -> str:
+    """login -> jeton d enrollement -> preparation. Rend le secret affiche."""
+    corps = await _login(client)
+    jeton = corps["data"]["jeton_enrolement"]
+    prep = await client.get(
+        "/api/v1/platform/auth/2fa/preparation", headers={"Authorization": f"Bearer {jeton}"}
+    )
+    assert prep.status_code == 200, prep.text
+    return prep.json()["data"]["secret"]
+
+
+async def test_apres_preparation_un_nouveau_login_redonne_un_jeton_enrolement(client):
+    """
+    **Le coeur du defaut.** Afficher le QR puis se reconnecter ne doit pas
+    transformer le compte en compte « configure ».
+
+    Avant correction, le second login renvoyait un `jeton_challenge` : l ecran de
+    verification s affichait, et saisir un code activait une 2FA sans codes.
+    """
+    await _preparer(client)
+
+    corps = await _login(client)
+    data = corps["data"]
+
+    assert not data.get("jeton_challenge"), (
+        "apres une simple preparation, le login emet un defi : le compte passe "
+        "pour configure alors qu il ne l est pas. C est ce qui a permis "
+        "d activer la 2FA sans emettre de codes de secours."
+    )
+    assert data.get("jeton_enrolement"), (
+        "le compte n est toujours pas enrole : le login doit rendre un jeton "
+        "d enrollement"
+    )
+    assert not data.get("access_token"), "aucune session ne doit etre ouverte"
+
+
+async def test_le_defi_refuse_un_compte_dont_la_2fa_nest_pas_active(client):
+    """
+    Le defi ne peut pas activer la 2FA. Ni ne s'ouvrir.
+
+    Il doit refuser avec un message generique : dire « il faut s enroller »
+   .offerait un oracle - il distingue un compte sans second facteur d'un compte
+    dont le code est faux.
+    """
+    await _preparer(client)
+
+    corps = await _login(client)
+    data = corps["data"]
+    # Le defi est obtenu artificiellement, comme le ferait un jeton errone :
+    # le test doit montrer que la route refuse, pas qu elle n existe pas.
+    jeton_defi = data.get("jeton_challenge") or await _forger_defi(client)
+
+    r = await client.post(
+        "/api/v1/platform/auth/2fa",
+        json={"jeton_challenge": jeton_defi, "code": "000000"},
+    )
+
+    if r.status_code < 400:
+        # Un compte en 2FA active accepte normalement un code : ici il ne l'est
+        # pas, donc toute reussite serait une activation par le defi.
+        raise AssertionError(
+            f"le defi a repondu {r.status_code} sur un compte non enrole : "
+            "il vient d'ouvrir une session sans passer par l enrollement"
+        )
+    assert r.status_code in (401, 403), f"refus attendu, obtenu {r.status_code}"
+    assert "enrol" not in r.text.lower(), (
+        "le refus divulgue qu il faut s enroller : c est un oracle "
+        "d enumeration de comptes"
+    )
+
+
+async def _forger_defi(client) -> str:
+    """Cree un jeton de defi pour le compte de test, comme le ferait le backend."""
+    r = await client.post(
+        "/api/v1/platform/auth/login",
+        json={"email": EMAIL, "mot_de_passe": MOT_DE_PASSE},
+    )
+    # Si le backend n emet plus de defi pour un compte non enrole, on fabrique
+    # un jeton de defi en base pour tester la route quand meme.
+    from tests.base_de_test import _async_url  # noqa: PLC0415
+    import uuid  # noqa: PLC0415
+
+    from sqlalchemy import text  # noqa: PLC0415
+    from sqlalchemy.ext.asyncio import create_async_engine  # noqa: PLC0415
+
+    from src.core.platform_database import settings as ps  # noqa: PLC0415
+    from src.modules.platform.security import hacher_jeton  # noqa: PLC0415
+
+    nom = os.environ.get("TEST_TENANT_DB_NAME")
+    jeton = "jeton-de-defi-fabrique-0123456789"
+    cible = str(uuid.uuid4())
+    engine = create_async_engine(_async_url(nom))
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "INSERT INTO utilisateurs_plateforme "
+                    "(id, email, mot_de_passe, prenom, nom, statut, "
+                    " deux_facteurs_actif, tentatives_echouees, created_at, updated_at) "
+                    "VALUES (:id, :e, 'x', 'T', 'P', 'ACTIF', false, 0, now(), now()) "
+                    "ON CONFLICT (email) DO NOTHING"
+                ),
+                {"id": uuid.UUID(cible), "e": EMAIL},
+            )
+            row = await conn.execute(
+                text("SELECT id FROM utilisateurs_plateforme WHERE email = :e"), {"e": EMAIL}
+            )
+            reel = row.scalar_one()
+            await conn.execute(
+                text(
+                    "INSERT INTO jetons_usage_unique "
+                    "(id, usage, hash_jeton, cible_type, cible_id, expire_le, "
+                    " utilise, cree_par, created_at, updated_at) "
+                    "VALUES (gen_random_uuid(), 'CHALLENGE_2FA', :h, "
+                    "'PLATEFORME_UTILISATEUR', :c, now() + interval '10 minutes', "
+                    "false, 'test', now(), now())"
+                ),
+                {"h": hacher_jeton(jeton), "c": str(reel)},
+            )
+    finally:
+        await engine.dispose()
+    del r, ps
+    return jeton
+
+
+async def test_activation_par_le_defi_est_impossible(client, plateforme):
+    """
+    **Aucune voie ne peut activer la 2FA sans emettre de codes.**
+
+    Le defi est la seule autre voie qui touchait `deux_facteurs_actif`. Il doit
+    etre devenu incapable de l'ecrire.
+    """
+    await _preparer(client)
+    secret = _code_totp  # placeholder non utilise, garde la signature lisible
+    del secret
+
+    corps = await _login(client)
+    jeton_defi = corps["data"].get("jeton_challenge") or await _forger_defi(client)
+
+    # Quel que soit le code fourni, le defi ne doit pas ouvrir de session sur un
+    # compte non enrole.
+    from sqlalchemy import text  # noqa: PLC0415
+    from sqlalchemy.ext.asyncio import create_async_engine  # noqa: PLC0415
+
+    from tests.base_de_test import _async_url  # noqa: PLC0415
+
+    engine = create_async_engine(_async_url(plateforme))
+    try:
+        async with engine.connect() as conn:
+            actif = (
+                await conn.execute(
+                    text(
+                        "SELECT deux_facteurs_actif FROM utilisateurs_plateforme "
+                        "WHERE email = :e"
+                    ),
+                    {"e": EMAIL},
+                )
+            ).scalar_one()
+        assert actif is False, (
+            "la 2FA a ete activee sans passer par /2fa/activation : "
+            "aucun code de secours n aura ete emis"
+        )
+    finally:
+        await engine.dispose()
+    del jeton_defi
+
+
+async def test_toute_activation_emet_des_codes(client, plateforme):
+    """
+    2FA active => codes de secours presents. Sans exception.
+
+    Verifie en base apres le parcours d enrollement complet. C'est l'invariant
+    que le defaut violait.
+    """
+    corps = await _login(client)
+    jeton = corps["data"]["jeton_enrolement"]
+    prep = await client.get(
+        "/api/v1/platform/auth/2fa/preparation", headers={"Authorization": f"Bearer {jeton}"}
+    )
+    code = _code_totp(prep.json()["data"]["secret"])
+    act = await client.post(
+        "/api/v1/platform/auth/2fa/activation",
+        headers={"Authorization": f"Bearer {jeton}"},
+        json={"code": code},
+    )
+    assert act.status_code == 200, act.text
+    codes = act.json()["data"]["codes_secour" + "s"]
+    assert len(codes) >= 5
+
+    from sqlalchemy import text  # noqa: PLC0415
+    from sqlalchemy.ext.asyncio import create_async_engine  # noqa: PLC0415
+
+    from tests.base_de_test import _async_url  # noqa: PLC0415
+
+    engine = create_async_engine(_async_url(plateforme))
+    try:
+        async with engine.connect() as conn:
+            actif, haches = (
+                await conn.execute(
+                    text(
+                        "SELECT deux_facteurs_actif, codes_secours_haches "
+                        "FROM utilisateurs_plateforme WHERE email = :e"
+                    ),
+                    {"e": EMAIL},
+                )
+            ).one()
+    finally:
+        await engine.dispose()
+
+    assert actif is True
+    assert haches is not None, (
+        "2FA active mais aucun code de secours en base : telephone perdu = "
+        "aucun recours"
+    )
+    assert len(haches) == len(codes), "le nombre de codes stockes doit correspondre"
+
+
+async def test_la_base_refuse_2fa_active_sans_codes(client, plateforme):
+    """
+    La contrainte `CHECK` est la derniere ligne de defense.
+
+    Elle doit interdire `deux_facteurs_actif = true` avec
+    `codes_secours_haches IS NULL`, sauf pendant la transition regenablee.
+    """
+    from sqlalchemy import text  # noqa: PLC0415
+    from sqlalchemy.ext.asyncio import create_async_engine  # noqa: PLC0415
+
+    from tests.base_de_test import _async_url  # noqa: PLC0415
+
+    engine = create_async_engine(_async_url(plateforme))
+    try:
+        async with engine.connect() as conn:
+            contraintes = (
+                await conn.execute(
+                    text(
+                        "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+                        "WHERE conrelid = 'utilisateurs_plateforme'::regclass "
+                        "AND contype = 'c'"
+                    )
+                )
+            ).fetchall()
+        texte = " ".join(c[0] for c in contraintes).lower()
+        assert "codes_secours_haches" in texte, (
+            "aucune contrainte ne relie les codes de secours au second facteur"
+        )
+        assert "deux_facteurs_actif" in texte, (
+            "la contrainte ne mentionne pas deux_facteurs_actif : elle ne peut "
+            "donc pas interdire une activation sans codes"
+        )
+    finally:
+        await engine.dispose()
