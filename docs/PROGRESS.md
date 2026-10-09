@@ -6,6 +6,51 @@
 
 
 ---
+## ACCES : **OPERATIONNEL** - 2026-10-09
+
+Le proprietaire est connecte au backoffice. `rhonekane@gmail.com` est le seul
+Super Admin actif ; l ancien compte `aminadiop@sysdent.pro` est **desactive** et
+ses 33 sessions sont revoquees, avec un refus de connexion verifie.
+
+Reste ouvert : le compte n a **aucun code de secours**, et le correctif de fond de
+l enrollement n est pas ecrit.
+
+## ETAT DE FIN DE SESSION - 2026-10-09 (4e session)
+
+**Prouve**
+- **Acces operationnel** : session ouverte cote backoffice.
+- `aminadiop@sysdent.pro` **desactive**, 33 sessions revoquees, refus de
+  connexion verifie en HTTP (`401 INVALID_CREDENTIALS`, message identique a un
+  mot de passe faux - aucun oracle d enumeration).
+  Garde-fou respecte avant ecriture : `rhonekane@gmail.com` etait deja ACTIF,
+  2FA active, Super Admin.
+  Sauvegarde de `sysdent_platform` avant ecriture (269 Ko, 22 tables).
+  Transaction avec `ON_ERROR_STOP=1`, sortie affichee : `UPDATE 31`, `UPDATE 1`,
+  `COMMIT`.
+- Non-regression : **442 passes, 1 echec** en 17 min 33 s (l echec est le defaut
+  de securite, volontairement non corrige).
+
+**Non verifie**
+- Objectif de 15 min non atteint (17 min 33 contre 13 min 06). Cause de l ecart
+  non etablie ; durees dans `docs/journal/2026-10-09-durees-suite.txt`.
+
+**Non fait**
+- **Correctif de fond de l enrollement 2FA** : les 5 tests sont ecrits et vus en
+  echec, le correctif n est pas commence. Defaut toujours ouvert : le defi peut
+  activer la 2FA sans emettre de codes de secours.
+- **Les codes de secours du proprietaire n existent pas.** C est le seul risque
+  residuel de son acces : telephone perdu = aucun recours aujourd hui.
+- Ecran de regeneration des codes (`POST /platform/auth/2fa/codes-secours/regenerer`).
+- Etapes 3 et 4 : typage des routes `APIResponse[dict]` utilisees par les ecrans,
+  `GET /platform/stats/dashboard`, ecrans du tableau de bord et des cabinets.
+  **La page d arrivee annonce ces ecrans comme non ecrits : elle est donc
+ 暂时 honnete.**
+- Isolation des tests sur une instance dediee ; suppression des 83 lignes :
+  **ne pas y toucher**, les tests ecrivent encore dans la vraie base master.
+- `PROGRESS.md` reste duplique ; `docs/journal/` cree cette semaine.
+
+---
+
 ## ACCES : **FONCTIONNEL, 2FA sans codes de secours, CORRECTIF NON ECRIT** - 2026-10-09
 
 Non-regression **verifiee** : **442 passes, 1 echec** en 17 min 33 s. L unique

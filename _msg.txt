@@ -1,8 +1,7 @@
-docs: verdict de non-regression - 442 passes, 1 echec, 17 min 33
+docs: acces operationnel, ancien compte desactive
 
-Ligne de base etablie apres le passage des migrations sur asyncpg : les 442 tests
-qui ne visent pas le defaut de securite passent tous.
+`rhonekane@gmail.com` est le seul Super Admin actif. `aminadiop@sysdent.pro`
+desactive, 33 sessions revoquees, refus verifie en HTTP. Sauvegarde de la base
+plateforme avant ecriture, transaction avec ON_ERROR_STOP=1 et sortie affichee.
 
-Objectif de 15 min non atteint. Les 30 durees sont dans docs/journal/ ; la cause
-de l ecart n est pas etablie, et ce que les durees montrent (un cout reparti sur
-des centaines de fixtures, pas un test lent) reste une hypothese.
+La page d arrivee annonce les ecrans non ecrits : elle reste honnete.
