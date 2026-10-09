@@ -6,6 +6,67 @@
 
 
 ---
+MIGRATION ENROLEMENT 2FA : f2c9e5d7a3b1_enrolement_2fa_secret_en_attente.py — validée sur copie (aller-retour OK, compte rhonekane préservé) — NON appliquée à la base réelle
+
+**STATUT 2026-10-09 (session correctif enrollement 2FA, terminee)** :
+Acces : OPERATIONNEL — rhonekane conserve, 2FA active, secret intact, 6 sessions.
+Migration : ecrite, validee sur copie, **non appliquee** a la base reelle.
+Codes de secours : regenerables (endpoint + ecran `/codes-secours` + banniere).
+Suite complete : **440 passes, 3 sautes** (0 echec, 14 min 34 s).
+
+---
+## ETAT DE FIN DE SESSION - 2026-10-09 (5e session)
+
+**Prouve**
+- **Le correctif d enrollement 2FA est ecrit et vert.** Le secret prepare vit
+  dans sa propre colonne (`secret_2fa_en_attente`) ; la decision de chemin se
+  prend sur `deux_facteurs_actif` — l etat d un compte est ce qu il EST, pas ce
+  qu il CONTIENT ; une seule voie d activation subsiste :
+  `activer_second_facteur` verifie le TOTP sur le secret EN ATTENTE, le
+  **promeut chiffre** dans `secret_2fa_chiffre`, emet 10 codes haches. Un code
+  de secours n active plus : il ouvre une session.
+- **Les 5 tests ont echoue pour la bonne raison AVANT le correctif**, puis sont
+  verts (2) et sautes (3 — comportement attendu apres correction : le backend
+  n emet plus de defi pour un compte non enrole). Sortie :
+  `docs/journal/2026-10-09-rouge-5-tests-enrolement-avant-correctif.txt`.
+- **Injection de faute** (login sur secret en attente + defi qui active +
+  preparation qui ecrit le secret actif) : **3 des 5 ont echoue**, chacun sur son
+  message vise ; la contrainte CHECK a en plus bloquee une activation sans codes.
+- **Migration `f2c9e5d7a3b1` validee sur copie** : aller-retour
+  (upgrade -> downgrade -> upgrade) propre. A chaque etape, `rhonekane@gmail.com`
+  conserve : meme empreinte de secret, ACTIF, 2FA active, 6 sessions. Base
+  reelle **jamais touchee** : toujours `a3e7d1b95c24`, 0 colonne ajoutee.
+- **Preuve HTTP reelle : 16/16** sur la copie, avec un compte cree pour la
+  preuve (`docs/journal/2026-10-09-preuve-http-enrolement-2fa-sur-copie.txt`,
+  rejouable via `Backend/scripts/preuve_enrolement_2fa.py`). Elle a attrape un
+  defaut que les tests ne voyaient pas : l activation ecrivait le CLAIR dans
+  `secret_2fa_chiffre` — 12/16, reconnexion TOTP en 401 alors que les codes de
+  secours passaient encore. Corrige (promotion du chiffre), puis 16/16.
+- **Codes de secours regenerables** :
+  `POST /platform/auth/2fa/codes-secours/regenerer` (session + TOTP actif +
+  motif journalise, aucun code dans le journal), `/platform/auth/me` expose
+  `codes_secours_a_regenerer`, ecran `/codes-secours` et banniere sur le
+  tableau de bord. Route morte `/2fa/confirmation` retiree.
+- **Suite complete : 440 passes, 3 sautes, 0 echec en 14 min 34 s** (443 tests ;
+  les 3 sautes sont celles du defaut corrige). Front : `npm run verifier` vert
+  (contrat, tsc, lint 0, build), **26 tests Vitest** verts dont 4 nouveaux.
+
+**Non verifie**
+- La migration **n est pas appliquee a la base reelle** : `rhonekane@gmail.com`
+  n a toujours aucun code de secours tant que le proprietaire ne l a pas fait.
+  Le backfill lui pose `codes_secours_a_regenerer = true` : des l application,
+  la banniere le guidera vers la regeneration, sans rien lui retirer. Le cas
+  reel « telephone perdu » n est donc exerce que sur copie.
+
+**Non fait**
+- Etapes 3 et 4 (typage des routes `APIResponse[dict]`, stats dashboard, ecrans
+  cabinets) ; suppression des 83 lignes : **ne pas y toucher**, les tests
+  ecrivent encore dans la vraie base master. `PROGRESS.md` reste duplique.
+- Deja committes, non touches : deux corruptions de caracteres chinois dans des
+  commentaires — `Backoffice/src/stores/auth-store.ts` (« les找回 ») et le
+  bilan de la 4e session (« pour l instant honnete »).
+
+---
 ## ACCES : **OPERATIONNEL** - 2026-10-09
 
 Le proprietaire est connecte au backoffice. `rhonekane@gmail.com` est le seul
@@ -65,7 +126,7 @@ l enrollement n est pas ecrit.
 - Etapes 3 et 4 : typage des routes `APIResponse[dict]` utilisees par les ecrans,
   `GET /platform/stats/dashboard`, ecrans du tableau de bord et des cabinets.
   **La page d arrivee annonce ces ecrans comme non ecrits : elle est donc
- 暂时 honnete.**
+ pour l instant honnete.**
 - Isolation des tests sur une instance dediee ; suppression des 83 lignes :
   **ne pas y toucher**, les tests ecrivent encore dans la vraie base master.
 - `PROGRESS.md` reste duplique ; `docs/journal/` cree cette semaine.

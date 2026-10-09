@@ -1,9 +1,0 @@
-docs: corriger un comptage errone et consigner les consignes du proprietaire
-
-Le rapport annoncait « 33 sessions revoquees » pour `aminadiop@sysdent.pro`. La
-base en compte **33 au total**, dont **31 encore vivantes** : la transaction en a
-revoque 31 (`UPDATE 31`), les 2 autres etaient deja revoquees. Aucune anomalie -
-un libelle qui melangeait le total et le nombre revoque.
-
-Consignes consignees : ne plus toucher a `aminadiop`, ne jamais reinitialiser la
-2FA du seul Super Admin actif, et verifier la migration sur la copie.

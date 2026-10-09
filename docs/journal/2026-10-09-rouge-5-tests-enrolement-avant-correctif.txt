@@ -1,0 +1,73 @@
+FFFFF                                                                    [100%]
+================================== FAILURES ===================================
+E   AssertionError: le defi a repondu 200 sur un compte non enrole, avec le bon code : c est une seconde voie d activation
+    assert 200 in (401, 403)
+     +  where 200 = <Response [200 OK]>.status_code
+---------------------------- Captured stdout setup ----------------------------
+
+  [garde] inventaire initial impossible : (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedTableError'>: relation "tenants_db" does not exist
+[SQL: SELECT db_name FROM tenants_db]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+2026-10-09T13:56:56.866456Z [info     ] closing_all_tenant_engines     [src.core.database] app=SysDent Pro API count=0 env=development
+---------------------------- Captured stderr setup ----------------------------
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> bc633ae8cd75, baseline plateforme
+INFO  [alembic.runtime.migration] Running upgrade bc633ae8cd75 -> a41d7c93e2b6, journal audit : interdire TRUNCATE
+INFO  [alembic.runtime.migration] Running upgrade a41d7c93e2b6 -> b92f0e5c17d4, usage_jeton : ajouter CHALLENGE_2FA
+INFO  [alembic.runtime.migration] Running upgrade b92f0e5c17d4 -> a3e7d1b95c24, Enr¶lement 2FA avant session complÞte, et codes de secours.
+----------------------------- Captured log setup ------------------------------
+INFO     src.core.database:database.py:150 {'count': 0, 'event': 'closing_all_tenant_engines', 'logger': 'src.core.database', 'level': 'info', 'app': 'SysDent Pro API', 'env': 'development', 'timestamp': '2026-10-09T13:56:56.866456Z'}
+C:\Users\RHONE\OneDrive\Desktop\SysDent\Backend\tests\test_enrolement_2fa.py:610: AssertionError: le defi a repondu 200 sur un compte non enrole, avec le bon code : c est une seconde voie d activation
+E   AssertionError: le defi a active la 2FA : aucun code de secours n aura ete emis, et le telephone perdu ne laisse plus aucune voie de recours
+    assert True is False
+---------------------------- Captured stderr setup ----------------------------
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> bc633ae8cd75, baseline plateforme
+INFO  [alembic.runtime.migration] Running upgrade bc633ae8cd75 -> a41d7c93e2b6, journal audit : interdire TRUNCATE
+INFO  [alembic.runtime.migration] Running upgrade a41d7c93e2b6 -> b92f0e5c17d4, usage_jeton : ajouter CHALLENGE_2FA
+INFO  [alembic.runtime.migration] Running upgrade b92f0e5c17d4 -> a3e7d1b95c24, Enr¶lement 2FA avant session complÞte, et codes de secours.
+C:\Users\RHONE\OneDrive\Desktop\SysDent\Backend\tests\test_enrolement_2fa.py:633: AssertionError: le defi a active la 2FA : aucun code de secours n aura ete emis, et le telephone perdu ne laisse plus aucune voie de recours
+E   AssertionError: 2FA active sans codes de secours en base : telephone perdu = aucun recours
+    assert None is not None
+---------------------------- Captured stderr setup ----------------------------
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> bc633ae8cd75, baseline plateforme
+INFO  [alembic.runtime.migration] Running upgrade bc633ae8cd75 -> a41d7c93e2b6, journal audit : interdire TRUNCATE
+INFO  [alembic.runtime.migration] Running upgrade a41d7c93e2b6 -> b92f0e5c17d4, usage_jeton : ajouter CHALLENGE_2FA
+INFO  [alembic.runtime.migration] Running upgrade b92f0e5c17d4 -> a3e7d1b95c24, Enr¶lement 2FA avant session complÞte, et codes de secours.
+C:\Users\RHONE\OneDrive\Desktop\SysDent\Backend\tests\test_enrolement_2fa.py:654: AssertionError: 2FA active sans codes de secours en base : telephone perdu = aucun recours
+E   AssertionError: la preparation a ecrit le secret ACTIF : le backend peut alors prendre un compte prepare pour un compte configure. Il faut une colonne distincte pour le secret en attente.
+    assert 'gAAAAABqyPKyBNS4Wp6Uwxtl2xSGpSACFIVsdeD7kby7D6KO1MQC2YIrfuNFVmaVrUhmZ66_HkeY96Yuvr3Kx6gsuOPu7ysayM4HKoVknulUIXO0bd2OomrMZ3mmNXdAwdQG4YGA0GZQ' is None
+---------------------------- Captured stderr setup ----------------------------
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> bc633ae8cd75, baseline plateforme
+INFO  [alembic.runtime.migration] Running upgrade bc633ae8cd75 -> a41d7c93e2b6, journal audit : interdire TRUNCATE
+INFO  [alembic.runtime.migration] Running upgrade a41d7c93e2b6 -> b92f0e5c17d4, usage_jeton : ajouter CHALLENGE_2FA
+INFO  [alembic.runtime.migration] Running upgrade b92f0e5c17d4 -> a3e7d1b95c24, Enr¶lement 2FA avant session complÞte, et codes de secours.
+C:\Users\RHONE\OneDrive\Desktop\SysDent\Backend\tests\test_enrolement_2fa.py:673: AssertionError: la preparation a ecrit le secret ACTIF : le backend peut alors prendre un compte prepare pour un compte configure. Il faut une colonne distincte pour le secret en attente.
+E   AssertionError: {"success":false,"error":{"code":"AUTHENTICATION_REQUIRED","message":"Authentification requise.","details":{},"request_id":"34fbf6f6-11cc-430a-9305-a3db7cda36e7"}}
+    assert 401 == 200
+     +  where 401 = <Response [401 Unauthorized]>.status_code
+---------------------------- Captured stderr setup ----------------------------
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> bc633ae8cd75, baseline plateforme
+INFO  [alembic.runtime.migration] Running upgrade bc633ae8cd75 -> a41d7c93e2b6, journal audit : interdire TRUNCATE
+INFO  [alembic.runtime.migration] Running upgrade a41d7c93e2b6 -> b92f0e5c17d4, usage_jeton : ajouter CHALLENGE_2FA
+INFO  [alembic.runtime.migration] Running upgrade b92f0e5c17d4 -> a3e7d1b95c24, Enr¶lement 2FA avant session complÞte, et codes de secours.
+---------------------------- Captured stderr call -----------------------------
+WARNI [src.core.exception_handlers] {'code': 'AUTHENTICATION_REQUIRED', 'status_code': 401, 'message': 'Authentification requise.', 'request_id': '34fbf6f6-11cc-430a-9305-a3db7cda36e7', 'path': '/api/v1/platform/auth/2fa/preparation', 'event': 'app_exception_raised', 'method': 'GET', 'client_ip': '127.0.0.1', 'logger': 'src.core.exception_handlers', 'level': 'warning', 'app': 'SysDent Pro API', 'env': 'development', 'timestamp': '2026-10-09T13:57:09.408986Z'}
+------------------------------ Captured log call ------------------------------
+WARNING  src.core.exception_handlers:exception_handlers.py:18 {'code': 'AUTHENTICATION_REQUIRED', 'status_code': 401, 'message': 'Authentification requise.', 'request_id': '34fbf6f6-11cc-430a-9305-a3db7cda36e7', 'path': '/api/v1/platform/auth/2fa/preparation', 'event': 'app_exception_raised', 'method': 'GET', 'client_ip': '127.0.0.1', 'logger': 'src.core.exception_handlers', 'level': 'warning', 'app': 'SysDent Pro API', 'env': 'development', 'timestamp': '2026-10-09T13:57:09.408986Z'}
+C:\Users\RHONE\OneDrive\Desktop\SysDent\Backend\tests\test_enrolement_2fa.py:551: AssertionError: {"success":false,"error":{"code":"AUTHENTICATION_REQUIRED","message":"Authentification requise.","details":{},"request_id":"34fbf6f6-11cc-430a-9305-a3db7cda36e7"}}
+=========================== short test summary info ===========================
+FAILED tests/test_enrolement_2fa.py::test_le_defi_refuse_un_compte_dont_la_2fa_nest_pas_active
+FAILED tests/test_enrolement_2fa.py::test_le_defi_ne_peut_pas_activer_la_2fa
+FAILED tests/test_enrolement_2fa.py::test_une_2fa_active_a_toujours_des_codes
+FAILED tests/test_enrolement_2fa.py::test_preparer_n_ecrit_pas_de_secret_actif
+FAILED tests/test_enrolement_2fa.py::test_preparation_repetee_ecrase_le_secret_en_attente
+5 failed, 12 deselected in 13.05s

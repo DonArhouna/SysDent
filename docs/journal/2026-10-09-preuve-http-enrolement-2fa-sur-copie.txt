@@ -1,0 +1,51 @@
+PREUVE HTTP REELLE — correctif d'enrolement 2FA
+Date : 2026-10-09
+Base : sysdent_copie_enrolement (copie fraiche de sysdent_platform, migration
+       f2c9e5d7a3b1 appliquee sur la copie ; base reelle NON touchee)
+Compte : preuve-enrolement@sysdent-exemple.fr (cree pour la preuve)
+Script : Backend/scripts/preuve_enrolement_2fa.py — rejouable ; la copie se
+         recree avec les commandes notees dans l'en-tete de ce script
+
+Aucun secret, code ou jeton n'apparait dans ce journal.
+
+16 etapes, toutes conformes (BILAN : 16/16) :
+
+OK  1. login sans 2FA active -> jeton d'enrolement, aucune session          [200]
+OK  2. preparation (jeton d'enrolement) -> secret affiche une fois          [200]
+OK  3. login apres preparation -> toujours un jeton d'enrolement, jamais
+      un defi                                                               [200]
+OK  4. defi provoque sur compte non enrole -> 401 generique, 2FA jamais
+      activee (meme avec un TOTP pourtant valide)                           [401]
+OK  5. activation (TOTP calcule sur le secret en attente) -> 10 codes +
+      session complete                                                      [200]
+OK  6. /auth/me -> deux_facteurs_actif true, indicateur a false             [200]
+OK  7. reconnexion -> defi TOTP -> session ouverte          [login 200, defi 200]
+OK  8. code de secours -> accepte la premiere fois                         [200]
+OK  9. meme code de secours -> refuse la deuxieme fois                     [401]
+OK 10. jeton d'enrolement rejoue apres activation -> refuse                 [401]
+OK 11. 2FA active sans codes (etat legacy simule sur le compte de preuve)
+      -> /auth/me signale codes_secours_a_regenerer = true                  [200]
+OK 12. regeneration avec un TOTP expire -> refuse                           [401]
+OK 13. regeneration (TOTP valide + motif) -> 10 nouveaux codes, lot
+      different de l'ancien, indicateur repasse a false                     [200]
+OK 14. ancien code de secours apres regeneration -> refuse                  [401]
+OK 15. journal d'audit : aucun code de secours (ancien ni nouveau) n'y figure
+OK 16. journal d'audit : le motif de regeneration est consigne
+
+DEFAUT ATTRAPE PAR CETTE PREUVE (corrigе puis revtu vert) :
+  La promotion du secret a l'activation ecrivait le CLAIR dans
+  `secret_2fa_chiffre` (colonne Fernet). Resultat : toute reconnexion TOTP
+  apres enrrollement echouait au dechiffrement (`secret_2fa_illisible`), les
+  codes de secours passant encore — defaut invisible des tests unitaires,
+  aucun desquels ne re-connexionne en TOTP apres activation. Correction :
+  promouvoir le CHIFFRE tel quel (`user.secret_2fa_chiffre =
+  user.secret_2fa_en_attente`). Premiers lancements : 12/16 ; apres
+  correction : 16/16.
+
+ETATS DE LA COPIE :
+  - Aller-retour migration verifie : upgrade -> downgrade -> upgrade, chaque
+    etape avec empreinte du secret, statut et nombre de sessions de
+    rhonekane@gmail.com inchange (bb9c3dee3803a157140f5b806edb8ba8, ACTIF,
+    6 sessions).
+  - Base reelle sysdent_platform : toujours a la tete a3e7d1b95c24, 0 colonne
+    du correctif ajoutee. Migration NON appliquee a la base reelle.
