@@ -1,4 +1,8 @@
-chore: retirer un script de preuve glisse dans le commit precedent
+docs: le blocage est leve par le code, le defaut 2FA est reproductible
 
-Prototype d aller-retour de migration, ecrit dans un coin. Sans valeur pour le
-depot : la preuve est dans le message de commit.
+PROGRESS.md ne disait plus la bonne chose : il annonait un blocage
+d'environnement sans remede, alors que psycopg2 etait un choix de code.
+
+Etat verifie par relecture apres ecriture. La suite complete tourne en
+arriere-plan : aucun chiffre de non-regression n est opposable tant que son
+verdict n a pas ete lu.

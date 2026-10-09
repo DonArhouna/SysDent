@@ -6,6 +6,55 @@
 
 
 ---
+## ACCES : **FONCTIONNEL, mais 2FA sans codes de secours** - 2026-10-09
+
+Le proprietaire est enrole et connecte. Le blocage de tests est **leve par le
+code** : psycopg2 est sorti du chemin d execution, l antenne etait un choix, pas
+une contrainte. Le defaut de securite est **desormais reproductible par un test**
+qui echoue pour la bonne raison.
+
+## ETAT DE FIN DE SESSION - 2026-10-09
+
+**Prouve**
+- **Le blocage est leve.** Les migrations passent par `asyncpg` comme le reste de
+  la pile. Aller-retour `upgrade` / `downgrade` / `upgrade` sur une **copie** de
+  la base plateforme ; la base reelle n a pas ete touchee.
+- `pytest --collect-only` : **443 tests collectes, aucune erreur d import**.
+- `tests/test_enrolement_2fa.py` : **16 verts, 1 echec**. L echec est
+  `test_apres_preparation_un_nouveau_login_redonne_un_jeton_enrolement` : apres
+  une simple preparation, le login emet un `jeton_challenge` au lieu d un jeton
+  d enrollement. **Le defaut de securite est reproduit.**
+- Aucune occurrence de psycopg2 hors documentation.
+
+**Non verifie**
+- **Suite complete NON lancee a la fin** : elle tourne en arriere-plan, verdict
+  non lu. Aucun chiffre de non-regression n est donc opposable.
+- `--durations=30` demande pour la duree : lance avec la suite, resultat non lu.
+
+**Non fait**
+- Le correctif de fond de la 2FA : separation `secret_2fa_en_attente` /
+  `secret_2fa_chiffre`, decision de chemin sur l etat actif, **voie d activation
+  unique**, migration, `POST /platform/auth/2fa/codes-secours/regenerer`,
+  banniere backoffice. **Aucun changement d authentification n a ete fait** : le
+  test qui prouve le defaut est ecrit et vu en echec, le correctif est l etape
+  suivante.
+- Les 4 autres tests ecrits pour la voie unique **passent deja** : ils ne
+  discriminent pas le defaut et devront etre resserres apres le correctif.
+- Suppression des 83 lignes d origine test : toujours non faite, et elle ne doit
+  pas l etre avant l isolation des tests.
+- Instance de test dediee et garde de demarrage ; suite ecrivant dans la vraie
+  base `sysdent_master`.
+- Defauts JSONB, 8 routes `APIResponse[dict]`, 5 endpoints, Lots 1 et 2.
+- `PROGRESS.md` reste duplique ; `docs/journal/` n existe pas.
+
+**A faire par le proprietaire**
+- Rien d urgent de technique : le telephone fonctionne et la connexion passe.
+- **Les codes de secours restent absents.** Telephone perdu = aucun recours.
+  today : `python -m src.modules.platform.admin reinitialiser-2fa --email rhonekane@gmail.com --motif "Codes de secours"`.
+  Demain : l ecran de regeneration, qui n est pas ecrit.
+
+---
+
 ## ACCES : **FONCTIONNEL cote backoffice, BLOQUANT cote tests** - 2026-10-09
 
 Le proprietaire a enrole son second facteur et s est connecte. Deux defauts ont
