@@ -72,7 +72,7 @@ async def plateforme():
         # `upgrade_platform_to_head()` ne prend pas d'argument : il lit l'URL
         # dans l'environnement, comme le veut l'isolation des trois contextes.
         os.environ["ALEMBIC_PLATFORM_DB_URL"] = (
-            f"postgresql+psycopg2://{settings.PLATFORM_DB_USER}:{settings.PLATFORM_DB_PASSWORD}"
+            f"postgresql+asyncpg://{settings.PLATFORM_DB_USER}:{settings.PLATFORM_DB_PASSWORD}"
             f"@{settings.PLATFORM_DB_HOST}:{settings.PLATFORM_DB_PORT}/{nom}"
         )
         try:

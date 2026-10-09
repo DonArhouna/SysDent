@@ -391,7 +391,7 @@ class ProvisioningService:
         import asyncio
 
         url = (
-            f"postgresql+psycopg2://{settings.TENANT_DB_USER}:{settings.TENANT_DB_PASSWORD}"
+            f"postgresql+asyncpg://{settings.TENANT_DB_USER}:{settings.TENANT_DB_PASSWORD}"
             f"@{settings.TENANT_DB_HOST}:{settings.TENANT_DB_PORT}/{db_name}"
         )
         await asyncio.to_thread(upgrade_tenant_to_head, url)

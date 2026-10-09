@@ -178,7 +178,7 @@ class Settings(BaseSettings):
     @property
     def master_db_sync_url(self) -> str:
         return (
-            f"postgresql+psycopg2://{self.MASTER_DB_USER}:{self.MASTER_DB_PASSWORD}"
+            f"postgresql+asyncpg://{self.MASTER_DB_USER}:{self.MASTER_DB_PASSWORD}"
             f"@{self.MASTER_DB_HOST}:{self.MASTER_DB_PORT}/{self.MASTER_DB_NAME}"
         )
 
@@ -192,7 +192,7 @@ class Settings(BaseSettings):
     @property
     def platform_db_sync_url(self) -> str:
         return (
-            f"postgresql+psycopg2://{self.PLATFORM_DB_USER}:{self.PLATFORM_DB_PASSWORD}"
+            f"postgresql+asyncpg://{self.PLATFORM_DB_USER}:{self.PLATFORM_DB_PASSWORD}"
             f"@{self.PLATFORM_DB_HOST}:{self.PLATFORM_DB_PORT}/{self.PLATFORM_DB_NAME}"
         )
 

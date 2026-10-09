@@ -69,8 +69,10 @@ def _async_url(db_name: str) -> str:
 
 
 def _sync_url(db_name: str) -> str:
-    """URL psycopg2 pour Alembic (qui est synchrone)."""
-    return f"postgresql+psycopg2://{_creds()}/{db_name}"
+    """URL des migrations. Alembic est synchrone, mais le moteur est
+    asynchrone : `src/core/alembic_async.py` fait tourner les migrations dans son
+    thread interne. Le pilote reste donc `asyncpg`, celui de la pile applicative."""
+    return f"postgresql+asyncpg://{_creds()}/{db_name}"
 
 
 @pytest_asyncio.fixture

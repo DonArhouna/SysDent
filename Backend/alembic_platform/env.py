@@ -3,12 +3,13 @@ import sys
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import engine_from_config, pool  # noqa: F401  (mode hors ligne)
 
 CURRENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if CURRENT_DIR not in sys.path:
     sys.path.insert(0, CURRENT_DIR)
 
+from src.core.alembic_async import run_migrations_async, normaliser_url_vers_asyncpg
 from src.common.base_model import PlatformBase
 
 # Importer les modèles plateforme pour qu'ils s'enregistrent dans
@@ -43,7 +44,7 @@ if not db_url:
 # silencieusement et le contexte retombe sur l'URL du .env.
 url_fournie = config.get_main_option("sqlalchemy.url", None)
 if url_fournie:
-    db_url = url_fournie.replace("postgresql+asyncpg://", "postgresql+psycopg2://").replace("%", "%%")
+    db_url = normaliser_url_vers_asyncpg(url_fournie).replace("%", "%%")
 
 config.set_main_option("sqlalchemy.url", db_url)
 
@@ -61,16 +62,11 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-
-    with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
-        with context.begin_transaction():
-            context.run_migrations()
+    # **Mode asynchrone**, via le pilote `asyncpg` que la pile applicative utilise
+    # deja. Le pilote psycopg2 est sorti du chemin d execution : il charge une DLL
+    # native qu une politique de controle d application peut bloquer, auquel cas
+    # toute la suite echoue a la collection.
+    run_migrations_async(db_url, target_metadata, compare_type=True)
 
 
 if context.is_offline_mode():

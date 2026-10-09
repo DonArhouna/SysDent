@@ -41,7 +41,7 @@ def _async_url(db_name: str) -> str:
 
 
 def _sync_url(db_name: str) -> str:
-    return f"postgresql+psycopg2://{_creds()}/{db_name}"
+    return f"postgresql+asyncpg://{_creds()}/{db_name}"
 
 
 async def _admin():

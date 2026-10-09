@@ -74,12 +74,14 @@ async def _bootstrap_tenant_schema_and_admin(societe_id: uuid.UUID, db_name: str
     # Référentiel médicamenteux : sans lui, aucune ordonnance ne peut être émise
     # et le contrôle de contre-indication n'a aucune règle à appliquer.
     from src.modules.ordonnances.services import MedicamentService
-    tenant_sync_url = (
-        f"postgresql+psycopg2://{settings.TENANT_DB_USER}:{settings.TENANT_DB_PASSWORD}"
+    tenant_url_migration = (
+        f"postgresql+asyncpg://{settings.TENANT_DB_USER}:{settings.TENANT_DB_PASSWORD}"
         f"@{settings.TENANT_DB_HOST}:{settings.TENANT_DB_PORT}/{db_name}"
     )
-    # Alembic est synchrone : on l'exécute dans un thread pour ne pas bloquer l'event loop asyncio.
-    await asyncio.to_thread(upgrade_tenant_to_head, tenant_sync_url)
+    # # Alembic reste synchrone cote appel : `src/core/alembic_async.py` ouvre un
+        # moteur `asyncpg` et fait tourner les migrations dans son thread interne.
+        # On l'appelle donc dans un thread, comme avant, sans boucle en cours.
+    await asyncio.to_thread(upgrade_tenant_to_head, tenant_url_migration)
 
     await tenant_db_manager.get_or_create_engine(
         tenant_id=str(societe_id),

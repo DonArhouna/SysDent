@@ -9,6 +9,7 @@ CURRENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if CURRENT_DIR not in sys.path:
     sys.path.insert(0, CURRENT_DIR)
 
+from src.core.alembic_async import run_migrations_async, normaliser_url_vers_asyncpg
 from src.common.base_model import TenantBase
 # Importer les modèles Tenant pour qu'ils s'enregistrent dans TenantBase.metadata.
 from src.modules.tenants import models as tenant_models  # noqa: F401
@@ -31,7 +32,7 @@ db_url = (
 )
 if not db_url:
     raise RuntimeError(
-        "URL de la base tenant manquante. Utiliser -x tenant_db_url=postgresql+psycopg2://... "
+        "URL de la base tenant manquante. Utiliser -x tenant_db_url=postgresql+asyncpg://... "
         "ou définir la variable d'environnement ALEMBIC_TENANT_DB_URL."
     )
 config.set_main_option("sqlalchemy.url", db_url)
@@ -49,16 +50,8 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-
-    with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
-        with context.begin_transaction():
-            context.run_migrations()
+    # Mode asynchrone via `asyncpg` : meme raison que le contexte plateforme.
+    run_migrations_async(db_url, target_metadata)
 
 
 if context.is_offline_mode():

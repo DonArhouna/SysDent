@@ -1,19 +1,38 @@
-docs: etat arrete par la politique AppLocker, tests 2FA ecrits mais non executes
+docs: psycopg2 retire du chemin d execution, le defaut 2FA est desormais reproductible
 
-Une politique de controle d application Windows bloque la DLL `_psycopg` du
-venv. `postgresql+psycopg2` est cable en dur dans les fixtures de test et dans
-`src/core/migrations.py` ; Alembic ne peut plus migrer, et la totalite des tests
-plateforme echoue a la collection. `asyncpg` passe : c est le pilote qui n est
-pas bloque.
+La session precedente concluait qu'aucun correctif de code ne pouvait lever le
+blocage AppLocker. C etait inexact : la dependance a psycopg2 etait un choix de
+code, pas une contrainte d Alembic.
 
-Ce n est pas une erreur de code et aucun correctif de code ne le resoudra.
+Les migrations passent desormais par `asyncpg`, le pilote que la pile
+applicative utilise deja. Deux raisons, pas une :
 
-Cinq tests sont ecrits pour la voie d activation unique 2FA : preparation puis
-nouveau login doit rendre un jeton d enrollement et jamais un defi, le defi doit
-refuser un compte non enrole, une 2FA active doit toujours avoir des codes en
-base, la contrainte CHECK doit relier les deux, et le defi ne doit plus pouvoir
-activer la 2FA. **Ils n ont pas pu etre executes** : ils n ont donc pas encore
-demontre qu ils echouent, et le correctif de fond n est pas commence.
+- la coherence : les migrations etaient appliquees par un pilote different de
+  celui du code, sans que rien ne le signale ;
+- la robustesse : psycopg2 charge une DLL native, qu une politique de controle
+  d application peut bloquer. Toute la suite echouait alors a la collection,
+  sans qu un seul test n ait ete ecrit faux.
 
-Le defaut reste ouvert : le compte du proprietaire est en 2FA active sans aucun
-code de secours. Telephone perdu, aucun recours.
+`src/core/alembic_async.py` ouvre un moteur `asyncpg` et fait tourner les
+migrations synchrones dans son thread interne via `run_sync`. Le point d entree
+public de `src.core.migrations` est inchange et reste synchrone : ses appelants
+l executent deja dans un thread dedie via `asyncio.to_thread`, donc aucune boucle
+n y est en cours et `asyncio.run` y est legal. `run_migrations_async_engine` est
+fourni pour un appelant qui possede deja sa boucle.
+
+Les trois contextes (master, tenant, plateforme) sont migres, ainsi que les URL
+de `config.py`, de l outillage de test et des deux chemins de provisionnement.
+Aucune occurrence de psycopg2 ne subsiste hors documentation.
+
+Preuve :
+- `upgrade`, `downgrade`, puis `upgrade` sur une **copie** de la base plateforme :
+  aller-retour complet. La base reelle n a pas ete touchee ;
+- `pytest --collect-only` : **443 tests collectes, aucune erreur d import** ;
+- `tests/test_enrolement_2fa.py` : **16 verts, 1 echec** -
+  `test_apres_preparation_un_nouveau_login_redonne_un_jeton_enrolement`, qui
+  echoue pour la bonne raison : apres une simple preparation, le login emet un
+  `jeton_challenge` au lieu d un jeton d enrollement. **Le defaut de securite
+  est desormais reproductible par un test.**
+
+Aucun changement d authentification n a ete fait : le correctif de fond attend
+d etre ecrit, puis vu en echec, puis vu vert.
