@@ -1,38 +1,4 @@
-docs: psycopg2 retire du chemin d execution, le defaut 2FA est desormais reproductible
+chore: retirer un script de preuve glisse dans le commit precedent
 
-La session precedente concluait qu'aucun correctif de code ne pouvait lever le
-blocage AppLocker. C etait inexact : la dependance a psycopg2 etait un choix de
-code, pas une contrainte d Alembic.
-
-Les migrations passent desormais par `asyncpg`, le pilote que la pile
-applicative utilise deja. Deux raisons, pas une :
-
-- la coherence : les migrations etaient appliquees par un pilote different de
-  celui du code, sans que rien ne le signale ;
-- la robustesse : psycopg2 charge une DLL native, qu une politique de controle
-  d application peut bloquer. Toute la suite echouait alors a la collection,
-  sans qu un seul test n ait ete ecrit faux.
-
-`src/core/alembic_async.py` ouvre un moteur `asyncpg` et fait tourner les
-migrations synchrones dans son thread interne via `run_sync`. Le point d entree
-public de `src.core.migrations` est inchange et reste synchrone : ses appelants
-l executent deja dans un thread dedie via `asyncio.to_thread`, donc aucune boucle
-n y est en cours et `asyncio.run` y est legal. `run_migrations_async_engine` est
-fourni pour un appelant qui possede deja sa boucle.
-
-Les trois contextes (master, tenant, plateforme) sont migres, ainsi que les URL
-de `config.py`, de l outillage de test et des deux chemins de provisionnement.
-Aucune occurrence de psycopg2 ne subsiste hors documentation.
-
-Preuve :
-- `upgrade`, `downgrade`, puis `upgrade` sur une **copie** de la base plateforme :
-  aller-retour complet. La base reelle n a pas ete touchee ;
-- `pytest --collect-only` : **443 tests collectes, aucune erreur d import** ;
-- `tests/test_enrolement_2fa.py` : **16 verts, 1 echec** -
-  `test_apres_preparation_un_nouveau_login_redonne_un_jeton_enrolement`, qui
-  echoue pour la bonne raison : apres une simple preparation, le login emet un
-  `jeton_challenge` au lieu d un jeton d enrollement. **Le defaut de securite
-  est desormais reproductible par un test.**
-
-Aucun changement d authentification n a ete fait : le correctif de fond attend
-d etre ecrit, puis vu en echec, puis vu vert.
+Prototype d aller-retour de migration, ecrit dans un coin. Sans valeur pour le
+depot : la preuve est dans le message de commit.
