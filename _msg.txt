@@ -1,7 +1,9 @@
-docs: acces operationnel, ancien compte desactive
+docs: corriger un comptage errone et consigner les consignes du proprietaire
 
-`rhonekane@gmail.com` est le seul Super Admin actif. `aminadiop@sysdent.pro`
-desactive, 33 sessions revoquees, refus verifie en HTTP. Sauvegarde de la base
-plateforme avant ecriture, transaction avec ON_ERROR_STOP=1 et sortie affichee.
+Le rapport annoncait « 33 sessions revoquees » pour `aminadiop@sysdent.pro`. La
+base en compte **33 au total**, dont **31 encore vivantes** : la transaction en a
+revoque 31 (`UPDATE 31`), les 2 autres etaient deja revoquees. Aucune anomalie -
+un libelle qui melangeait le total et le nombre revoque.
 
-La page d arrivee annonce les ecrans non ecrits : elle reste honnete.
+Consignes consignees : ne plus toucher a `aminadiop`, ne jamais reinitialiser la
+2FA du seul Super Admin actif, et verifier la migration sur la copie.

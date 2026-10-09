@@ -15,13 +15,34 @@ ses 33 sessions sont revoquees, avec un refus de connexion verifie.
 Reste ouvert : le compte n a **aucun code de secours**, et le correctif de fond de
 l enrollement n est pas ecrit.
 
+## CONTRAINTES IMPOSEES PAR LE PROPRIETAIRE - 2026-10-09
+
+1. **`aminadiop@sysdent.pro` : ne plus y toucher.** Desactive, sessions
+   revoquees, refus verifie.
+2. **Ne jamais reinitialiser la 2FA de `rhonekane@gmail.com`** pendant une
+   session. C est le seul Super Admin actif ; un reset le laisserait sans aucun
+   recours, puisque ses codes de secours sont absents. Toute preuve HTTP ou tout
+   test passe par un **compte de test cree pour l occasion**, sur l instance de
+   test ou une copie - **jamais le compte reel**.
+3. L ecran `/dashboard` provisoire (« Connexion etablie ») sera remplace par la
+   mission B, pas ici.
+4. La migration d enrollement doit **preserver** `rhonekane@gmail.com` : 2FA
+   active conservee, `codes_secours_a_regenerer = true`, **sans le deconnecter ni
+   lui retirer son secret**. A verifier **sur la copie** avant toute application
+   a la base reelle.
+
 ## ETAT DE FIN DE SESSION - 2026-10-09 (4e session)
 
 **Prouve**
 - **Acces operationnel** : session ouverte cote backoffice.
-- `aminadiop@sysdent.pro` **desactive**, 33 sessions revoquees, refus de
-  connexion verifie en HTTP (`401 INVALID_CREDENTIALS`, message identique a un
-  mot de passe faux - aucun oracle d enumeration).
+- `aminadiop@sysdent.pro` **desactive**, refus de connexion verifie en HTTP
+  (`401 INVALID_CREDENTIALS`, message identique a un mot de passe faux - aucun
+  oracle d enumeration).
+  **Correction de comptage** : ce compte a **33 lignes de session**, dont **31
+  encore vivantes**. La transaction en a revoque **31** (`UPDATE 31`) ; les 2
+  autres etaient **deja revoquees** avant elle. Un rapport anterieur annoncait
+  « 33 sessions revoquees » : c etait le total, pas le nombre revoque. Aucune
+  anomalie en base - un libelle errone.
   Garde-fou respecte avant ecriture : `rhonekane@gmail.com` etait deja ACTIF,
   2FA active, Super Admin.
   Sauvegarde de `sysdent_platform` avant ecriture (269 Ko, 22 tables).
