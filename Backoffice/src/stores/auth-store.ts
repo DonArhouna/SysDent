@@ -237,10 +237,16 @@ export const useAuthStore = create<AuthState>()(
     activerEnrolement: async (code) => {
       const jeton = get().jetonEnrolement
       if (!jeton) throw new Error("Session de connexion expiree.")
-      const reponse = await api.post<ApiReponse<EnrolementTermine>>('/platform/auth/2fa/activation', {
-        code,
-        bearer: jeton,
-      })
+      // `bearer` va dans le **troisieme** argument (les options), pas dans le
+      // corps. `api.post(chemin, corps, options)` : place dans le corps, le jeton
+      // partait dans le JSON et l en-tete `Authorization` n etait jamais pose.
+      // La preparation, elle, fonctionnait : son second argument *est* les
+      // options. D ou un QR code visible puis une activation refusee.
+      const reponse = await api.post<ApiReponse<EnrolementTermine>>(
+        '/platform/auth/2fa/activation',
+        { code },
+        { bearer: jeton },
+      )
       const { codes_secours, ...jetons } = reponse.data
       if (!jetons.access_token || !jetons.refresh_token) {
         // L'activation a reussi cote serveur : impossible d'ecrire un etat

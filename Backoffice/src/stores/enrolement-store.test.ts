@@ -80,10 +80,15 @@ describe('enrolement 2FA', () => {
 
     const codes = await useAuthStore.getState().activerEnrolement('123456')
 
-    expect(post).toHaveBeenCalledWith('/platform/auth/2fa/activation', {
-      code: '123456',
-      bearer: 'jeton-denrolement-1234567890',
-    })
+    // Le jeton est dans le **troisieme** argument, pas dans le corps. Cette
+    // assertion encodait le defaut : un test qui fixe le contrat doit dire
+    // *ou* va la valeur, sinon il valide silencieusement un jeton envoye dans
+    // le JSON et un en-tete absent.
+    expect(post).toHaveBeenCalledWith(
+      '/platform/auth/2fa/activation',
+      { code: '123456' },
+      { bearer: 'jeton-denrolement-1234567890' },
+    )
     expect(codes).toEqual(['ABCD2345', 'EFGH6789', 'JKMN2345'])
     expect(useAuthStore.getState().token).toBe('acces-1')
     // Le jeton d enrollement est consomme cote serveur : le garder laisserait

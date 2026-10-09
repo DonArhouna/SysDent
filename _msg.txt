@@ -1,31 +1,26 @@
-fix(backoffice): le jeton d enrollement etait jete par la couche transport
+fix(backoffice): le jeton d activation partait dans le corps JSON, pas dans l en-tete
 
-`api.get`, `api.post`, `api.patch` et `api.delete` reconstruisaient leurs options
-et ne transmettaient **pas** `bearer` a `request()`. La requete partait donc sans
-en-tete `Authorization`, et le backend repondait « Authentification requise. »
+Le store appelait
+`api.post('/platform/auth/2fa/activation', { code, bearer: jeton })`.
+Or la signature est `api.post(chemin, corps, options)` : `bearer` tombait dans le
+**corps**. L en-tete `Authorization` n etait donc jamais pose, et le backend
+repondait « Authentification requise. ».
 
-Concretement : l assistant d enrollement fourmait toujours. Clic sur « Afficher le
-QR code » -> 401. Et l activation aurait echoue de la meme facon.
+La preparation, elle, fonctionnait : `api.get(chemin, options)` - son second
+argument *est* les options. D ou le symptome exacte : QR code affiche, puis
+activation refusee.
 
-Le test qui aurait du attraper cela ne le pouvait pas : il affirmait « `api.get` a
-ete appele avec `{ bearer }` ». Or le mock **remplacait `api` entierement** - la
-couche transport, celle qui construit les options reelles, n etait jamais
-exercee. Le test verifiait l intention de l appelant, pas la requete envoyee.
-C est un test qui passe depuis deux sessions sur un的功能 cassee.
+**Les tests validaient le defaut.** Deux assertions affirmaient
+`toHaveBeenCalledWith(chemin, { code, bearer })` : la forme du defaut. Elles
+passaient donc depuis que la fonction avait ete ecrite, en attestant qu un jeton
+envoye dans le JSON et un en-tete absent etaient le comportement attendu. C est
+la limite de mocker `api` : on verifie l intention de l appelant, pas la requete.
 
-Les 4 tests neufs interceptent `fetch` et regardent l en-tete reellement emis :
-- GET et POST transmettent le jeton ;
-- PATCH et DELETE aussi ;
-- le jeton fourni **prime sur une session ouverte**, sans quoi l en-tete de
-  session ecraserait le jeton d etape en silence des qu un Super Admin a une
-  session ;
-- sans jeton ni session, l en-tete est **absent** plutot que vide.
+Les deux assertions sont recalees sur le vrai contrat - `bearer` dans le
+**troisieme** argument - et une troisieme couche existe deja : `api.test.ts`
+intercepte `fetch` et lit l en-tete reellement emis, ce que le mock de store ne
+peut pas faire.
 
-Preuve par injection de defaut : retirer `bearer` du wrapper GET fait echouer 2
+Preuve par injection de defaut : remettre `bearer` dans le corps fait echouer 2
 tests sur 22 ; restaure, 22 verts. `npm run verifier` vert : contrat a jour, 0
 warning, 0 erreur.
-
-Preuve par execution, sur le serveur en service : login -> jeton d enrollement,
-`GET /2fa/preparation` 200 avec secret et URI, `POST /2fa/activation` 200 avec
-session et 10 codes de secours. Le secret de cette preuve a ete efface et la
-session revoquee : le compte est rendu au proprietaire, non enrole.

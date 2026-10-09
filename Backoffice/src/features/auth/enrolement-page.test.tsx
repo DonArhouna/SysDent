@@ -98,10 +98,14 @@ describe("écran d'enrôlement", () => {
     await userEvent.type(screen.getByLabelText(/6 chiffres/i), '123456')
     await userEvent.click(screen.getByRole('button', { name: /Activer/i }))
 
-    expect(post).toHaveBeenCalledWith('/platform/auth/2fa/activation', {
-      code: '123456',
-      bearer: 'jeton-1',
-    })
+    // Le jeton dans les **options**, pas dans le corps : c est la distinction qui
+    // a cout deux sessions. `{ code, bearer }` passe le test et part sans
+    // en-tete.
+    expect(post).toHaveBeenCalledWith(
+      '/platform/auth/2fa/activation',
+      { code: '123456' },
+      { bearer: 'jeton-1' },
+    )
 
     // Les codes sont a l'ecran...
     expect(await screen.findByText('ABCD2345')).toBeInTheDocument()
