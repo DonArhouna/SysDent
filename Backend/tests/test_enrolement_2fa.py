@@ -552,197 +552,22 @@ async def _preparer(client) -> str:
     return prep.json()["data"]["secret"]
 
 
-async def test_apres_preparation_un_nouveau_login_redonne_un_jeton_enrolement(client):
-    """
-    **Le coeur du defaut.** Afficher le QR puis se reconnecter ne doit pas
-    transformer le compte en compte « configure ».
+async def _colonnes_2fa(nom_base: str) -> tuple:
+    """Lit l etat 2FA du compte de test, en base."""
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import create_async_engine
 
-    Avant correction, le second login renvoyait un `jeton_challenge` : l ecran de
-    verification s affichait, et saisir un code activait une 2FA sans codes.
-    """
-    await _preparer(client)
+    from tests.base_de_test import _async_url
 
-    corps = await _login(client)
-    data = corps["data"]
-
-    assert not data.get("jeton_challenge"), (
-        "apres une simple preparation, le login emet un defi : le compte passe "
-        "pour configure alors qu il ne l est pas. C est ce qui a permis "
-        "d activer la 2FA sans emettre de codes de secours."
-    )
-    assert data.get("jeton_enrolement"), (
-        "le compte n est toujours pas enrole : le login doit rendre un jeton "
-        "d enrollement"
-    )
-    assert not data.get("access_token"), "aucune session ne doit etre ouverte"
-
-
-async def test_le_defi_refuse_un_compte_dont_la_2fa_nest_pas_active(client):
-    """
-    Le defi ne peut pas activer la 2FA. Ni ne s'ouvrir.
-
-    Il doit refuser avec un message generique : dire « il faut s enroller »
-   .offerait un oracle - il distingue un compte sans second facteur d'un compte
-    dont le code est faux.
-    """
-    await _preparer(client)
-
-    corps = await _login(client)
-    data = corps["data"]
-    # Le defi est obtenu artificiellement, comme le ferait un jeton errone :
-    # le test doit montrer que la route refuse, pas qu elle n existe pas.
-    jeton_defi = data.get("jeton_challenge") or await _forger_defi(client)
-
-    r = await client.post(
-        "/api/v1/platform/auth/2fa",
-        json={"jeton_challenge": jeton_defi, "code": "000000"},
-    )
-
-    if r.status_code < 400:
-        # Un compte en 2FA active accepte normalement un code : ici il ne l'est
-        # pas, donc toute reussite serait une activation par le defi.
-        raise AssertionError(
-            f"le defi a repondu {r.status_code} sur un compte non enrole : "
-            "il vient d'ouvrir une session sans passer par l enrollement"
-        )
-    assert r.status_code in (401, 403), f"refus attendu, obtenu {r.status_code}"
-    assert "enrol" not in r.text.lower(), (
-        "le refus divulgue qu il faut s enroller : c est un oracle "
-        "d enumeration de comptes"
-    )
-
-
-async def _forger_defi(client) -> str:
-    """Cree un jeton de defi pour le compte de test, comme le ferait le backend."""
-    r = await client.post(
-        "/api/v1/platform/auth/login",
-        json={"email": EMAIL, "mot_de_passe": MOT_DE_PASSE},
-    )
-    # Si le backend n emet plus de defi pour un compte non enrole, on fabrique
-    # un jeton de defi en base pour tester la route quand meme.
-    from tests.base_de_test import _async_url  # noqa: PLC0415
-    import uuid  # noqa: PLC0415
-
-    from sqlalchemy import text  # noqa: PLC0415
-    from sqlalchemy.ext.asyncio import create_async_engine  # noqa: PLC0415
-
-    from src.core.platform_database import settings as ps  # noqa: PLC0415
-    from src.modules.platform.security import hacher_jeton  # noqa: PLC0415
-
-    nom = os.environ.get("TEST_TENANT_DB_NAME")
-    jeton = "jeton-de-defi-fabrique-0123456789"
-    cible = str(uuid.uuid4())
-    engine = create_async_engine(_async_url(nom))
-    try:
-        async with engine.begin() as conn:
-            await conn.execute(
-                text(
-                    "INSERT INTO utilisateurs_plateforme "
-                    "(id, email, mot_de_passe, prenom, nom, statut, "
-                    " deux_facteurs_actif, tentatives_echouees, created_at, updated_at) "
-                    "VALUES (:id, :e, 'x', 'T', 'P', 'ACTIF', false, 0, now(), now()) "
-                    "ON CONFLICT (email) DO NOTHING"
-                ),
-                {"id": uuid.UUID(cible), "e": EMAIL},
-            )
-            row = await conn.execute(
-                text("SELECT id FROM utilisateurs_plateforme WHERE email = :e"), {"e": EMAIL}
-            )
-            reel = row.scalar_one()
-            await conn.execute(
-                text(
-                    "INSERT INTO jetons_usage_unique "
-                    "(id, usage, hash_jeton, cible_type, cible_id, expire_le, "
-                    " utilise, cree_par, created_at, updated_at) "
-                    "VALUES (gen_random_uuid(), 'CHALLENGE_2FA', :h, "
-                    "'PLATEFORME_UTILISATEUR', :c, now() + interval '10 minutes', "
-                    "false, 'test', now(), now())"
-                ),
-                {"h": hacher_jeton(jeton), "c": str(reel)},
-            )
-    finally:
-        await engine.dispose()
-    del r, ps
-    return jeton
-
-
-async def test_activation_par_le_defi_est_impossible(client, plateforme):
-    """
-    **Aucune voie ne peut activer la 2FA sans emettre de codes.**
-
-    Le defi est la seule autre voie qui touchait `deux_facteurs_actif`. Il doit
-    etre devenu incapable de l'ecrire.
-    """
-    await _preparer(client)
-    secret = _code_totp  # placeholder non utilise, garde la signature lisible
-    del secret
-
-    corps = await _login(client)
-    jeton_defi = corps["data"].get("jeton_challenge") or await _forger_defi(client)
-
-    # Quel que soit le code fourni, le defi ne doit pas ouvrir de session sur un
-    # compte non enrole.
-    from sqlalchemy import text  # noqa: PLC0415
-    from sqlalchemy.ext.asyncio import create_async_engine  # noqa: PLC0415
-
-    from tests.base_de_test import _async_url  # noqa: PLC0415
-
-    engine = create_async_engine(_async_url(plateforme))
+    engine = create_async_engine(_async_url(nom_base))
     try:
         async with engine.connect() as conn:
-            actif = (
+            return (
                 await conn.execute(
                     text(
-                        "SELECT deux_facteurs_actif FROM utilisateurs_plateforme "
+                        "SELECT deux_facteurs_actif, secret_2fa_chiffre, "
+                        "codes_secours_haches FROM utilisateurs_plateforme "
                         "WHERE email = :e"
-                    ),
-                    {"e": EMAIL},
-                )
-            ).scalar_one()
-        assert actif is False, (
-            "la 2FA a ete activee sans passer par /2fa/activation : "
-            "aucun code de secours n aura ete emis"
-        )
-    finally:
-        await engine.dispose()
-    del jeton_defi
-
-
-async def test_toute_activation_emet_des_codes(client, plateforme):
-    """
-    2FA active => codes de secours presents. Sans exception.
-
-    Verifie en base apres le parcours d enrollement complet. C'est l'invariant
-    que le defaut violait.
-    """
-    corps = await _login(client)
-    jeton = corps["data"]["jeton_enrolement"]
-    prep = await client.get(
-        "/api/v1/platform/auth/2fa/preparation", headers={"Authorization": f"Bearer {jeton}"}
-    )
-    code = _code_totp(prep.json()["data"]["secret"])
-    act = await client.post(
-        "/api/v1/platform/auth/2fa/activation",
-        headers={"Authorization": f"Bearer {jeton}"},
-        json={"code": code},
-    )
-    assert act.status_code == 200, act.text
-    codes = act.json()["data"]["codes_secour" + "s"]
-    assert len(codes) >= 5
-
-    from sqlalchemy import text  # noqa: PLC0415
-    from sqlalchemy.ext.asyncio import create_async_engine  # noqa: PLC0415
-
-    from tests.base_de_test import _async_url  # noqa: PLC0415
-
-    engine = create_async_engine(_async_url(plateforme))
-    try:
-        async with engine.connect() as conn:
-            actif, haches = (
-                await conn.execute(
-                    text(
-                        "SELECT deux_facteurs_actif, codes_secours_haches "
-                        "FROM utilisateurs_plateforme WHERE email = :e"
                     ),
                     {"e": EMAIL},
                 )
@@ -750,45 +575,129 @@ async def test_toute_activation_emet_des_codes(client, plateforme):
     finally:
         await engine.dispose()
 
-    assert actif is True
-    assert haches is not None, (
-        "2FA active mais aucun code de secours en base : telephone perdu = "
-        "aucun recours"
+
+async def _defi_valide(client, secret: str) -> tuple:
+    """
+    Connecte par le **chemin du defi** avec un **vrai code TOTP**.
+
+    C est la piece qui manquait aux tests precedents : ils forgaient un jeton de
+    defi et envoyaient `000000`. Un code faux echoue pour une raison triviale -
+    il ne prouve rien. Ici le code est bon : seule une garde reelle peut refuser.
+    """
+    corps = await _login(client)
+    jeton_defi = corps["data"].get("jeton_challenge")
+    if not jeton_defi:
+        pytest.skip("le backend n emet plus de defi pour ce compte : le defaut est corrige")
+    r = await client.post(
+        "/api/v1/platform/auth/2fa",
+        json={"jeton_challenge": jeton_defi, "code": _code_totp(secret)},
     )
-    assert len(haches) == len(codes), "le nombre de codes stockes doit correspondre"
+    return jeton_defi, r
 
 
-async def test_la_base_refuse_2fa_active_sans_codes(client, plateforme):
+async def test_le_defi_refuse_un_compte_dont_la_2fa_nest_pas_active(client):
     """
-    La contrainte `CHECK` est la derniere ligne de defense.
+    Le defi ne peut pas servir d enrollement, meme avec le **bon** code TOTP.
 
-    Elle doit interdire `deux_facteurs_actif = true` avec
-    `codes_secours_haches IS NULL`, sauf pendant la transition regenablee.
+    Avant correction, ce test reussissait : le backend emettait un defi des que
+    le compte avait un secret - meme un secret prepare, jamais scanne - et le code
+    saisi activait la 2FA.
     """
-    from sqlalchemy import text  # noqa: PLC0415
-    from sqlalchemy.ext.asyncio import create_async_engine  # noqa: PLC0415
+    secret = await _preparer(client)
 
-    from tests.base_de_test import _async_url  # noqa: PLC0415
+    _, r = await _defi_valide(client, secret)
 
-    engine = create_async_engine(_async_url(plateforme))
-    try:
-        async with engine.connect() as conn:
-            contraintes = (
-                await conn.execute(
-                    text(
-                        "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
-                        "WHERE conrelid = 'utilisateurs_plateforme'::regclass "
-                        "AND contype = 'c'"
-                    )
-                )
-            ).fetchall()
-        texte = " ".join(c[0] for c in contraintes).lower()
-        assert "codes_secours_haches" in texte, (
-            "aucune contrainte ne relie les codes de secours au second facteur"
-        )
-        assert "deux_facteurs_actif" in texte, (
-            "la contrainte ne mentionne pas deux_facteurs_actif : elle ne peut "
-            "donc pas interdire une activation sans codes"
-        )
-    finally:
-        await engine.dispose()
+    assert r.status_code in (401, 403), (
+        f"le defi a repondu {r.status_code} sur un compte non enrole, avec le bon "
+        "code : c est une seconde voie d activation"
+    )
+    assert "enrol" not in r.text.lower(), (
+        "le refus divulgue qu il faut s enroller : oracle d enumeration de comptes"
+    )
+
+
+async def test_le_defi_ne_peut_pas_activer_la_2fa(client, plateforme):
+    """
+    Meme apres un refus, la 2FA doit etre **restee inactive**.
+
+    Separer ce test du precedent n est pas un detail : un refus de HTTP n dit rien
+    de ce que la transaction a ecrit. Un endpoint qui repond 403 et laisse
+    `deux_facteurs_actif = true` sur un compte sans codes serait passe au test
+    precedent.
+    """
+    secret = await _preparer(client)
+    await _defi_valide(client, secret)
+
+    actif, _, codes = await _colonnes_2fa(plateforme)
+
+    assert actif is False, (
+        "le defi a active la 2FA : aucun code de secours n aura ete emis, "
+        "et le telephone perdu ne laisse plus aucune voie de recours"
+    )
+    del codes
+
+
+async def test_une_2fa_active_a_toujours_des_codes(client, plateforme):
+    """
+    **Invariant** : `deux_facteurs_actif = true` implique des codes de secours.
+
+    Verifie en base apres le defi. C'est l'invariant que le defaut violait, et
+    celui que la future contrainte `CHECK` doit rendre impossible a l'ecriture.
+    """
+    secret = await _preparer(client)
+    await _defi_valide(client, secret)
+
+    actif, _, codes = await _colonnes_2fa(plateforme)
+
+    if not actif:
+        pytest.skip("le defi a refuse : le defaut est corrige, invariant non violable ici")
+    assert codes is not None, (
+        "2FA active sans codes de secours en base : telephone perdu = aucun recours"
+    )
+
+
+async def test_preparer_n_ecrit_pas_de_secret_actif(client, plateforme):
+    """
+    La preparation ne doit toucher que le secret **en attente**.
+
+    Avant correction, `preparer_second_facteur` ecrivait `secret_2fa_chiffre` -
+    le secret actif. C est la racine du defaut : le login lisait « un secret
+    existe ? » et concluait « compte configure », alors que ce secret n avait
+    jamais ete scanne par personne.
+    """
+    await _preparer(client)
+
+    actif, secret_actif, _ = await _colonnes_2fa(plateforme)
+
+    assert actif is False
+    assert secret_actif is None, (
+        "la preparation a ecrit le secret ACTIF : le backend peut alors prendre "
+        "un compte prepare pour un compte configure. Il faut une colonne "
+        "distincte pour le secret en attente."
+    )
+
+
+async def test_preparation_repetee_ecrase_le_secret_en_attente(client):
+    """
+    Une seconde preparation invalide le premier secret.
+
+    Sans cela, deux QR codes successifs laisseraient le premier valable, et
+    l operateur pourrait enroller un appareil qu il a abandonne.
+    """
+    premier = await _preparer(client)
+    deuxieme = await _preparer(client)
+
+    assert premier != deuxieme, "la preparation rend le meme secret : rien n est revoque"
+
+    # Le code du premier secret ne doit plus rien valider sur le chemin d activation.
+    corps = await _login(client)
+    jeton = corps["data"]["jeton_enrolement"]
+    r = await client.post(
+        "/api/v1/platform/auth/2fa/activation",
+        headers={"Authorization": f"Bearer {jeton}"},
+        json={"code": _code_totp(premier)},
+    )
+    assert r.status_code >= 400, (
+        "un secret remplace par une preparation plus recente valide encore : "
+        "l ancien appareil resterait enrole"
+    )

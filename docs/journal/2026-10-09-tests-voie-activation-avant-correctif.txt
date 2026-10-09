@@ -1,0 +1,26 @@
+............FFFFF                                                        [100%]
+================================== FAILURES ===================================
+E   AssertionError: le defi a repondu 200 sur un compte non enrole, avec le bon code : c est une seconde voie d activation
+    assert 200 in (401, 403)
+     +  where 200 = <Response [200 OK]>.status_code
+C:\Users\RHONE\OneDrive\Desktop\SysDent\Backend\tests\test_enrolement_2fa.py:610: AssertionError: le defi a repondu 200 sur un compte non enrole, avec le bon code : c est une seconde voie d activation
+E   AssertionError: le defi a active la 2FA : aucun code de secours n aura ete emis, et le telephone perdu ne laisse plus aucune voie de recours
+    assert True is False
+C:\Users\RHONE\OneDrive\Desktop\SysDent\Backend\tests\test_enrolement_2fa.py:633: AssertionError: le defi a active la 2FA : aucun code de secours n aura ete emis, et le telephone perdu ne laisse plus aucune voie de recours
+E   AssertionError: 2FA active sans codes de secours en base : telephone perdu = aucun recours
+    assert None is not None
+C:\Users\RHONE\OneDrive\Desktop\SysDent\Backend\tests\test_enrolement_2fa.py:654: AssertionError: 2FA active sans codes de secours en base : telephone perdu = aucun recours
+E   AssertionError: la preparation a ecrit le secret ACTIF : le backend peut alors prendre un compte prepare pour un compte configure. Il faut une colonne distincte pour le secret en attente.
+    assert 'gAAAAABqyOKEhQUQZcyMnyXipUf533rEMGsIjjttb6dd2hVLoHIoiiq9YMiu5bt0aeZ-segaRrXQnSKtLv7V9ukLwSGsxiicsOESsh_Kx45maBe1WX51tE8WO7t0dOrczHHKv5lkFGN2' is None
+C:\Users\RHONE\OneDrive\Desktop\SysDent\Backend\tests\test_enrolement_2fa.py:673: AssertionError: la preparation a ecrit le secret ACTIF : le backend peut alors prendre un compte prepare pour un compte configure. Il faut une colonne distincte pour le secret en attente.
+E   AssertionError: {"success":false,"error":{"code":"AUTHENTICATION_REQUIRED","message":"Authentification requise.","details":{},"request_id":"5b2e48da-6482-4cc6-9511-34d60f9e07ed"}}
+    assert 401 == 200
+     +  where 401 = <Response [401 Unauthorized]>.status_code
+C:\Users\RHONE\OneDrive\Desktop\SysDent\Backend\tests\test_enrolement_2fa.py:551: AssertionError: {"success":false,"error":{"code":"AUTHENTICATION_REQUIRED","message":"Authentification requise.","details":{},"request_id":"5b2e48da-6482-4cc6-9511-34d60f9e07ed"}}
+=========================== short test summary info ===========================
+FAILED tests/test_enrolement_2fa.py::test_le_defi_refuse_un_compte_dont_la_2fa_nest_pas_active
+FAILED tests/test_enrolement_2fa.py::test_le_defi_ne_peut_pas_activer_la_2fa
+FAILED tests/test_enrolement_2fa.py::test_une_2fa_active_a_toujours_des_codes
+FAILED tests/test_enrolement_2fa.py::test_preparer_n_ecrit_pas_de_secret_actif
+FAILED tests/test_enrolement_2fa.py::test_preparation_repetee_ecrase_le_secret_en_attente
+5 failed, 12 passed in 51.22s
