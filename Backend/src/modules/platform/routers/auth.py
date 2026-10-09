@@ -36,12 +36,13 @@ from src.modules.platform.schemas import (
     Enrolement2FAResponse,
     Challenge2FARequest,
     ChangementMotDePasseRequest,
-    Confirmer2FARequest,
     LoginPlateformeResponse,
     PlatformLoginRequest,
     PlatformProfilResponse,
     PlatformRefreshRequest,
     PlatformTokenResponse,
+    RegenererCodesSecoursRequest,
+    RegenererCodesSecoursResponse,
 )
 from src.modules.platform.services.auth import PlatformAuthService
 from src.modules.platform.services.rbac import PlatformRbacService
@@ -88,10 +89,16 @@ async def login(
     """
     Vérifie l'e-mail et le mot de passe d'un compte de la console.
 
-    Retourne systématiquement un **défi 2FA** : un compte dont le second
-    facteur n'est pas actif ne reçoit PAS de jeton de session, seulement une
-    erreur explicite (`DEUX_FACTEURS_NON_ACTIVE`). Le second facteur n'est donc
-    pas une option, il est une condition d'accès.
+    **La décision porte sur l'état actif du second facteur** :
+
+    - 2FA inactive → un **jeton d'enrôlement**, jamais une session ni un défi.
+      Le chemin du défi refuse un compte non actif : l'enrôlement ne se fait
+      que par `/2fa/preparation` puis `/2fa/activation`, la seule voie qui
+      émette les codes de secours ;
+    - 2FA active → un **défi** à saisir dans l'application d'authentification.
+
+    Dans les deux cas, aucun jeton de session n'est émis à cette étape : la
+    session ne s'ouvre qu'après le second facteur.
     """
     refuser_acces_client(request)
     ip = exiger_ip_autorisee(request)
@@ -140,7 +147,14 @@ async def confirmer_2fa(
     response: Response,
     db: AsyncSession = Depends(get_platform_db),
 ):
-    """Valide le code TOTP et ouvre la session (jeton d'accès 10 min, refresh 8 h)."""
+    """
+    Valide le code TOTP (ou un code de secours) et ouvre la session.
+
+    **Seulement pour un compte déjà enrôlé** : un compte dont la 2FA n'est pas
+    active reçoit un jeton d'enrôlement au login, jamais un défi ; et si un défi
+    lui parvient quand même, ce chemin refuse avec le message d'un code
+    invalide — il n'active jamais le second facteur.
+    """
     refuser_acces_client(request)
     ip = exiger_ip_autorisee(request)
 
@@ -226,6 +240,9 @@ async def me(user: UtilisateurPlateforme = Depends(get_current_platform_user),
             roles=roles,
             permissions=permissions,
             deux_facteurs_actif=user.deux_facteurs_actif,
+            # Indicateur de la bannière : la 2FA est active mais les codes de
+            # secours doivent être régénérés (compte préexistant sans codes).
+            codes_secours_a_regenerer=user.codes_secours_a_regenerer,
             dernier_login=user.dernier_login,
             cree_le=user.created_at,
         )
@@ -277,20 +294,53 @@ async def preparer_2fa(
 
 
 @platform_auth_router.post(
-    "/2fa/confirmation",
-    response_model=APIResponse[None],
-    summary="Confirmer le secret TOTP",
-    responses={401: {"description": "Code incorrect"}},
+    "/2fa/codes-secours/regenerer",
+    response_model=APIResponse[RegenererCodesSecoursResponse],
+    summary="Régénérer les codes de secours",
+    responses={
+        401: {"description": "TOTP invalide, ou compte sans second facteur actif"},
+        429: {"description": "Trop de tentatives (limitation de débit)"},
+    },
 )
-async def confirmer_activation_2fa(
-    data: Confirmer2FARequest,
-    user: UtilisateurPlateforme = Depends(get_current_platform_user),
+async def regenerer_codes_secours(
+    data: RegenererCodesSecoursRequest,
+    request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_platform_db),
+    user: UtilisateurPlateforme = Depends(get_current_platform_user),
 ):
-    """Active le second facteur à partir d'un code valide. Le compte est verrouillé tant que ce n'est pas fait."""
-    await PlatformAuthService.activer_second_facteur(db, user, data.code)
+    """
+    Remplace les codes de secours d'un compte déjà enrôlé par dix nouveaux.
+
+    **Seule voie de recours après la perte des codes.** Garde-fous identiques au
+    login : limitation de débit sur (e-mail, IP), message générique en cas
+    d'échec, et une session ouverte ne suffit pas — un **TOTP valide sur le
+    secret actif** et un **motif** sont exigés. Les anciens codes sont invalidés
+    dans la même transaction, les dix nouveaux ne sont renvoyés qu'ici, et le
+    journal ne contient que leur nombre.
+    """
+    refuser_acces_client(request)
+    ip = exiger_ip_autorisee(request)
+
+    # Même limiteur et même granularité que le login : (e-mail, IP). Une
+    # session ouverte ne doit pas permettre d'essayer des codes en boucle.
+    cle = f"platform_codes_secours|{cle_login(user.email, ip)}"
+    login_platform_limiter.tenter(cle)
+
+    codes = await PlatformAuthService.regenerer_codes_secours(
+        db,
+        user,
+        code=data.code,
+        motif=data.motif,
+        client_ip=ip,
+        user_agent=request.headers.get("user-agent"),
+    )
+    login_platform_limiter.reussite(cle)
     await db.commit()
-    return APIResponse(message="Second facteur activé.", data=None)
+    return APIResponse(
+        message="Codes de secours régénérés. Les précédents ne sont plus valables.",
+        data=RegenererCodesSecoursResponse(codes_secours=codes),
+    )
 
 
 @platform_auth_router.post(
@@ -316,11 +366,26 @@ async def activer_2fa(
     vient d'etre activee. Le jeton d'enrolement est consomme ici et ne vaut plus
     rien : il ne reutilise pas le jeton de session, il disparait.
 
+    Le code est verifie **sur le secret en attente** — celui que le compte vient
+    de scanner — et le secret est ensuite promu secret actif. Un code de secours
+    ne peut pas activer : il ouvre une session, il n'enrole pas.
+
     Les codes de secours sont renvoyes **une seule fois**. Ni la base ni le
     journal ne les conservent en clair.
     """
+    refuser_acces_client(request)
+    ip = exiger_ip_autorisee(request)
+
     jeton = _jeton_de_l_entete(request)
+    # Limitation de débit comme au login : le code TOTP est devinable en
+    # force brute si rien ne limite les essais. La clé suit le jeton
+    # d'enrolement, éphémère et à usage unique — pas l'e-mail, pour ne pas
+    # croiser le compteur du login proprement dit.
+    cle = f"platform_activation|{cle_login(jeton[:16], ip)}"
+    login_platform_limiter.tenter(cle)
+
     codes = await PlatformAuthService.activer_second_facteur(db, user, data.code)
+    login_platform_limiter.reussite(cle)
     await PlatformAuthService._marquer_enrolement_consomme(db, jeton)
 
     await JournalService.journaliser(
