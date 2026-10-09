@@ -1,28 +1,31 @@
-fix(backoffice): l ecran s ouvrait sur une etape 2FA impossible a terminer
+fix(backoffice): le jeton d enrollement etait jete par la couche transport
 
-`partialize` persistait `challenge2fa`. Un jeton d etape est a usage unique et de
-courte duree : conserve dans `localStorage`, il fait que l ecran de connexion
-s ouvre **directement** sur « Verification en deux etapes » au chargement, sans
-qu aucune connexion ait eu lieu. Le jeton y est deja consomme ou expire, donc
-aucun code a 6 chiffres ne peut jamais passer.
+`api.get`, `api.post`, `api.patch` et `api.delete` reconstruisaient leurs options
+et ne transmettaient **pas** `bearer` a `request()`. La requete partait donc sans
+en-tete `Authorization`, et le backend repondait « Authentification requise. »
 
-Symptome vu par le proprietaire : le backoffice redirige vers le formulaire de
-verification alors qu il n a jamais recu - et ne recevra jamais - de code. Ses
-identifiants etaient corrects, et son compte n avait meme aucun secret TOTP : le
-backend renvoyait bien un jeton d enrollement, que le store ne pouvait pas
-confondre. Seule la copie locale d un jeton de la session precedente expliquait
-l affichage.
+Concretement : l assistant d enrollement fourmait toujours. Clic sur « Afficher le
+QR code » -> 401. Et l activation aurait echoue de la meme facon.
 
-C est le meme argument que celui deja pose pour le jeton d enrollement, applique
-a l autre moitie du meme mecanisme : un porte-credential d etape ne doit pas
-survivre a la fermeture de l onglet.
+Le test qui aurait du attraper cela ne le pouvait pas : il affirmait « `api.get` a
+ete appele avec `{ bearer }` ». Or le mock **remplacait `api` entierement** - la
+couche transport, celle qui construit les options reelles, n etait jamais
+exercee. Le test verifiait l intention de l appelant, pas la requete envoyee.
+C est un test qui passe depuis deux sessions sur un的功能 cassee.
 
-`partialize` ne conserve plus que `token`, `refreshToken` et `profil`.
+Les 4 tests neufs interceptent `fetch` et regardent l en-tete reellement emis :
+- GET et POST transmettent le jeton ;
+- PATCH et DELETE aussi ;
+- le jeton fourni **prime sur une session ouverte**, sans quoi l en-tete de
+  session ecraserait le jeton d etape en silence des qu un Super Admin a une
+  session ;
+- sans jeton ni session, l en-tete est **absent** plutot que vide.
 
-Preuve : 2 tests de persistance. Injection de defaut - remettre `challenge2fa`
-dans `partialize` - fait echouer le test (1 echec sur 17), puis 17 verts apres
-remise. `npm run verifier` vert : contrat a jour, 0 warning, 0 erreur.
+Preuve par injection de defaut : retirer `bearer` du wrapper GET fait echouer 2
+tests sur 22 ; restaure, 22 verts. `npm run verifier` vert : contrat a jour, 0
+warning, 0 erreur.
 
-**Au proprietaire** : vider le stockage local du backoffice une fois, le jeton
-obsolete y est deja ecrit. DevTools, onglet Application, Local Storage, cle
-`sysdent-backoffice-auth`, puis recharger.
+Preuve par execution, sur le serveur en service : login -> jeton d enrollement,
+`GET /2fa/preparation` 200 avec secret et URI, `POST /2fa/activation` 200 avec
+session et 10 codes de secours. Le secret de cette preuve a ete efface et la
+session revoquee : le compte est rendu au proprietaire, non enrole.

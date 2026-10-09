@@ -231,6 +231,7 @@ export const api = {
       method: 'GET',
       signal: options?.signal,
       silencieux: options?.silencieux,
+      bearer: options?.bearer,
     })
   },
   post: <T,>(path: string, body?: unknown, options?: OptionsAppel) => {
@@ -240,6 +241,7 @@ export const api = {
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: options?.signal,
       silencieux: options?.silencieux,
+      bearer: options?.bearer,
     })
   },
   patch: <T,>(path: string, body?: unknown, options?: OptionsAppel) => {
@@ -249,11 +251,17 @@ export const api = {
       body: JSON.stringify(body ?? {}),
       signal: options?.signal,
       silencieux: options?.silencieux,
+      bearer: options?.bearer,
     })
   },
   delete: <T,>(path: string, options?: OptionsAppel) => {
     const qs = buildQueryString(options?.params)
-    return request<T>(`${path}${qs}`, { method: 'DELETE', signal: options?.signal })
+    return request<T>(`${path}${qs}`, {
+      method: 'DELETE',
+      signal: options?.signal,
+      silencieux: options?.silencieux,
+      bearer: options?.bearer,
+    })
   },
 }
 
