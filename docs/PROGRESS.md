@@ -6,6 +6,64 @@
 
 
 ---
+## ACCES : **FONCTIONNEL, 2FA sans codes de secours, CORRECTIF NON ECRIT** - 2026-10-09
+
+Le blocage de tests est **leve par le code** : psycopg2 sorti du chemin
+d execution, migrations par `asyncpg`. Les tests qui prouvent le defaut de
+securite **echouent**, chacun pour la bonne raison. Le correctif n est pas
+ecrit.
+
+## ETAT DE FIN DE SESSION - 2026-10-09 (2e session)
+
+**Prouve**
+- psycopg2 hors chemin d execution. Aller-retour `upgrade` / `downgrade` /
+  `upgrade` sur une **copie** de la base plateforme, base reelle intacte.
+  `pytest --collect-only` : **443 tests, aucune erreur d import**.
+- **5 tests echouent, avant tout correctif** (12 verts sur 17). Les quatre
+  precedents passaient : ils ne prouvaient rien, ils forguaient un jeton de defi
+  et envoyaient `000000` - un code faux echoue pour une raison triviale.
+  Sortie complete : `docs/journal/2026-10-09-tests-voie-activation-avant-correctif.txt`.
+- Messages releves :
+  - `le defi a reponde 200 sur un compte non enrole, avec le bon code : c est
+    une seconde voie d activation`
+  - `le defi a active la 2FA : aucun code de secours n aura ete emis`
+  - `2FA active sans codes de secours en base : telephone perdu = aucun recours`
+  - `la preparation a ecrit le secret ACTIF` - **la racine du defaut** : le
+    login concluait « compte configure » sur un secret que personne n avait scanne.
+- Le cinquieme test echoue **avant** son assertion (sa seconde preparation ne
+  recoit plus de jeton d enrollement). Meme cause racine, message non vise :
+  a resserrer apres le correctif.
+
+**Non verifie**
+- **Suite complete : verdict non lu.** Elle tourne en arriere-plan avec
+  `--durations=30`. Aucun chiffre de non-regression n est opposable.
+- Les 30 tests les plus lents ne sont pas consignes : `docs/journal/` vient
+  d etre cree et ne contient que la preuve ci-dessus.
+
+**Non fait - le correctif de fond**
+- Colonne `secret_2fa_en_attente`, decision de chemin sur l etat actif, voie d
+  activation unique, migration, `POST /platform/auth/2fa/codes-secours/regenerer`,
+  banniere backoffice. **Aucun changement d authentification n a ete fait** : les
+  tests sont ecrits et vus en echec, le correctif est l etape suivante et exige
+  une migration, donc un plan, une sauvegarde et un aller-retour sur copie.
+- Etapes 3 et 4 (typage, `GET /platform/stats/dashboard`, ecrans du backoffice).
+- Isolation des tests sur une instance dediee ; suppression des 83 lignes :
+  **ne pas y toucher**, les tests ecrivent encore dans la vraie base master.
+- `PROGRESS.md` reste duplique.
+
+**Migration a appliquer par le proprietaire, apres correctif et tests verts**
+Commande exacte, une fois le correctif ecrit et valide :
+
+    cd Backend
+    python scripts\exporter_openapi.py
+    alembic -c alembic_platform.ini upgrade head
+
+**A faire par le proprietaire**
+- Les codes de secours restent absents. Telephone perdu = aucun recours :
+  `python -m src.modules.platform.admin reinitialiser-2fa --email rhonekane@gmail.com --motif "Codes de secours"`.
+
+---
+
 ## ACCES : **FONCTIONNEL, mais 2FA sans codes de secours** - 2026-10-09
 
 Le proprietaire est enrole et connecte. Le blocage de tests est **leve par le

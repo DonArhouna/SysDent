@@ -1,43 +1,5 @@
-test(2fa): cinq tests qui echouent vraiment, avant le correctif
+docs: etat reel a jour - 5 tests en echec, correctif non ecrit
 
-Les quatre tests ecrits pour la voie d activation unique **passaient** avant le
-correctif : ils ne prouvaient donc rien. Deux raisons, identiques :
-
-- ils forgeaient un jeton de defi et envoyaient `000000`. Un code faux echoue
-  pour une raison triviale - il ne prouve rien. Seule une garde reelle doit
-  pouvoir refuser ;
-- ils interrogeaient l invariant apres un echec HTTP, ce qui ne dit rien de ce que
-  la transaction a ecrit.
-
-Ils sont reecrits sur ce qui discrimine :
-
-1. le defi est obtenu du **backend** et soumis avec le **vrai code TOTP** du
-   secret prepare. Reponse 200 attendue apres correction, 401/403 avant ;
-2. apres le refus, `deux_facteurs_actif` doit etre **restee** false. Un endpoint
-   qui repond 403 en laissant la 2FA active serait passe au test precedent ;
-3. invariant `2FA active => codes de secours presents`, lu en base ;
-4. la preparation ne doit ecrire que le secret **en attente** : avant
-   correction elle ecrivait `secret_2fa_chiffre`, le secret actif - racine du
-   defaut, puisque le login concluait alors « compte configure » sur un secret
-   que personne n avait scanne ;
-5. une preparation repetee invalide le secret precedent.
-
-Etat, avant tout correctif - **5 echecs sur 17** :
-
-    le defi a repondu 200 sur un compte non enrole, avec le bon code :
-      c est une seconde voie d activation
-    le defi a active la 2FA : aucun code de secours n aura ete emis,
-      et le telephone perdu ne laisse plus aucune voie de recours
-    2FA active sans codes de secours en base : telephone perdu = aucun recours
-    la preparation a ecrit le secret ACTIF : le backend peut alors prendre un
-      compte prepare pour un compte configure
-    AUTHENTICATION_REQUIRED (5e test)
-
-Sortie complete : `docs/journal/2026-10-09-tests-voie-activation-avant-correctif.txt`
-
-Le cinquieme echoue **avant** son assertion : sa seconde preparation demande un
-jeton d enrollement que le backend ne delivre plus, puisque le compte a un
-secret. C est la meme cause racine, mais le message n est pas celui vise. Il
-faudra le resserrer apres le correctif.
-
-Aucune modification d authentification dans ce commit.
+PROGRESS.md annonait encore « suite non lancee » et « blocage d environnement »,
+tandis que le blocage est leve et que le defaut est reproductible. Corrige.
+Suite complete encore en cours : aucun verdict annonce.
