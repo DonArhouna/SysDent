@@ -120,3 +120,46 @@ describe('connexion plateforme — les trois issues possibles', () => {
     )
   })
 })
+
+describe('persistance', () => {
+  beforeEach(() => {
+    useAuthStore.setState({
+      token: null,
+      refreshToken: null,
+      profil: null,
+      challenge2fa: null,
+      jetonEnrolement: null,
+    })
+    post.mockReset()
+    get.mockReset()
+  })
+
+  it("aucun jeton d'etape n'est ecrit dans le stockage", () => {
+    useAuthStore.setState({
+      challenge2fa: 'jeton-de-defi-obsolete',
+      jetonEnrolement: 'jeton-denrolement-obsolete',
+    })
+
+    const persiste = JSON.parse(
+      window.localStorage.getItem('sysdent-backoffice-auth') ?? '{}',
+    ).state
+
+    // Un jeton d etape persiste rouvre l ecran sur une etape impossible a
+    // terminer : le jeton est consomme ou expire, et aucun code ne passe.
+    expect(persiste.challenge2fa).toBeUndefined()
+    expect(persiste.jetonEnrolement).toBeUndefined()
+  })
+
+  it('la session, elle, survit a la fermeture', () => {
+    // Le contraire serait une regression : le backoffice demanderait les
+    // identifiants a chaque rechargement.
+    useAuthStore.setState({ token: 'acces-1', refreshToken: 'refresh-1' })
+
+    const persiste = JSON.parse(
+      window.localStorage.getItem('sysdent-backoffice-auth') ?? '{}',
+    ).state
+
+    expect(persiste.token).toBe('acces-1')
+    expect(persiste.refreshToken).toBe('refresh-1')
+  })
+})

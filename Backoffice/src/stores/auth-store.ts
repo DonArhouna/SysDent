@@ -280,12 +280,25 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'sysdent-backoffice-auth',
-      partialize: (etat) => ({
-        token: etat.token,
-        refreshToken: etat.refreshToken,
-        profil: etat.profil,
-        challenge2fa: etat.challenge2fa,
-      }),
+      /**
+     * Ne persiste **que** ce qui survit legitimement a une fermeture d'onglet.
+     *
+     * Ni `challenge2fa` ni `jetonEnrolement` : ce sont des jetons d'etape, a
+     * usage unique et de courte duree. Persistes, ils rouvrent l'ecran sur une
+     * etape **que l'utilisateur ne peut pas terminer** - le jeton est deja
+     * consomme ou expire, et aucun code ne passera jamais. Concretement :
+     * l'ecran s'ouvrait sur « Verification en deux etapes » sans qu'aucune
+     * connexion ait eu lieu, et le compte paraissait bloque alors que les
+     * identifiants etaient corrects.
+     *
+     * C'est aussi un porte-credential : un jeton d'etape dans `localStorage`
+     * reste lisible sur le poste apres la fin de la session.
+     */
+    partialize: (etat) => ({
+      token: etat.token,
+      refreshToken: etat.refreshToken,
+      profil: etat.profil,
+    }),
     },
   ),
 )

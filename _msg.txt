@@ -1,26 +1,28 @@
-docs(etape 1): sauvegarde de la base master, inventaire du registre, etat exact
+fix(backoffice): l ecran s ouvrait sur une etape 2FA impossible a terminer
 
-**Sauvegarde.** `sysdent_master` dumpee hors depot (215 Ko, 7 tables).
-`.gitignore` complete de `*.sql` et `*.backup` : les motifs existants
-(`*.dump`, `*.sql.gz`) ne couvraient pas la sortie par defaut de `pg_dump`.
-Controle actif verifie par `git check-ignore`.
+`partialize` persistait `challenge2fa`. Un jeton d etape est a usage unique et de
+courte duree : conserve dans `localStorage`, il fait que l ecran de connexion
+s ouvre **directement** sur « Verification en deux etapes » au chargement, sans
+qu aucune connexion ait eu lieu. Le jeton y est deja consomme ou expire, donc
+aucun code a 6 chiffres ne peut jamais passer.
 
-**Inventaire en lecture seule.** Registre : 125 lignes. 3 bases a conserver,
-**83 lignes prouvées d'origine test** (base absente, motif de test explicite,
-aucun utilisateur ayant connecte), **39 ambigues** dont 18 avec un utilisateur
-qui s'est deja connecte alors que leur nom ressemble a un test.
+Symptome vu par le proprietaire : le backoffice redirige vers le formulaire de
+verification alors qu il n a jamais recu - et ne recevra jamais - de code. Ses
+identifiants etaient corrects, et son compte n avait meme aucun secret TOTP : le
+backend renvoyait bien un jeton d enrollement, que le store ne pouvait pas
+confondre. Seule la copie locale d un jeton de la session precedente expliquait
+l affichage.
 
-**La suppression des 83 lignes n'a pas ete faite.** Une tentative en transaction
-n'a rien supprime et n'a affiche aucune erreur ; elle a ete interrompue plutot
-que reessayee. Supprimer des lignes en base reelle sans avoir vu le resultat
-n'est pas une suppression, c'est un risque.
+C est le meme argument que celui deja pose pour le jeton d enrollement, applique
+a l autre moitie du meme mecanisme : un porte-credential d etape ne doit pas
+survivre a la fermeture de l onglet.
 
-**Dette de la session precedente.** La section de fin de session ecrite
-hier n'etait jamais arrivee dans le fichier : l'ancre de remplacement ne
-correspondait pas a cause du tiret cadratin du titre, et l'ecriture s'est faite
-sans verification. Cette fois l'ancre est validee apres coup.
+`partialize` ne conserve plus que `token`, `refreshToken` et `profil`.
 
-Le fichier est en outre **duplique** dans sa version commitee (1440 lignes, 606
-positions dupliquees, 14 titres repetes). La coupe automatique a ete abandonnee :
-le bloc repete n'est pas identique a sa source, une coupe aurait pu detruire du
-contenu. A traiter a la main.
+Preuve : 2 tests de persistance. Injection de defaut - remettre `challenge2fa`
+dans `partialize` - fait echouer le test (1 echec sur 17), puis 17 verts apres
+remise. `npm run verifier` vert : contrat a jour, 0 warning, 0 erreur.
+
+**Au proprietaire** : vider le stockage local du backoffice une fois, le jeton
+obsolete y est deja ecrit. DevTools, onglet Application, Local Storage, cle
+`sysdent-backoffice-auth`, puis recharger.
