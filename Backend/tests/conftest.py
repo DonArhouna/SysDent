@@ -18,7 +18,7 @@ import os
 import re
 import sys
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import AsyncGenerator
 
 import pytest
@@ -955,6 +955,12 @@ async def super_admin(client_platform, session_plateforme, catalogue_bootstrap):
     # Le secret TOTP est généré ici : `activer_2fa=False` laisse le compte sans
     # secret, et un compte plateforme sans 2FA ne peut pas se connecter — ce qui
     # est exactement ce qu'exige la Phase A.
+    #
+    # Le compte est ensuite mis dans l'état **enrôlé** : `deux_facteurs_actif`
+    # vrai (le login décide sur l'état actif, plus sur l'existence d'un secret)
+    # et `codes_secours_a_regenerer` vrai, parce que ce compte de test n'a
+    # aucun code de secours — exactement le cas que l'indicateur décrit, et la
+    # contrainte `ck_2fa_active_exige_secours` l'exige à l'écriture.
     compte = (
         await session.execute(
             select(UtilisateurPlateforme).where(
@@ -964,6 +970,9 @@ async def super_admin(client_platform, session_plateforme, catalogue_bootstrap):
     ).scalar_one()
     secret = generer_secret_totp()
     compte.secret_2fa_chiffre = chiffrer_secret_2fa(secret)
+    compte.deux_facteurs_actif = True
+    compte.deux_facteurs_confirme_at = datetime.now(timezone.utc)
+    compte.codes_secours_a_regenerer = True
     await session.commit()
     compte_id = compte.id
 

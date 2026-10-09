@@ -145,6 +145,12 @@ async def _session_de(client_platform, session_plateforme, role: str, email: str
     ).scalar_one()
     secret = generer_secret_totp()
     compte.secret_2fa_chiffre = chiffrer_secret_2fa(secret)
+    # Compte enrôlé au sens du correctif : le login décide sur l'état ACTIF, et
+    # la contrainte `ck_2fa_active_exige_secours` exige soit des codes de
+    # secours, soit le drapeau de régénération — ce compte de test n'a pas de
+    # codes, il porte donc le drapeau.
+    compte.deux_facteurs_actif = True
+    compte.codes_secours_a_regenerer = True
     await session_plateforme.commit()
 
     from tests.conftest import _connecter

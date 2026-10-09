@@ -352,6 +352,11 @@ async def cmd_reinitialiser_2fa(args) -> int:
                 return 1
             nb = await _revoquer_sessions(db, compte.id)
             compte.secret_2fa_chiffre = None
+            # Le secret PREPARE est egalement remis a zero : une reinitialisation
+            # efface tout etat 2FA, y compris un QR jamais scanne. Sans cela, un
+            # secret en attente survivrait a la reinitialisation et serait
+            # promu a la prochaine activation.
+            compte.secret_2fa_en_attente = None
             compte.deux_facteurs_actif = False
             compte.deux_facteurs_confirme_at = None
             # **SQL NULL, pas le litteral JSON `null`.** Sur une colonne JSONB, `None`
@@ -364,6 +369,8 @@ async def cmd_reinitialiser_2fa(args) -> int:
             # jamais** - c'est-a-dire la seule voie de recours quand un telephone est
             # perdu. Le compte resterait bloque avec un secret que personne ne detient.
             compte.codes_secours_haches = null()
+            # Plus de 2FA active, donc plus rien a regenerer : le drapeau suit.
+            compte.codes_secours_a_regenerer = False
             compte.tentatives_echouees = 0
             compte.verrouille_jusqua = None
             await _journaliser(

@@ -47,20 +47,6 @@ class PlatformTokenResponse(BaseSchema):
     refresh_expires_in: int = Field(..., description="Durée de validité du refresh token, en secondes")
 
 
-class LoginChallengeResponse(BaseSchema):
-    """Réponse intermédiaire : le mot de passe est juste, le 2FA reste à faire."""
-
-    deux_facteurs_requis: bool = True
-    activation_requise: bool = Field(
-        False,
-        description="Vrai si le second facteur doit encore être activé : le code saisi "
-        "à cette étape l'active et ouvre la session dans le même mouvement "
-        "(première connexion)",
-    )
-    jeton_challenge: str
-    expiration_secondes: int
-
-
 class PlatformProfilResponse(BaseSchema):
     id: uuid.UUID
     email: EmailStr
@@ -71,6 +57,9 @@ class PlatformProfilResponse(BaseSchema):
     roles: List[str]
     permissions: List[str]
     deux_facteurs_actif: bool
+    # Vrai quand la 2FA est active mais que les codes de secours doivent être
+    # régénérés : c'est lui qui pilote la bannière du backoffice.
+    codes_secours_a_regenerer: bool = False
     dernier_login: Optional[datetime] = None
     cree_le: datetime
 
@@ -79,10 +68,6 @@ class Activation2FAResponse(BaseSchema):
     secret: str = Field(..., description="Secret TOTP base32 — affiché UNE seule fois")
     uri: str = Field(..., description="URI otpauth:// à encoder en QR Code")
     instruction: str
-
-
-class Confirmer2FARequest(BaseSchema):
-    code: str = Field(..., min_length=6, max_length=8, description="Code TOTP à 6 chiffres")
 
 
 # ==============================================================================
@@ -639,3 +624,26 @@ class LoginPlateformeResponse(BaseSchema):
 
 class Activer2FARequest(BaseSchema):
     code: str = Field(..., min_length=6, max_length=8)
+
+
+class RegenererCodesSecoursRequest(BaseSchema):
+    """Régénération des codes de secours : session + TOTP actif + motif obligatoire."""
+
+    code: str = Field(
+        ...,
+        min_length=6,
+        max_length=8,
+        description="Code TOTP courant de l'application d'authentification (secret ACTIF)",
+    )
+    motif: str = Field(
+        ...,
+        min_length=3,
+        max_length=500,
+        description="Motif de la régénération, consigné au journal d'audit",
+    )
+
+
+class RegenererCodesSecoursResponse(BaseSchema):
+    """Les dix nouveaux codes, renvoyés **une seule fois** — jamais stockés en clair."""
+
+    codes_secours: List[str]

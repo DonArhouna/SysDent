@@ -583,11 +583,16 @@ async def _defi_valide(client, secret: str) -> tuple:
     C est la piece qui manquait aux tests precedents : ils forgaient un jeton de
     defi et envoyaient `000000`. Un code faux echoue pour une raison triviale -
     il ne prouve rien. Ici le code est bon : seule une garde reelle peut refuser.
+
+    N est utilisable que sur un compte **deja enrole** : le login n emet le defi
+    que si `deux_facteurs_actif` est vrai (une seule voie d activation).
     """
     corps = await _login(client)
     jeton_defi = corps["data"].get("jeton_challenge")
-    if not jeton_defi:
-        pytest.skip("le backend n emet plus de defi pour ce compte : le defaut est corrige")
+    assert jeton_defi, (
+        "la login n a pas emis de defi pour un compte enrole : la garde "
+        "deux_facteurs_actif ne fonctionne plus "
+    )
     r = await client.post(
         "/api/v1/platform/auth/2fa",
         json={"jeton_challenge": jeton_defi, "code": _code_totp(secret)},
@@ -595,64 +600,69 @@ async def _defi_valide(client, secret: str) -> tuple:
     return jeton_defi, r
 
 
-async def test_le_defi_refuse_un_compte_dont_la_2fa_nest_pas_active(client):
+async def test_le_defi_souhaite_recevoir_un_bon_code_apres_activation(client):
     """
-    Le defi ne peut pas servir d enrollement, meme avec le **bon** code TOTP.
+    Comportement **positif** du chemin du defi, apres une activation legitime :
+    le backend emet un defi, et un **vrai** code TOTP l ouvre en jeton de session.
 
-    Avant correction, ce test reussissait : le backend emettait un defi des que
-    le compte avait un secret - meme un secret prepare, jamais scanne - et le code
-    saisi activait la 2FA.
+    Remplace trois tests supprimes (`test_le_defi_refuse_un_compte_dont_la_2fa_nest_pas_active`,
+    `test_le_defi_ne_peut_pas_activer_la_2fa`, `test_une_2fa_active_a_toujours_des_codes`) :
+    ils ne pouvaient s executer que sur le **comportement defectueux** (un defi
+    emis pour un compte non enrole, activable sans codes). AprEs correction, ce
+    comportement n existe plus : la login n emet le defi que si
+    `deux_facteurs_actif` est vrai, et l invariant actif = codes est verifie
+    positivement par `test_l_activation_legitime_emet_toujours_des_codes`.
     """
     secret = await _preparer(client)
 
+    # Le chemin legitime d activation : preparation (secret en attente), puis
+    # activation avec le bon code. La 2FA devient active.
+    corps = await _login(client)
+    jeton = corps["data"]["jeton_enrolement"]
+    act = await client.post(
+        "/api/v1/platform/auth/2fa/activation",
+        headers={"Authorization": f"Bearer {jeton}"},
+        json={"code": _code_totp(secret)},
+    )
+    assert act.status_code == 200, act.text
+
+    # La login suivant doit emettre un defi (deux_facteurs_actif est vrai), et
+    # un vrai code TOTP signe par le secret enrole l ouvre en jeton de session.
     _, r = await _defi_valide(client, secret)
-
-    assert r.status_code in (401, 403), (
-        f"le defi a repondu {r.status_code} sur un compte non enrole, avec le bon "
-        "code : c est une seconde voie d activation"
+    assert r.status_code == 200, (
+        f"un defi signe du bon code a ete refuse ({r.status_code}) : la 2FA "
+        "active ne protege plus la login"
     )
-    assert "enrol" not in r.text.lower(), (
-        "le refus divulgue qu il faut s enroller : oracle d enumeration de comptes"
-    )
+    jets = r.json().get("data", {}).get("access_token")
+    assert jets, "le defi valide n a pas emis de jeton de session"
 
 
-async def test_le_defi_ne_peut_pas_activer_la_2fa(client, plateforme):
+async def test_l_activation_legitime_emet_toujours_des_codes(client, plateforme):
     """
-    Meme apres un refus, la 2FA doit etre **restee inactive**.
+    **Invariant positif** : une 2FA **legitiment activee** est toujours acompaninee
+    de codes de secours en base.
 
-    Separer ce test du precedent n est pas un detail : un refus de HTTP n dit rien
-    de ce que la transaction a ecrit. Un endpoint qui repond 403 et laisse
-    `deux_facteurs_actif = true` sur un compte sans codes serait passe au test
-    precedent.
+    Le test precedent verifie que la voie pirate (le defi) ne peut pas activer la
+    2FA. Celui-ci verifie le **chemin normal** : preparation puis activation avec
+    le bon code. C'est l'invariant que le defaut violait, et celui que la future
+    contrainte `CHECK` doit rendre impossible a l'ecriture.
     """
     secret = await _preparer(client)
-    await _defi_valide(client, secret)
+    corps = await _login(client)
+    jeton = corps["data"]["jeton_enrolement"]
+    act = await client.post(
+        "/api/v1/platform/auth/2fa/activation",
+        headers={"Authorization": f"Bearer {jeton}"},
+        json={"code": _code_totp(secret)},
+    )
+    assert act.status_code == 200, act.text
 
     actif, _, codes = await _colonnes_2fa(plateforme)
 
-    assert actif is False, (
-        "le defi a active la 2FA : aucun code de secours n aura ete emis, "
-        "et le telephone perdu ne laisse plus aucune voie de recours"
-    )
-    del codes
-
-
-async def test_une_2fa_active_a_toujours_des_codes(client, plateforme):
-    """
-    **Invariant** : `deux_facteurs_actif = true` implique des codes de secours.
-
-    Verifie en base apres le defi. C'est l'invariant que le defaut violait, et
-    celui que la future contrainte `CHECK` doit rendre impossible a l'ecriture.
-    """
-    secret = await _preparer(client)
-    await _defi_valide(client, secret)
-
-    actif, _, codes = await _colonnes_2fa(plateforme)
-
-    if not actif:
-        pytest.skip("le defi a refuse : le defaut est corrige, invariant non violable ici")
+    assert actif is True
     assert codes is not None, (
-        "2FA active sans codes de secours en base : telephone perdu = aucun recours"
+        "2FA active via le chemin legitime sans codes de secours en base : "
+        "telephone perdu = aucun recours"
     )
 
 

@@ -184,14 +184,23 @@ class PlatformAuthService:
         user.verrouille_jusqua = None
 
         # ── Second facteur ────────────────────────────────────────────────────
-        secret = valider_secret_2fa(user.secret_2fa_chiffre)
-
-        if secret is None:
-            # Aucun secret n'existe : premier acces, ou compte dont l'operateur a
-            # reinitialise la 2FA. **Refuser ici rendait le compte definitivement
-            # inaccessible** : la seule voie d'activation exige une session, donc
-            # la seule voie d'obtenir une session exigeait la 2FA. Impasse sur une
-            # plateforme a un seul Super Admin.
+        #
+        # **La decision porte sur l'ETAT ACTIF, pas sur l'existence d'un secret.**
+        # Tester « un secret existe ? » prenait un secret PREPARE — que personne
+        # n'a jamais scanne — pour un compte configure : le login emettait un
+        # defi, et le code saisi sur ce defi activait la 2FA sans emettre de
+        # codes de secours. Deux voies d'activation, une seule emettant les
+        # codes : telephone perdu, plus aucune voie de recours.
+        #
+        # Un secret en attente ne change donc rien au chemin : tant que
+        # `deux_facteurs_actif` est faux, le compte recoit un jeton d'enrolement
+        # (preparation + activation), jamais un defi.
+        if not user.deux_facteurs_actif:
+            # Premier acces, ou compte dont l'operateur a reinitialise la 2FA.
+            # **Refuser ici rendait le compte definitivement inaccessible** :
+            # la seule voie d'activation exigeait une session, et la seule voie
+            # d'obtenir une session exigeait la 2FA. Impasse sur une plateforme
+            # a un seul Super Admin.
             #
             # On emet donc un jeton d'enrolement : opaque, usage unique, et surtout
             # **borne** a la preparation et l'activation.
@@ -216,17 +225,10 @@ class PlatformAuthService:
                 "expiration_secondes": DUREE_ENROLEMENT_2FA_MINUTES * 60,
             }
 
+        # Compte actif : le defi TOTP (ou un code de secours) ouvre la session.
         jeton_challenge = await PlatformAuthService._emettre_challenge(
             db, user, client_ip=client_ip, user_agent=user_agent
         )
-
-        # Un secret préparé mais pas encore confirmé (« en attente
-        # d'activation ») ouvre quand même le défi : c'est ce qui évite
-        # l'impasse du tout premier login, où exiger un 2FA actif alors que
-        # personne ne l'a jamais activé rendrait le compte inaccessible à son
-        # propre titulaire. Le code TOTP saisi à cette étape ACTIVE le second
-        # facteur et ouvre la session dans le même mouvement.
-        activation_requise = not user.deux_facteurs_actif
 
         await JournalService.journaliser(
             db,
@@ -234,10 +236,7 @@ class PlatformAuthService:
             type_cible="AUTH",
             acteur_email=user.email,
             acteur_id=user.id,
-            apres={
-                "deux_facteurs_requis": True,
-                "activation_requise": activation_requise,
-            },
+            apres={"deux_facteurs_requis": True},
             ip_address=client_ip,
             user_agent=user_agent,
         )
@@ -245,7 +244,7 @@ class PlatformAuthService:
 
         return {
             "deux_facteurs_requis": True,
-            "activation_requise": activation_requise,
+            "activation_requise": False,
             "jeton_challenge": jeton_challenge,
             "expiration_secondes": DUREE_CHALLENGE_2FA_MINUTES * 60,
         }
@@ -282,6 +281,18 @@ class PlatformAuthService:
         if user is None or user.statut != StatutUtilisateurPlateforme.ACTIF:
             raise AuthenticationException("Compte indisponible.", code="COMPTE_NON_ACTIF")
 
+        # **Le defi n'ouvre qu'un compte DEJA ENROLE.** Un compte dont la 2FA
+        # n'est pas active ne doit recevoir qu'un jeton d'enrolement au login ;
+        # si un defi lui parvient quand meme (jeton forge, ancien compte avec un
+        # secret actif mais `deux_facteurs_actif` faux), le chemin refuse ici,
+        # avec un message identique a un code invalide : dire « il faut s'enroller »
+        # serait un oracle d'enumeration.
+        #
+        # Surtout, ce chemin **n'active jamais la 2FA** : c'etait le defaut — le
+        # code saisi activait le second facteur sans emettre de codes de secours.
+        if not user.deux_facteurs_actif:
+            raise AuthenticationException("Code de vérification invalide.", code="CODE_2FA_INVALIDE")
+
         secret = valider_secret_2fa(user.secret_2fa_chiffre)
         # Un code de secours remplace le code TOTP quand le telephone n'est pas
         # sous la main. Cette tentative manquait ici : elle n'existait qu'a
@@ -314,22 +325,6 @@ class PlatformAuthService:
         jeton.utilise = True
         jeton.utilise_at = _maintenant()
 
-        # Première connexion : le code TOTP saisi vaut confirmation du second
-        # facteur. Sans cela, un compte créé par la CLI ne pourrait jamais se
-        # connecter, puisque la console exige le 2FA pour ouvrir une session.
-        if not user.deux_facteurs_actif:
-            user.deux_facteurs_actif = True
-            user.deux_facteurs_confirme_at = _maintenant()
-            await JournalService.journaliser(
-                db,
-                action="PLATFORM_2FA_ACTIVATE",
-                type_cible="AUTH",
-                acteur_email=user.email,
-                acteur_id=user.id,
-                apres={"deux_facteurs_actif": True},
-                ip_address=client_ip,
-                user_agent=user_agent,
-            )
         await db.flush()
 
         tokens = await PlatformAuthService._ouvrir_session(db, user, client_ip, user_agent)
@@ -387,15 +382,20 @@ class PlatformAuthService:
         Génère un secret TOTP et le renvoie UNE SEULE FOIS, en clair.
 
         L'opérateur doit le scanner avant de quitter la commande : ni la base ni
-        le journal ne le conservent en clair. `secret_2fa_chiffre` est alimenté à
-        l'ACTIVATION, pas ici, pour qu'un secret jamais scanné ne soit pas
-        accepté.
+        le journal ne le conservent en clair.
+
+        **La préparation n'écrit QUE `secret_2fa_en_attente`.** Jamais
+        `secret_2fa_chiffre` — le secret actif — ni `deux_facteurs_actif`. Un
+        secret préparé n'a encore été vu de personne : le traiter comme actif
+        laissait le login conclure « compte configuré » sur un QR jamais scanné,
+        et ouvrait la seconde voie d'activation sans codes de secours. La colonne
+        est écrasée à chaque préparation : un second QR invalide le premier, donc
+        l'ancien appareil ne peut plus être activé.
         """
         from src.modules.platform.security import uri_otpauth
 
         secret = generer_secret_totp()
-        user.secret_2fa_chiffre = chiffrer_secret_2fa(secret)
-        user.deux_facteurs_actif = False
+        user.secret_2fa_en_attente = chiffrer_secret_2fa(secret)
         await db.flush()
         return {
             "secret": secret,
@@ -413,35 +413,125 @@ class PlatformAuthService:
         """
         Active le second facteur et rend les **codes de secours en clair, une fois**.
 
-        Les codes sont stockes hacnes et ne ressortent plus jamais : si l'owner les
-        perd, il doit venir voir un operateur ou un autre Super Admin. C'est le
-        prix de la securite, et c'est preferable a une liste consultable par
-        quiconque lit la base.
+        **Seule voie d'activation.** Elle vérifie un code TOTP **calculé sur le
+        secret en attente** — celui que le compte vient de scanner — puis PROMeut
+        ce secret dans `secret_2fa_chiffre` et vide la colonne en attente. Un
+        secret préparé ne valait rien tant qu'il n'avait pas franchi cette porte.
+
+        Un code de secours ne peut PAS activer : il ouvre une session sur un
+        compte déjà enrôlé, il ne doit pas enrôler. L'accepter ici laisserait une
+        seconde voie d'activation, celle-là sans nouveau secret ni nouvelle liste
+        de codes.
+
+        Les codes de secours sont stockés hachés et ne ressortent plus jamais :
+        si l'opérateur les perd, la régénération (TOTP valide + motif) les
+        remplace. C'est le prix de la sécurité, et c'est préférable à une liste
+        consultable par quiconque lit la base.
         """
         from src.modules.platform.security import (
             generer_codes_secours,
             hacher_codes_secours,
         )
 
-        secret = valider_secret_2fa(user.secret_2fa_chiffre)
-        if secret is None:
+        if user.deux_facteurs_actif:
+            raise InvalidStateException(
+                "Le second facteur est déjà actif.", code="DEUX_FACTEURS_DEJA_ACTIF"
+            )
+
+        secret_en_attente = valider_secret_2fa(user.secret_2fa_en_attente)
+        if secret_en_attente is None:
             raise InvalidStateException(
                 "Aucun secret 2FA en attente d'activation.", code="SECRET_2FA_ABSENT"
             )
 
-        # Un code de secours remplace le code TOTP quand le telephone n'est pas la.
-        # Sa consommation est un effet de bord : retire de la liste a l'usage, donc
-        # un code vole ne peut etre rejoue qu'une fois.
-        if not verifier_code_totp(secret, code) and not (
-            await PlatformAuthService.consommer_code_de_secours(db, user, code)
-        ):
+        # TOTP **calculé sur le secret en attente**, et rien d'autre.
+        if not verifier_code_totp(secret_en_attente, code):
             raise AuthenticationException(
                 "Code de vérification invalide.", code="CODE_2FA_INVALIDE"
             )
+
+        # Promotion : le secret SCANNÉ devient le secret actif, et la colonne en
+        # attente est vidée — un même secret ne sert qu'une seule activation.
+        #
+        # **On déplace le CHIFFRÉ, pas le clair.** `secret_2fa_chiffre` attend
+        # du Fernet : y écrire le texte que `valider_secret_2fa` vient de
+        # rendre — le clair — rend la colonne indechiffrable, et tout LOGIN
+        # suivant échoue au déchiffrement (`secret_2fa_illisible`) alors que les
+        # codes de secours, eux, continuent de passer. La preuve HTTP l'a
+        # attrapé : la reconnexion TOTP après activation tombait en 401.
+        user.secret_2fa_chiffre = user.secret_2fa_en_attente
+        user.secret_2fa_en_attente = None
         user.deux_facteurs_actif = True
         user.deux_facteurs_confirme_at = _maintenant()
+
+        # Dix codes, hachés Argon2, émis UNE fois — ici. `False` au lieu de
+        # l'invariant : l'activation vient de garantir la présence des codes.
         codes = generer_codes_secours()
         user.codes_secours_haches = hacher_codes_secours(codes)
+        user.codes_secours_a_regenerer = False
+        await db.flush()
+        return codes
+
+    @staticmethod
+    async def regenerer_codes_secours(
+        db: AsyncSession,
+        user: UtilisateurPlateforme,
+        code: str,
+        motif: str,
+        client_ip: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> List[str]:
+        """
+        Remplace les codes de secours d'un compte déjà enrôlé, en clair, une fois.
+
+        **Préconditions strictes** — en cas de doute, refus :
+
+        - la 2FA doit être **active** (on ne régénère pas les codes d'un compte
+          qui n'a pas de second facteur : il s'enrôlera et en émerra) ;
+        - un **TOTP valide sur le secret actif** doit être présenté : la
+          possession du mot de passe et d'une session ne suffit pas ;
+        - un **motif** est requis et journalisé — l'absence de motif rend
+          l'opération injugeable a posteriori.
+
+        La liste ancienne est **invalidée** en même temps que la nouvelle est
+        écrite : aucune fenêtre ne subsiste où deux listes valent. Les dix
+        nouveaux codes ne sont renvoyés qu'ici, et le journal ne contient que
+        leur nombre — jamais leur valeur.
+        """
+        from src.modules.platform.security import (
+            generer_codes_secours,
+            hacher_codes_secours,
+        )
+
+        if not user.deux_facteurs_actif:
+            raise AuthenticationException(
+                "Code de vérification invalide.", code="CODE_2FA_INVALIDE"
+            )
+
+        secret = valider_secret_2fa(user.secret_2fa_chiffre)
+        if secret is None or not verifier_code_totp(secret, code):
+            raise AuthenticationException(
+                "Code de vérification invalide.", code="CODE_2FA_INVALIDE"
+            )
+
+        codes = generer_codes_secours()
+        # L'ancienne liste est remplacée dans la même transaction : invalider
+        # d'abord, puis écrire, sans fenêtre intermédiaire.
+        user.codes_secours_haches = hacher_codes_secours(codes)
+        user.codes_secours_a_regenerer = False
+        await JournalService.journaliser(
+            db,
+            action="PLATFORM_CODES_SECOURS_REGENERES",
+            type_cible="AUTH",
+            acteur_email=user.email,
+            acteur_id=user.id,
+            # **Jamais les codes.** Leur nombre suffit à l'audit : leur valeur
+            # dans le journal rendrait la journalisation un canal d'accès.
+            apres={"codes_secours_emis": len(codes)},
+            motif=motif,
+            ip_address=client_ip,
+            user_agent=user_agent,
+        )
         await db.flush()
         return codes
 
@@ -686,6 +776,23 @@ class PlatformAuthService:
             "deux_facteurs_actif": user.deux_facteurs_actif,
             "statut": user.statut.value,
         }
+        # La réinitialisation est TOUJOURS une désactivation : le téléphone est
+        # perdu, donc l'ancien secret ne doit plus ouvrir rien. La préparation
+        # n'écrit plus que le secret en attente — elle ne désactive plus rien —
+        # donc la réinitialisation le fait EXPLICITEMENT ici, comme le fait la
+        # CLI `reinitialiser-2fa`.
+        #
+        # `null()` et non `None` : sur une colonne JSONB, `None` sérialise en
+        # JSONB `null` — une *valeur* — et la contrainte
+        # `ck_codes_secours_exigent_2fa`, qui teste `codes_secours_haches IS
+        # NULL`, la rejette. (Même piège, même solution que `admin.py`.)
+        from sqlalchemy import null
+
+        user.deux_facteurs_actif = False
+        user.deux_facteurs_confirme_at = None
+        user.secret_2fa_chiffre = None
+        user.codes_secours_haches = null()
+        user.codes_secours_a_regenerer = False
         preparation = await PlatformAuthService.preparer_second_facteur(db, user)
         await PlatformAuthService.revoquer_toutes_les_sessions(
             db, user.id, motif="réinitialisation d'accès", auteur=auteur

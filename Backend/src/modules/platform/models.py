@@ -238,8 +238,14 @@ class UtilisateurPlateforme(PlatformBase, UUIDMixin, TimestampMixin):
     # ── Second facteur, OBLIGATOIRE ──────────────────────────────────────────
     deux_facteurs_actif: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # Secret TOTP CHIFFRÉ (Fernet), jamais en clair : une lecture de la base ne
-    # doit pas suffire à fabriquer un code d'authentification.
+    # doit pas suffire à fabriquer un code d'authentification. N'est alimenté
+    # qu'à l'ACTIVATION, par promotion depuis `secret_2fa_en_attente`.
     secret_2fa_chiffre: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Secret PREPARE, jamais scanné par personne : la préparation n'écrit que
+    # la, et la colonne est écrasée à chaque préparation. Ce secret ne sert
+    # qu'à la vérification d'activation, jamais à authentifier — c'est la
+    # séparation qui empêche un compte préparé de passer pour un compte configuré.
+    secret_2fa_en_attente: Mapped[str | None] = mapped_column(Text, nullable=True)
     deux_facteurs_confirme_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -247,6 +253,12 @@ class UtilisateurPlateforme(PlatformBase, UUIDMixin, TimestampMixin):
     # Codes de secours, **hachés** : un vidage de la base ne doit pas rendre la
     # plateforme accessible à la place du propriétaire. Consommés une seule fois.
     codes_secours_haches: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    # Vrai quand la 2FA est active mais que les codes de secours doivent être
+    # régénérés (compte préexistant sans codes, ou régénération en attente).
+    # Exposé dans `/platform/auth/me` : c'est lui qui pilote la bannière.
+    codes_secours_a_regenerer: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
     # Mis a vrai par l'opérateur ou une réinitialisation : le mot de passe connu
     # de l'opérateur ne doit jamais devenir un mot de passe durable.
     changement_mot_de_passe_obligatoire: Mapped[bool] = mapped_column(
