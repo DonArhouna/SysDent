@@ -4,13 +4,21 @@
 > est, ce qui est **prouvé**, ce qui ne l'est pas, et par où reprendre.
 > Mis à jour à la fin de chaque étape. Un commit atomique par étape.
 
+---
+MIGRATION ENROLEMENT 2FA : **APPLIQUÉE le 2026-10-10 (révision f2c9e5d7a3b1) ; dump : `C:\sauvegardes_sysdent\sysdent_platform_avant_f2c9e5d7a3b1_20261010.dump` (local, hors cloud, à conserver) ; codes de secours régénérables : oui**
+
+Preuve : empreinte du secret de `rhonekane@gmail.com` identique avant/après,
+statut ACTIF, 5 sessions vivantes inchangées, `aminadiop@sysdent.pro` toujours
+désactivé, comptages identiques, contraintes CHECK en place, preuve HTTP
+16/16 sur compte de test temporaire (créé puis supprimé).
 
 ---
-MIGRATION ENROLEMENT 2FA : f2c9e5d7a3b1_enrolement_2fa_secret_en_attente.py — validée sur copie (aller-retour OK, compte rhonekane préservé) — NON appliquée à la base réelle
+
+MIGRATION ENROLEMENT 2FA (COMPTE RENDU ANCIEN) : f2c9e5d7a3b1_enrolement_2fa_secret_en_attente.py — validée sur copie (aller-retour OK, compte rhonekane préservé) - appliquée à la base réelle le 2026-10-10, voir l'en-tête.
 
 **STATUT 2026-10-09 (session correctif enrollement 2FA, terminee)** :
 Acces : OPERATIONNEL — rhonekane conserve, 2FA active, secret intact, 6 sessions.
-Migration : ecrite, validee sur copie, **non appliquee** a la base reelle.
+Migration : ecrite, validee sur copie, appliquee a la base reelle le 2026-10-10.
 Codes de secours : regenerables (endpoint + ecran `/codes-secours` + banniere).
 Suite complete : **440 passes, 3 sautes** (0 echec, 14 min 34 s).
 
