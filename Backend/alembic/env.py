@@ -24,8 +24,18 @@ target_metadata = Base.metadata
 
 # L'URL vient de settings (donc de .env) et non du .ini, pour rester sur une seule source de vérité.
 # ALEMBIC_MASTER_DB_URL permet de la surcharger ponctuellement (ex: génération de baseline sur une DB vierge).
-db_url = os.environ.get("ALEMBIC_MASTER_DB_URL", settings.master_db_sync_url)
-config.set_main_option("sqlalchemy.url", db_url)
+#
+# `master_db_sync_url` est, lui, une URL **synchrone** (`postgresql+psycopg2`).
+# Or le chemin d'exécution est asynchrone : `run_migrations_async` ouvre un moteur
+# `asyncpg`. Sans conversion, c'est le pilote `psycopg2` qui est sélectionné, et il
+# charge une DLL native — que la stratégie de contrôle d'application de certains
+# postes bloque, ce qui fait échouer la migration avec un `ImportError` qui ne parle
+# ni de l'URL, ni du pilote, ni de la DLL.
+db_url = normaliser_url_vers_asyncpg(
+    os.environ.get("ALEMBIC_MASTER_DB_URL", settings.master_db_sync_url)
+)
+# `%%` : l'URL passe par ConfigParser, où `%` est un caractère d'interpolation.
+config.set_main_option("sqlalchemy.url", db_url.replace("%", "%%"))
 
 
 def run_migrations_offline() -> None:

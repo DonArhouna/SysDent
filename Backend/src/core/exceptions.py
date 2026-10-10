@@ -83,14 +83,24 @@ class TenantNotFoundException(AppException):
 
 
 class TenantConnectionException(AppException):
-    """Levée lors d'une impossibilité de connexion à la base de données d'un cabinet."""
+    """La base d'un cabinet est injoignable.
+
+    **La réponse ne dit rien.** Ni l'identifiant du cabinet, ni le message
+    d'erreur de PostgreSQL n'en sortent : le premier révèle l'existence d'un
+    cabinet, le second le nom exact de sa base. C'est précisément ce qui s'est
+    produit en 500 sur `/auth/login` -
+    `database "sysdent_tenant_..." does not exist`. Le détail, lui, est
+    journalisé côté serveur avec l'identifiant du cabinet — jamais ici.
+    """
 
     def __init__(self, tenant_id: str, original_error: Optional[str] = None):
+        # `tenant_id` et `original_error` restent reçus pour compatibilité
+        # d'appel : ils servent au journal, et n'entrent dans aucune réponse.
         super().__init__(
-            message=f"Impossible de se connecter à la base de données du cabinet '{tenant_id}'.",
-            code="TENANT_DB_CONNECTION_FAILED",
+            message="Service momentanément indisponible. Veuillez réessayer dans quelques instants.",
+            code="SERVICE_INDISPONIBLE",
             status_code=503,
-            details={"tenant_id": tenant_id, "error": original_error},
+            details={},
         )
 
 

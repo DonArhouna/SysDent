@@ -35,7 +35,14 @@ if not db_url:
         "URL de la base tenant manquante. Utiliser -x tenant_db_url=postgresql+asyncpg://... "
         "ou définir la variable d'environnement ALEMBIC_TENANT_DB_URL."
     )
-config.set_main_option("sqlalchemy.url", db_url)
+# Le chemin d'exécution est asynchrone (`run_migrations_async` ouvre un moteur
+# `asyncpg`). Une URL `psycopg2` doit donc être convertie ici, sinon c'est elle
+# qui est sélectionnée et la DLL native est chargée — ce que la stratégie de
+# contrôle d'application de certains postes bloque, avec un `ImportError` qui ne
+# parle ni de l'URL, ni du pilote, ni de la DLL.
+db_url = normaliser_url_vers_asyncpg(db_url)
+# `%%` : l'URL passe par ConfigParser, où `%` est un caractère d'interpolation.
+config.set_main_option("sqlalchemy.url", db_url.replace("%", "%%"))
 
 
 def run_migrations_offline() -> None:
