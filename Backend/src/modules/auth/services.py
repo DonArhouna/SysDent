@@ -2,16 +2,104 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 import uuid
 import structlog
+
+import asyncpg
 from sqlalchemy import select
+from sqlalchemy.exc import InterfaceError, OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from src.core.database import tenant_db_manager
-from src.core.exceptions import AuthenticationException, InvalidTokenException
+from src.core.exceptions import (
+    AuthenticationException,
+    InvalidTokenException,
+    TenantConnectionException,
+)
 from src.core.security import create_access_token, create_refresh_token, decrypt_secret, verify_password
 from src.modules.master.models import Societe, TenantDB, UtilisateurIndex
 from src.modules.tenants.models import Permission, PermissionRole, Role, SessionUser, Utilisateur
 
 logger = structlog.get_logger(__name__)
+
+#: Erreurs qui signifient « la base de ce cabinet est injoignable ». Liste
+#: courte et **fermée** : un `except Exception` attraperait au passage un bug
+#: d'application et le déguiserait en 503, c'est-à-dire l'invisible.
+#:
+#: Les violations de contrainte (`UniqueViolation`, `ForeignKeyViolation`) sont
+#: volontairement absentes : elles viennent de la donnée, pas du serveur, et
+#: doivent remonter comme des erreurs.
+BASE_TENANT_INJOIGNABLE = (
+    # Le cas survenu le 08/10 : la base du cabinet n'existe plus.
+    asyncpg.exceptions.InvalidCatalogNameError,
+    # Connexion déjà ouverte dont le serveur a disparu.
+    asyncpg.exceptions.ConnectionDoesNotExistError,
+    asyncpg.exceptions.PostgresConnectionError,
+    asyncpg.exceptions.ClientCannotConnectError,
+    asyncpg.exceptions.AdminShutdownError,
+    asyncpg.exceptions.TooManyConnectionsError,
+    # Ce que SQLAlchemy substitue lorsque c'est le pilote qui échoue à connecter.
+    OperationalError,
+    InterfaceError,
+)
+
+#: Erreurs qui signifient « la base répond, mais plus comme le code l'attend ».
+#:
+#: Le schéma du cabinet est en retard de migrations : la connexion réussit, puis
+#: la première requête échoue. Le 10/10, un cabinet restauré deux migrations en
+#: retard renvoyait `UndefinedColumnError: column utilisateurs.cabinet_id does
+#: not exist` — un 500 qui exposait au client le schéma interne du cabinet.
+#:
+#: SQLAlchemy encapsule ces erreurs-là dans `ProgrammingError`, d'où le tri fait
+#: dans le `except` dédié : `ProgrammingError` couvre aussi une faute de frappe
+#: dans une requête, qui n'a rien à voir et doit remonter telle quelle.
+SCHEMA_PERIME = (
+    asyncpg.exceptions.UndefinedColumnError,
+    asyncpg.exceptions.UndefinedTableError,
+    asyncpg.exceptions.UndefinedFunctionError,
+)
+
+
+def _est_divergence_de_schema(exc: BaseException) -> bool:
+    """
+    L'erreur vient-elle d'un schéma périmé, ou d'une requête de code cassée ?
+
+    SQLAlchemy conserve l'erreur du pilote dans `.orig` : c'est là qu'il faut
+    regarder. S'arrêter à la surface confondrait les deux, et une faute de
+    frappe deviendrait « service indisponible » — donc invisible.
+    """
+    for cause in (exc, getattr(exc, "orig", None), exc.__cause__, exc.__context__):
+        if isinstance(cause, SCHEMA_PERIME):
+            return True
+    return False
+
+
+def _base_tenant_indisponible(
+    exc: BaseException, tenant_id: str, tenant_config, *, schema_perime: bool = False
+) -> TenantConnectionException:
+    """
+    Journalise la panne côté serveur et renvoie la réponse contrôlée à lever.
+
+    Le journal porte l'identifiant du cabinet, son hôte, son port et le nom de
+    sa base : de quoi agir sans que le client apprenne rien. Jamais de mot de
+    passe : il n'est ni journalisé ni retourné.
+
+    `erreur` désigne l'erreur **du pilote**, pas l'enveloppe SQLAlchemy : c'est
+    elle qui dit *quelle* divergence. `ProgrammingError` ne dit que « la requête
+    a échoué », ce qui est le problème entier.
+    """
+    origine = getattr(exc, "orig", None)
+    cause = origine if isinstance(origine, BaseException) else exc
+    logger.error(
+        "login_base_tenant_injoignable",
+        tenant_id=tenant_id,
+        db_name=tenant_config.db_name,
+        db_host=tenant_config.db_host,
+        db_port=tenant_config.db_port,
+        erreur=type(cause).__name__,
+        erreur_sqlalchemy=type(exc).__name__ if cause is not exc else None,
+        schema_perime=schema_perime,
+        detail=str(exc),
+    )
+    return TenantConnectionException(tenant_id=tenant_id, original_error=str(exc))
 
 
 def _charger_utilisateur_stmt():
@@ -108,28 +196,47 @@ class AuthService:
         )
         session_factory = await tenant_db_manager.get_session_factory(tenant_id)
 
-        async with session_factory() as tenant_session:
-            stmt_user = _charger_utilisateur_stmt().where(Utilisateur.email == email_normalise)
-            user = (await tenant_session.execute(stmt_user)).scalar_one_or_none()
+        try:
+            async with session_factory() as tenant_session:
+                stmt_user = _charger_utilisateur_stmt().where(Utilisateur.email == email_normalise)
+                user = (await tenant_session.execute(stmt_user)).scalar_one_or_none()
 
-            if not user:
-                logger.warning("login_email_inconnu_dans_tenant", email=email_normalise, tenant_id=tenant_id)
-                raise AuthenticationException("Email ou mot de passe incorrect.", code="INVALID_CREDENTIALS")
+                if not user:
+                    logger.warning("login_email_inconnu_dans_tenant", email=email_normalise, tenant_id=tenant_id)
+                    raise AuthenticationException("Email ou mot de passe incorrect.", code="INVALID_CREDENTIALS")
 
-            if not verify_password(password, user.mot_de_passe):
-                logger.warning("login_wrong_password", email=email_normalise, tenant_id=tenant_id)
-                raise AuthenticationException("Email ou mot de passe incorrect.", code="INVALID_CREDENTIALS")
+                if not verify_password(password, user.mot_de_passe):
+                    logger.warning("login_wrong_password", email=email_normalise, tenant_id=tenant_id)
+                    raise AuthenticationException("Email ou mot de passe incorrect.", code="INVALID_CREDENTIALS")
 
-            user.dernier_login = datetime.now(timezone.utc)
-            await tenant_session.flush()
+                user.dernier_login = datetime.now(timezone.utc)
+                await tenant_session.flush()
 
-            permissions = await _permissions_de(tenant_session, user)
-            role_nom = user.role.nom if user.role is not None else "INCONNU"
+                permissions = await _permissions_de(tenant_session, user)
+                role_nom = user.role.nom if user.role is not None else "INCONNU"
 
-            await tenant_session.commit()
-            logger.info("login_reussi", email=email_normalise, tenant_id=tenant_id, role=role_nom)
+                await tenant_session.commit()
+                logger.info("login_reussi", email=email_normalise, tenant_id=tenant_id, role=role_nom)
 
-            return user, tenant_id, permissions
+                return user, tenant_id, permissions
+        except BASE_TENANT_INJOIGNABLE as exc:
+            # **Un cabinet dont la base est injoignable ne produit pas un 500.**
+            # C'est ce qui s'est passé le 08/10 : `database "sysdent_tenant_..."
+            # does not exist` partait tel quel au client, avec le nom de la base
+            # dedans. La réponse est générique ; le journal porte l'identifiant
+            # du cabinet, son hôte et son port — jamais son mot de passe.
+            raise _base_tenant_indisponible(exc, tenant_id, tenant_config) from exc
+        except ProgrammingError as exc:
+            # **Un schéma en retard de migrations non plus.** La base est là, la
+            # connexion réussit, et c'est la première requête qui tombe. Même
+            # réponse contrôlée, même journal — mais seulement si l'erreur vient
+            # bien du schéma : une requête cassée par le code doit remonter, sinon
+            # le vrai bug disparaît derrière un « service indisponible ».
+            if not _est_divergence_de_schema(exc):
+                raise
+            raise _base_tenant_indisponible(
+                exc, tenant_id, tenant_config, schema_perime=True
+            ) from exc
 
     @staticmethod
     async def ouvrir_session(

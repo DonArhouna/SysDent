@@ -13,6 +13,8 @@ Quatre contrôles, du plus vital au moins vital :
 | Base plateforme    | `SELECT 1`                        | la console est inutile sans elle |
 | Base master        | `SELECT 1`                        | sans elle, aucun cabinet n'existe|
 | Files clients      | état de `tenants_db`              | un tenant ACTIVE mais injoignable|
+| Bases absentes     | registre contre `pg_database`     | un dossier ACTIVE sans base      |
+| Schémas en retard  | `alembic_version` contre la tête  | une base migrée à moitié         |
 | Gabarits / plans   | presence du plan par défaut       | un provisionnement échouerait    |
 
 Aucun secret, aucune donnée de santé n'apparaît dans le résultat : ni mot de
@@ -21,17 +23,77 @@ troncées — une trace complète pourrait contenir la chaîne de connexion.
 """
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+import pathlib
+import re
+from typing import Any, Dict, List, Optional
 
 import structlog
 from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.pool import NullPool
 
 logger = structlog.get_logger(__name__)
 
 #: Longueur maximale d'un message d'erreur exposé. Au-delà, on tronque.
 MAX_LONGUEUR_ERREUR = 200
+
+
+def _racine_backend() -> pathlib.Path:
+    """Dossier `Backend/`, depuis n'importe quel module de l'application."""
+    return pathlib.Path(__file__).resolve().parents[4]
+
+
+def _tete_attendue() -> Optional[str]:
+    """
+    Tête de la chaîne de migrations des cabinets, lue sur le disque.
+
+    **Jamais écrite en dur.** Une tête écrite en dur devient fausse au premier
+    commit qui ajoute une migration, et l'écran de santé continue d'annoncer
+    « à jour » pendant que le code ne l'est plus. C'est précisément ce qui a
+    laissé passer un cabinet deux migrations en retard : rien ne le comparait
+    à quoi que ce soit.
+
+    Renvoie `None` si la chaîne est illisible ou si elle a **plus d'une tête** :
+    dans ce cas, « être à jour » n'a pas de sens, et il vaut mieux le dire que
+    mentir.
+    """
+    try:
+        from alembic.config import Config
+        from alembic.script import ScriptDirectory
+
+        racine = _racine_backend()
+        cfg = Config(str(racine / "alembic_tenant.ini"))
+        cfg.set_main_option("script_location", str(racine / "alembic_tenant"))
+        tetes = ScriptDirectory.from_config(cfg).get_heads()
+        return tetes[0] if len(tetes) == 1 else None
+    except Exception:  # noqa: BLE001 - un contrôle ne doit jamais faire tomber la page
+        return None
+
+
+def _migrations_manquantes(courante: Optional[str], tete: str) -> Optional[int]:
+    """
+    Nombre de migrations à appliquer pour passer de `courante` à `tete`.
+
+    `None` si la révision courante est inconnue de la chaîne : c'est un état
+    distinct d'« en retard », et le confondre avec un nombre serait faux.
+    """
+    if not courante:
+        return None
+    try:
+        from alembic.config import Config
+        from alembic.script import ScriptDirectory
+
+        racine = _racine_backend()
+        cfg = Config(str(racine / "alembic_tenant.ini"))
+        cfg.set_main_option("script_location", str(racine / "alembic_tenant"))
+        script = ScriptDirectory.from_config(cfg)
+        # `iterate_revisions(tete, courante)` descend de la tête **jusqu'à la
+        # révision courante exclue** : chaque entrée est une migration à
+        # appliquer. Le nombre est donc la longueur exacte, sans correction.
+        return max(0, len(list(script.iterate_revisions(tete, courante))))
+    except Exception:  # noqa: BLE001
+        return None
 
 
 class HealthService:
@@ -86,6 +148,207 @@ class HealthService:
             }
         except SQLAlchemyError as exc:
             return {"composant": "files_clients", "ok": False, "detail": _tronquer(str(exc))}
+
+    @staticmethod
+    async def bases_absentes(master_db: AsyncSession) -> Dict[str, Any]:
+        """
+        Lignes du registre dont la base n'existe plus sur l'instance des tenants.
+
+        **Le contrôle qui manquait.** Le 08/10, 130 lignes du registre se sont
+        retrouvées sans base : le login de ces cabinets est tombé en 500, et la
+        supervision continuait de répondre « ok ». `files_clients` comptait des
+        statuts — il comptait aussi les lignes orphelines comme des cabinets en
+        règle.
+
+        Une seule lecture du catalogue `pg_database`, jamais un ping par
+        cabinet : 130 connexions par appel serait exactement le défaut que cette
+        page est censée révéler.
+        """
+        from src.core.config import settings
+        from src.modules.master.models import TenantDB
+
+        #: Lignes détaillées au maximum. Au-delà, seule la comptition compte.
+        LIMITE_AFFICHEE = 25
+
+        try:
+            lignes = (await master_db.execute(select(TenantDB.db_name, TenantDB.statut))).all()
+        except SQLAlchemyError as exc:
+            return {"composant": "bases_absentes", "ok": False, "detail": _tronquer(str(exc))}
+
+        moteur = create_async_engine(
+            f"postgresql+asyncpg://{settings.TENANT_DB_USER}:{settings.TENANT_DB_PASSWORD}"
+            f"@{settings.TENANT_DB_HOST}:{settings.TENANT_DB_PORT}/postgres",
+            isolation_level="AUTOCOMMIT",
+        )
+        try:
+            async with moteur.connect() as conn:
+                existantes = {
+                    ligne[0]
+                    for ligne in (
+                        await conn.execute(
+                            text("SELECT datname FROM pg_database WHERE datistemplate = false")
+                        )
+                    ).fetchall()
+                }
+        except SQLAlchemyError as exc:
+            return {"composant": "bases_absentes", "ok": False, "detail": _tronquer(str(exc))}
+        finally:
+            await moteur.dispose()
+
+        absentes = [(db, statut) for db, statut in lignes if db not in existantes]
+        par_statut: Dict[str, int] = {}
+        for _, statut in absentes:
+            par_statut[statut] = par_statut.get(statut, 0) + 1
+
+        # Un dossier PROVISIONING sans base est normal, c'est l'état transitoire
+        # d'une création. Un dossier **ACTIVE** sans base, c'est un cabinet dont
+        # le login est cassé : c'est le seul cas qui dégrade la santé.
+        actives = par_statut.get("ACTIVE", 0)
+        return {
+            "composant": "bases_absentes",
+            "ok": actives == 0,
+            "detail": (
+                None
+                if actives == 0
+                else f"{actives} dossier(s) ACTIVE sans base : le login de ces cabinets échoue."
+            ),
+            "total_registre": len(lignes),
+            "absentes": len(absentes),
+            "absentes_par_statut": par_statut,
+            "exemples": [
+                {"db_name": db, "statut": statut} for db, statut in absentes[:LIMITE_AFFICHEE]
+            ],
+            "exemples_limite": min(len(absentes), LIMITE_AFFICHEE),
+        }
+
+    @staticmethod
+    async def schemas_tenants(master_db: AsyncSession) -> Dict[str, Any]:
+        """
+        Écart de révision de schéma, base par base.
+
+        **Le contrôle qui manquait à côté de `bases_absentes`.** Une base peut
+        être parfaitement présente et parfaitement inexploitable : il lui
+        manque deux migrations. La connexion réussit, puis la première requête
+        échoue — c'est exactement l'état du cabinet restauré le 10/10, et
+        `bases_absentes` n'en voyait rien, puisqu'elle ne regarde que le
+        catalogue : la base est là.
+
+        La tête attendue est **lue sur la chaîne de migrations du dépôt**, jamais
+        écrite en dur : une tête écrite en dur devient fausse au premier commit
+        qui ajoute une migration, et l'écran dit « à jour » pendant que le code,
+        lui, ne l'est plus.
+
+        Une base sans table `alembic_version` n'est pas comptée comme « en
+        retard » : elle n'est pas migrée du tout, ce qui est un autre état.
+        Elle estSignalée à part, pour qu'un cabinet cassé n'empêche pas le
+        contrôle de rendre son verdict sur les autres.
+        """
+        from src.core.config import settings
+        from src.modules.master.models import TenantDB
+
+        LIMITE_AFFICHEE = 25
+
+        tete = _tete_attendue()
+        if tete is None:
+            return {
+                "composant": "schemas_tenants",
+                "ok": False,
+                "detail": "Chaîne de migrations tenant illisible : tête inconnue.",
+            }
+
+        try:
+            lignes = (await master_db.execute(select(TenantDB.db_name, TenantDB.statut))).all()
+        except SQLAlchemyError as exc:
+            return {"composant": "schemas_tenants", "ok": False, "detail": _tronquer(str(exc))}
+
+        moteur = create_async_engine(
+            f"postgresql+asyncpg://{settings.TENANT_DB_USER}:{settings.TENANT_DB_PASSWORD}"
+            f"@{settings.TENANT_DB_HOST}:{settings.TENANT_DB_PORT}/postgres",
+            isolation_level="AUTOCOMMIT",
+        )
+        derriere: List[Dict[str, Any]] = []
+        non_migrees: List[str] = []
+        analysees = 0
+        non_inspectees = 0
+
+        try:
+            async with moteur.connect() as conn:
+                existantes = {
+                    ligne[0]
+                    for ligne in (
+                        await conn.execute(
+                            text("SELECT datname FROM pg_database WHERE datistemplate = false")
+                        )
+                    ).fetchall()
+                }
+
+            candidates = [
+                (db_name, statut)
+                for db_name, statut in lignes
+                if db_name in existantes and NOM_BASE_SURE.match(db_name)
+            ]
+            non_inspectees = max(0, len(candidates) - MAX_BASES_INSPECTEES)
+            candidates = candidates[:MAX_BASES_INSPECTEES]
+
+            # **PostgreSQL n'a aucune syntaxe inter-base** : `base.table` designe
+            # un *schema* de ce nom, pas une autre base. Une seule requete pour
+            # toutes les bases echouait donc partout, et chaque cabinet -
+            # migre ou non - etait declare « sans table de migrations ». Le
+            # symptome est discret et faux : la page de sante tournait, et ne
+            # controlait rien. Il faut une connexion par base.
+            for db_name, statut in candidates:
+                moteur_base = create_async_engine(
+                    f"postgresql+asyncpg://{settings.TENANT_DB_USER}"
+                    f":{settings.TENANT_DB_PASSWORD}"
+                    f"@{settings.TENANT_DB_HOST}:{settings.TENANT_DB_PORT}/{db_name}",
+                    isolation_level="AUTOCOMMIT",
+                    poolclass=NullPool,
+                )
+                revision = None
+                try:
+                    async with moteur_base.connect() as conn:
+                        revision = (
+                            await conn.execute(text("SELECT version_num FROM alembic_version"))
+                        ).scalar_one_or_none()
+                except SQLAlchemyError:
+                    revision = None
+                finally:
+                    await moteur_base.dispose()
+
+                analysees += 1
+                if revision is None:
+                    non_migrees.append(db_name)
+                    continue
+                if revision == tete:
+                    continue
+                derriere.append(
+                    {
+                        "db_name": db_name,
+                        "statut": statut,
+                        "revision_courante": revision,
+                        "migrations_manquantes": _migrations_manquantes(revision, tete),
+                    }
+                )
+        except SQLAlchemyError as exc:
+            return {"composant": "schemas_tenants", "ok": False, "detail": _tronquer(str(exc))}
+        finally:
+            await moteur.dispose()
+
+        return {
+            "composant": "schemas_tenants",
+            "ok": not derriere,
+            "detail": (
+                None
+                if not derriere
+                else f"{len(derriere)} cabinet(s) en retard de migrations : leur code echoue."
+            ),
+            "tete_attendue": tete,
+            "bases_analysees": analysees,
+            "derriere_tete": derriere[:LIMITE_AFFICHEE],
+            "derriere_tete_limite": min(len(derriere), LIMITE_AFFICHEE),
+            "sans_table_migrations": non_migrees[:LIMITE_AFFICHEE],
+            "bases_non_inspectees": non_inspectees,
+        }
 
     @staticmethod
     async def jobs_planifies(db: AsyncSession) -> Dict[str, Any]:
@@ -177,6 +440,8 @@ class HealthService:
             await HealthService.base_plateforme(platform_db),
             await HealthService.base_master(),
             await HealthService.files_clients(master_db),
+            await HealthService.bases_absentes(master_db),
+            await HealthService.schemas_tenants(master_db),
             await HealthService.migrations_par_tenant(platform_db),
             await HealthService.catalogue(platform_db),
             await HealthService.jobs_planifies(platform_db),
@@ -190,12 +455,36 @@ class HealthService:
         }
 
 
+#: Un nom de base ne peut contenir que cela. Le contrôle interroge chaque base
+#: par son nom : un nom venue du registre ne doit pas pouvoir devenir une
+#: injection SQL dans une requête qui traverse les bases.
+NOM_BASE_SURE = re.compile(r"^[A-Za-z0-9_]{1,63}$")
+
+#: Combien de bases on ouvre au plus pour lire leur révision. Chaque base coûte
+#: une connexion : un registre de plusieurs milliers de cabinets ne doit pas
+#: transformer un écran de santé en deni de service.
+MAX_BASES_INSPECTEES = 40
+
+#: `user:password@` à l'intérieur d'une URL, y compris `postgresql+asyncpg://`.
+IDENTIFIANTS_URL = re.compile(r"(://[^:/@\s]+):[^@\s]+@")
+
+
+def _sans_identifiants(texte: str) -> str:
+    """Masque `user:password@` d'une chaîne pouvant contenir une URL de connexion."""
+    return IDENTIFIANTS_URL.sub(r"\1:***@", texte)
+
+
 def _tronquer(texte: str) -> str:
     """
-    Tronque un message d'erreur technique.
+    Retire les identifiants, puis tronque un message d'erreur technique.
 
     Les erreurs SQLAlchemy peuvent contenir la chaîne de connexion complète,
     donc le mot de passe du compte applicatif. Une page de santé affichée sur un
     écran de supervision deviendrait alors un écran de secrets.
+
+    La troncature seule ne suffisait pas : un mot de passe tient aisément dans
+    les 200 premiers caractères. Le retrait des identifiants est donc fait
+    **avant**.
     """
-    return texte[:MAX_LONGUEUR_ERREUR] + "…" if len(texte) > MAX_LONGUEUR_ERREUR else texte
+    propre = _sans_identifiants(texte)
+    return propre[:MAX_LONGUEUR_ERREUR] + "…" if len(propre) > MAX_LONGUEUR_ERREUR else propre
