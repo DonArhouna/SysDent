@@ -18,8 +18,10 @@ import os
 import re
 import sys
 import uuid
+from collections.abc import Iterable
 from datetime import date, datetime, timezone
 from typing import AsyncGenerator
+from urllib.parse import urlsplit
 
 import pytest
 import pytest_asyncio
@@ -232,6 +234,106 @@ def classer_base(nom: str, avant_session: frozenset[str], tenants_reels: frozens
     return "conserve"
 
 
+# ---------------------------------------------------------------------------
+# Instance de tests : la garde ne s'y execute que si on la lui designe
+# ---------------------------------------------------------------------------
+#:
+#: Une purge ne se juge pas a ce qu'elle supprime, mais a ce qu'elle **peut**
+#: supprimer. Celle du 08/10 se contentait du nom : elle a efface la base de
+#: demonstration du proprietaire, `sysdent_tenant_clinique_cabinet_sn_5bd215`,
+#: dont la forme est exactement celle d'un residu de test. Le provisionnement
+#: nomme en effet ses cabinets `sysdent_tenant_<slug>_<hex6>` - le meme motif que
+#: `nom_jetable()`. Depuis, le login du client tombe en 500 sur cette base
+#: introuvable.
+#:
+#: La reponse n'est donc pas un motif de nom plus fin : aucun motif ne distingue
+#: une base de cabinet d'un residu. C'est l'**instance** qui doit etre distinguee.
+
+#: Variable d'environnement designant l'instance de tests.
+VARS_URL_TESTS = "TEST_DATABASE_URL"
+
+#: Base-temoin : sa presence sur une instance signifie qu'on l'a volontairement
+#: dediee aux tests. Aucune instance reelle n'en porte une.
+MARQUEUR_INSTANCE_DE_TESTS = "sysdent_instance_de_tests"
+
+#: Prefixe de toute base provisionnee pour un cabinet (`sanitize_db_name`).
+PREFIXE_TENANT = "sysdent_tenant_"
+
+
+def url_de_tests() -> str | None:
+    """`TEST_DATABASE_URL`, ou `None` si elle n'est pas renseignee."""
+    url = os.environ.get(VARS_URL_TESTS, "").strip()
+    return url or None
+
+
+def resume_url(url: str) -> str:
+    """`hote:port/nom` : les identifiants ne sortent jamais, meme dans un journal."""
+    donnees = urlsplit(url)
+    hote = donnees.hostname or "?"
+    port = f":{donnees.port}" if donnees.port else ""
+    return f"{hote}{port}/{donnees.path.lstrip('/') or '?'}"
+
+
+def _cible(url: str) -> tuple[str, int]:
+    """`(hote, port)` d'une URL, avec le port PostgreSQL par defaut."""
+    donnees = urlsplit(url)
+    return (donnees.hostname or "", donnees.port or 5432)
+
+
+def cible_distincte(url_tests: str, hote_ref: str, port_ref: int) -> bool:
+    """L'instance de tests est-elle une **autre** que celle des tenants ?"""
+    return _cible(url_tests) != (hote_ref, port_ref)
+
+
+def instance_explicitement_marquee(noms: Iterable[str]) -> bool:
+    """L'instance porte-t-elle la base-temoin qui la dedie aux tests ?"""
+    return MARQUEUR_INSTANCE_DE_TESTS in set(noms)
+
+
+def base_supprimable(nom: str, *, tenants_reels: frozenset[str], session: set[str]) -> bool:
+    """Une base peut-elle etre supprimee ? Le doute se resout **contre** la
+    suppression : c'est le cas `5bd215` qui a coute sa base au proprietaire.
+    """
+    if nom in BASES_PROTEGEES:
+        return False
+    if nom in tenants_reels:
+        # Portee au registre `tenants_db` : c'est un cabinet reel, quoi dise son
+        # nom. Le motif de nom n'est qu'un indice, le registre est la preuve.
+        return False
+    if nom in session:
+        # Creee par cette session : certitude, pas indice.
+        return True
+    if nom.startswith(PREFIXE_TENANT):
+        # Une base de cabinet non creee par nous n'est jamais supprimee, motif ou
+        # non : on ne distingue pas un cabinet d'un residu de test par le nom.
+        return False
+    return _motif_jetable(nom)
+
+
+def bases_a_supprimer(
+    noms: Iterable[str],
+    *,
+    tenants_reels: frozenset[str],
+    session: set[str],
+    url_tests: str | None,
+    hote_ref: str,
+    port_ref: int,
+) -> list[str]:
+    """Les bases que la garde a le droit de supprimer, et les seules.
+
+    Trois verrous, tous **necessaires** : une URL de tests, une instance autre
+    que celle des tenants, et la base-temoin sur cette instance. Un seul verrou
+    manquant et la liste est vide, quoi que dise le nom des bases.
+    """
+    if not url_tests:
+        return []
+    if not cible_distincte(url_tests, hote_ref, port_ref):
+        return []
+    if not instance_explicitement_marquee(noms):
+        return []
+    return [n for n in noms if base_supprimable(n, tenants_reels=tenants_reels, session=session)]
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _garder_la_purge():
     """
@@ -247,70 +349,95 @@ def _garder_la_purge():
     session est interrompue, la purge n'a pas lieu et les bases restent : mieux
     vaut des residus qu'une suppression sur un serveur qui n'est pas celui des
     tests.
+
+    **Les trois verrous.** La garde reste inerte tant que les trois ne sont pas
+    reunis : `TEST_DATABASE_URL` designe une instance, cette instance n'est pas
+    celle des tenants, et elle porte la base-temoin
+    `sysdent_instance_de_tests`. Ensuite encore, elle ne supprime ni une base
+    portee au registre `tenants_db`, ni aucune `sysdent_tenant_*` non creee par
+    la session. Sans cela, une purge n'est pas un nettoyage : c'est ce qui a
+    coute sa base de demonstration au proprietaire le 08/10.
     """
-    etat: dict[str, object] = {}
+    url_tests = url_de_tests()
 
-    async def _inventaire() -> tuple[list[str], frozenset[str]]:
-        engine = create_async_engine(_async_url("postgres"), isolation_level="AUTOCOMMIT")
+    def _verrou() -> str | None:
+        """Raison pour laquelle la garde reste inerte, ou `None` si un est ouverte."""
+        if not url_tests:
+            return f"{VARS_URL_TESTS} n'est pas renseignee : aucune instance de tests designee"
+        if not cible_distincte(url_tests, settings.TENANT_DB_HOST, settings.TENANT_DB_PORT):
+            return (
+                f"{resume_url(url_tests)} vise l'instance des tenants "
+                f"({settings.TENANT_DB_HOST}:{settings.TENANT_DB_PORT}), pas une instance dediee"
+            )
+        return None
+
+    async def _inventaire_tests() -> list[str]:
+        """Noms presents sur l'instance de tests. Lecture seule."""
+        moteur = create_async_engine(url_tests or "", isolation_level="AUTOCOMMIT")
         try:
-            async with engine.connect() as conn:
-                noms = [
-                    r[0]
-                    for r in (
-                        await conn.execute(
-                            text(
-                                "SELECT datname FROM pg_database "
-                                "WHERE datistemplate = false"
-                            )
-                        )
-                    ).fetchall()
-                ]
-                tenants: set[str] = set()
-                existe = await conn.execute(
-                    text("SELECT 1 FROM pg_database WHERE datname = 'sysdent_master'")
+            async with moteur.connect() as conn:
+                lignes = await conn.execute(
+                    text("SELECT datname FROM pg_database WHERE datistemplate = false")
                 )
-                if existe.scalar_one_or_none():
-                    lignes = await conn.execute(
-                        text("SELECT db_name FROM tenants_db")  # noqa: S608
-                    )
-                    tenants = {r[0] for r in lignes.fetchall()}
+                return [r[0] for r in lignes.fetchall()]
         finally:
-            await engine.dispose()
-        return noms, frozenset(tenants)
+            await moteur.dispose()
 
-    async def _nettoyer() -> tuple[list[str], list[str]]:
-        noms, tenants = await _inventaire()
-        avant = etat.get("avant") or frozenset()
-        categorise = {
-            n: classer_base(n, avant, tenants) for n in noms  # type: ignore[arg-type]
-        }
-        cibles = [n for n in noms if categorise[n] in ("session", "indice")]
-        for nom in cibles:
-            engine = create_async_engine(_async_url("postgres"), isolation_level="AUTOCOMMIT")
-            try:
-                async with engine.connect() as conn:
-                    await conn.execute(
-                        text(f'DROP DATABASE IF EXISTS "{nom}" WITH (FORCE)')
-                    )
-            finally:
-                await engine.dispose()
-        return cibles, [n for n in noms if categorise[n] == "protege"]
+    async def _registre() -> frozenset[str]:
+        """Registre `tenants_db`, lu sur la base Master de reference. Lecture seule.
 
-    async def _constat() -> tuple[int, int]:
-        noms, _ = await _inventaire()
-        avant = etat.get("avant") or frozenset()
-        return len(avant), len(noms)
+        La lecture echoue-t-elle, toute la purge est abandonnee : une garde qui
+        ignore quels tenants sont reels n'a aucun droit de supprimer. La lecture
+        se faisait auparavant sur la base `postgres`, qui ne contient pas la
+        table : elle levait `UndefinedTableError` et la protection par registre
+        n'a donc **jamais** fonctionne.
+        """
+        moteur = create_async_engine(settings.master_db_async_url, isolation_level="AUTOCOMMIT")
+        try:
+            async with moteur.connect() as conn:
+                lignes = await conn.execute(text("SELECT db_name FROM tenants_db"))
+                return frozenset(r[0] for r in lignes.fetchall())
+        finally:
+            await moteur.dispose()
 
-    async def _depart() -> None:
-        noms, _ = await _inventaire()
-        etat["avant"] = frozenset(noms)
+    async def _nettoyer() -> tuple[list[str], list[str], frozenset[str], bool]:
+        noms = await _inventaire_tests()
+        marque = instance_explicitement_marquee(noms)
+        if not marque:
+            # Pas de base-temoin : rien n'a ete dit de cette instance, donc rien
+            # n'en sort.
+            return [], noms, frozenset(), False
+        # Deux lectures avant toute decision : l'instance, puis le registre.
+        tenants = await _registre()
+        cibles = bases_a_supprimer(
+            noms,
+            tenants_reels=tenants,
+            session=BASES_CREEES_PAR_LA_SESSION,
+            url_tests=url_tests,
+            hote_ref=settings.TENANT_DB_HOST,
+            port_ref=settings.TENANT_DB_PORT,
+        )
+        moteur = create_async_engine(url_tests or "", isolation_level="AUTOCOMMIT")
+        try:
+            async with moteur.connect() as conn:
+                for nom in cibles:
+                    await conn.execute(text(f'DROP DATABASE IF EXISTS "{nom}" WITH (FORCE)'))
+        finally:
+            await moteur.dispose()
+        return cibles, noms, tenants, marque
 
-    # L'instantane « avant » est pris **avant** le premier test : c'est la seule
-    # reference qui permette de distinguer une base de travail d'un residu.
-    try:
-        asyncio.run(_depart())
-    except Exception as e:  # noqa: BLE001
-        print(f"\n  [garde] inventaire initial impossible : {e}")
+    verrou = _verrou()
+    if verrou:
+        print(
+            f"\n  [garde] purge inoffensive : {verrou}.\n"
+            f"  [garde] Une purge ne s'execute que sur une instance dediee aux tests, "
+            f"portant la base-temoin '{MARQUEUR_INSTANCE_DE_TESTS}'. "
+            f"Les bases de test resteront en place."
+        )
+        # Un fixture generateur doit toujours `yield` : c'est l'unique instant ou
+        # la garde pouvait agir, et il est ferme.
+        yield
+        return
 
     yield
 
@@ -321,23 +448,29 @@ def _garder_la_purge():
         )
         return
     try:
-        supprimees, protegees = asyncio.run(_nettoyer())
-        avant_n, apres_n = asyncio.run(_constat())
-        print(
-            f"\n  [garde] {len(supprimees)} base(s) supprimee(s), "
-            f"{len(protegees)} protegee(s). "
-            f"Inventaire : {avant_n} au depart -> {apres_n} a la fin."
-        )
-        if apres_n > avant_n:
-            print(
-                f"  [garde] FUITE : {apres_n - avant_n} base(s) de plus qu au "
-                f"depart. La purge a ete contournee."
-            )
+        supprimees, noms, tenants, marque = asyncio.run(_nettoyer())
     except Exception as e:  # noqa: BLE001
         # Une purge qui leve ferait echouer une suite pourtant verte, et l'erreur
         #aurait etre sans rapport avec le test qui l'a provoquee. Elle doit
         # rester visible, pas bloquante.
-        print(f"\n  [garde] purge impossible : {e}")
+        print(
+            f"\n  [garde] purge impossible sur {resume_url(url_tests or '')} : {e}\n"
+            f"  [garde] rien n'a ete supprime."
+        )
+        return
+    if not marque:
+        print(
+            f"\n  [garde] purge abandonnee : {resume_url(url_tests or '')} ne porte pas "
+            f"la base-temoin '{MARQUEUR_INSTANCE_DE_TESTS}'. Rien n'a ete supprime."
+        )
+        return
+    conserves = len(noms) - len(supprimees)
+    proteges = sum(1 for n in noms if n in tenants or n in BASES_PROTEGEES)
+    print(
+        f"\n  [garde] instance de tests {resume_url(url_tests or '')}\n"
+        f"  [garde] {len(supprimees)} base(s) supprimee(s) sur {len(noms)}, "
+        f"{conserves} conservee(s), dont {proteges} portee(s) au registre ou protegee(s)."
+    )
 
 
 # ---------------------------------------------------------------------------
