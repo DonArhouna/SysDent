@@ -1,122 +1,105 @@
-# Tests SysDent Pro — quoi lancer, quand, et ce que ça prouve
+# Tests
 
-Ce document existe parce que la suite complète était **impossible à lancer en
-routine** : plus de 40 minutes, deux fois abandonnée avant la fin. Une suite qu'on
-ne finit pas n'est pas une suite, c'est un décor.
+Les tests du backend parlent à PostgreSQL. Cette page explique **quelle
+instance** ils doivent viser, comment la lancer, et ce qui les empêche d'écrire
+dans l'instance de développement.
 
 ---
 
-## Les deux niveaux
+## La règle, en une phrase
 
-### `rapide` — à lancer après **chaque** modification
+**Les tests n'ont le droit de viser qu'une instance qui porte la base-témoin
+`sysdent_instance_test_marker`.** Cette base n'existe que sur l'instance de
+tests ; aucune instance réelle ne la porte. Au démarrage de chaque session,
+`tests/conftest.py` la vérifie et **refuse de s'exécuter** si elle est absente.
+
+Conséquence : une session de tests qui viserait par mégarde l'instance de
+développement s'arrête sur un message, avant le moindre `CREATE DATABASE`.
+
+## Lancer l'instance de tests
+
+L'instance est **distincte** de celle de développement : port `55436` (le
+développement est sur `55435`), volume `tmpfs` (rien n'est écrit sur le disque),
+identifiants imposés par variable d'environnement.
+
+PowerShell :
 
 ```powershell
+$env:TEST_PG_PASSWORD = "<mot de passe de votre choix, uniquement pour les tests>"
 cd Backend
-$env:MASTER_DB_HOST='127.0.0.1'; $env:MASTER_DB_PORT='55435'
-$env:TENANT_DB_HOST='127.0.0.1';  $env:TENANT_DB_PORT='55435'
-$env:PLATFORM_DB_HOST='127.0.0.1'; $env:PLATFORM_DB_PORT='55435'
-.\.venv\Scripts\python.exe -m pytest tests/test_patients_dossier.py tests/test_consultations_workflow.py -q --tb=short
+docker compose -f docker-compose.test.yml up -d
 ```
 
-Couvre le cœur métier et le RBAC. **Ne vérifie pas** l'isolation inter-tenant, les
-migrations, ni l'étanchéité plateforme/tenant.
+Le mot de passe n'a pas de valeur par défaut dans le fichier de composition :
+`docker compose` refuse de démarrer sans lui. Il n'est donc jamais écrit dans le
+dépôt, et il ne peut pas être confondu avec celui du développement.
 
-### `complet` — avant de conclure une étape
+Arrêter l'instance :
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -q --tb=line --durations=15
+docker compose -f docker-compose.test.yml down
 ```
 
-Tout : isolation inter-tenant, migrations, étanchéité plateforme/tenant, RBAC,
-parcours de bout en bout. **C'est le seul niveau qui autorise à dire « rien n'est
-cassé ».**
+Le volume étant `tmpfs`, `down` suffit : il n'y a pas de volume nommé à
+supprimer.
 
-### Frontend
+## Pointer les tests sur cette instance
+
+Les tests lisent **exclusivement** `TEST_DATABASE_URL`. Elle est **obligatoire et
+sans valeur par défaut** : sans elle, la session s'arrête.
 
 ```powershell
-cd Frontend
-npm test          # Vitest
-npx tsc -b --force
-npx oxlint
+$env:TEST_DATABASE_URL = "postgresql+asyncpg://<utilisateur>:<mot de passe>@localhost:55436/postgres"
 ```
 
-`tsc -b --force` et non `tsc --noEmit -p tsconfig.json` : ce dernier ne type-checke
-**rien**, `tsconfig.json` n'étant qu'un redirectionneur.
+Le nom de base dans l'URL est `postgres` : c'est le point d'entrée
+d'administration, depuis lequel la garde de démarrage vérifie le marqueur et
+puis crée `sysdent_master_test`, `sysdent_platform_test` et le modèle de tenant.
 
-### Contrats de pagination
+## Ce que les tests utilisent sur cette instance
 
-Deux contrôles complémentaires, tous deux découverts depuis les routes
-enregistrées — ni mémoire, ni documentation.
-
-```powershell
-# 1. La forme : une liste volumineuse sans pagination
-.\.venv\Scripts\python.exe tests\inventaire_listes.py
-
-# 2. Le comportement : pages perdues, doublons, tri instable, paramètres ignorés
-.\.venv\Scripts\python.exe -m pytest tests\test_contrat_pagination.py -q
-```
-
-`inventaire_listes.py` sort en code **1** si une liste volumineuse n'est pas
-paginée. `test_contrat_pagination.py` parcourt **toutes** les pages et vérifie
-qu'aucune ligne n'est perdue ni dupliquée, que `total` est exact, que deux
-parcours successifs rendent le même ordre, et que les paramètres invalides ou
-inconnus sont refusés.
-
-**Les deux doivent être branchés en CI.** Un test de contrat jamais vu en échec
-n'est pas prouvé : celui-ci a d'abord échoué sur du code livré, en détectant un
-tri non déterministe.
-
----
-
-## Résultat mesuré
-
-| Exécution | Passés | Échoués | Ignorés | Durée |
-|---|---|---|---|---|
-| Avant corrections | — | — | — | **> 40 min, jamais achevée** |
-| Après modèle cloné + hachage rapide | 344 | 0 | 0 | 18,8 min |
-| Après clonage des tests d'isolation | **344** | **0** | **0** | **12,1 min** |
-
-Les mêmes 344 tests qu'avant : aucun supprimé, ignoré ni assoupli.
-
-## Pourquoi la suite est passée de 40 min à moins de 15
-
-| Correction | Effet mesuré |
-|---|---|
-| Schéma construit **une fois par session**, chaque test obtient sa base par `CREATE DATABASE … TEMPLATE` | setup : plusieurs secondes → **0,80 s** |
-| Les 3 fichiers d'isolation ne rejouent plus 17 migrations **par base** (ils en créent 2 par test) | setup : **6–8,6 s → 0,80 s** |
-| Hachage de mot de passe à coût réduit **en session de test** | 440 ms → **2,2 ms** par hachage |
-
-### Ce qui n'a pas été affaibli
-
-- **Aucun test supprimé, ignoré ni assoupli.** Le seul `skip` de la suite est
-  inchangé.
-- Chaque test garde **sa propre base physique**. L'isolation reste structurelle :
-  elle est obtenue plus vite, pas approximée.
-- `src/core/security.py` garde ses paramètres de production. Seul le nom lié dans
-  chaque module est remplacé, pendant la seule session de test.
-- Le hachage de test est un vrai KDF, salé et irréversible : les tests qui vérifient
-  qu'un mauvais mot de passe est rejeté restent honnêtes.
-
----
-
-## Prérequis
-
-- Conteneur PostgreSQL démarré : `docker ps` doit montrer `sysdent_s0b` en `Up`.
-  Il s'est arrêté **trois fois** sur ce poste ; c'est la cause la plus fréquente
-  d'un échec qui n'a rien à voir avec le code.
-- Toujours `127.0.0.1`, jamais `localhost`.
-- Ne **jamais** `pg_terminate_backend` sur la base partagée.
-- `pg_dump` / `psql` sont absents du venv : passer par
-  `docker exec sysdent_s0b pg_dump` / `psql`.
-
----
-
-## Pièges rencontrés, pour ne pas les rediscover
-
-| Piège | Symptôme | Cause |
+| Base | Rôle | Créée par |
 |---|---|---|
-| `tests/platform/` masque le module standard `platform` | `AttributeError: module 'platform' has no attribute 'python_implementation'` | Python ajoute le dossier du script en tête de `sys.path` |
-| Les routers inclus ne sont pas aplatis dans `app.routes` | l'inventaire des routes renvoie **0 route**, sans erreur | cette version de FastAPI conserve un nœud `_IncludedRouter` |
-| `PaginationParams = Depends()` sur un modèle Pydantic | la pagination est inopérante **sans erreur** | `Depends()` n'analyse pas `__init__` : `page` et `limit` restent à 1/20 |
-| Remplacer une fonction importée par son nom | le remplacement échoue **silencieusement** | comparer à `module.fonction` *pendant* la substitution : dès la première, plus rien ne correspond |
-| `CREATE DATABASE … TEMPLATE` échoue | `source database "…" is being accessed by other users` | une connexion reste ouverte sur le modèle |
+| `sysdent_instance_test_marker` | Preuve que l'instance est dédiée aux tests | `docker/init-test/10_marqueur.sql`, au démarrage du conteneur |
+| `sysdent_master_test` | Registre, index des emails, super-admins | `conftest.py` |
+| `sysdent_platform_test` | Console, quotas, annonces | `conftest.py` |
+| `sysdent_modele_tenant_test` | Modèle migré, **cloné** par base de test | `base_de_test.py` |
+
+Aucune de ces bases ne porte de donnée réelle : elles sont sur une instance
+`tmpfs`, sans volume sur disque.
+
+## Les bases que les tests ne doivent jamais viser
+
+La garde de démarrage échoue également si `TEST_DATABASE_URL` :
+
+- désigne le même `hôte:port` que l'instance de développement ;
+- nomme une base réelle : `sysdent_master`, `sysdent_platform`, ou une base de
+  cabinet du registre.
+
+Ces trois refus sont **cumulatifs** : il faut que les trois soient satisfaits
+pour qu'une session démarre.
+
+## Lancer les tests
+
+Depuis `Backend/` :
+
+```powershell
+$env:TEST_DATABASE_URL = "..."
+.\.venv\Scripts\python.exe -m pytest tests/ -q
+```
+
+## Ce que le hook de commit vérifie, et ce qu'il ne vérifie pas
+
+Le hook `pre-commit` (`Backend/scripts/controle_integrite.py`) vérifie la
+compilation, l'unicité de tête de chaque chaîne Alembic, et l'absence de
+caractères d'écritures non latines dans les fichiers modifiés. Il **ne vérifie
+pas** la base visée : c'est la garde de démarrage des tests qui le fait, parce
+qu'elle peut, elle, se connecter et constater.
+
+## Ne pas contourner la garde
+
+Si une session échoue en annonçant que l'instance n'est pas marquée, la réponse
+n'est pas de désactiver le contrôle. C'est de lancer
+`docker compose -f docker-compose.test.yml up -d`. Une garde qu'on écarte
+quand elle gêne est une garde qui ne protège plus au moment où l'on en aurait
+besoin.

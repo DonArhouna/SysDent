@@ -279,8 +279,7 @@ def test_une_base_de_registre_reste_protegee_meme_armee(monkeypatch) -> None:
 URL_TESTS = "postgresql+asyncpg://postgres:motdepasse@127.0.0.1:55436/postgres"
 
 #: L'instance reelle des tenants, telle que configuree.
-HOTE_REEL = conftest.settings.TENANT_DB_HOST
-PORT_REEL = conftest.settings.TENANT_DB_PORT
+HOTE_REEL, PORT_REEL = conftest.INSTANCE_DEVELOPPEMENT
 
 
 def supprimer(

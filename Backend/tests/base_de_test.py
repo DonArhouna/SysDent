@@ -24,16 +24,33 @@ from src.core.migrations import upgrade_tenant_to_head
 
 #: Nom du modèle vide au schéma à jour. Renseigné au premier usage puis réutilisé
 #: : le construire coûte le démarrage d'Alembic et 17 lots de DDL.
-MODELE_TENANT = "sysdent_modele_tenant"
+#:
+#: Il porte le suffixe `_test` **exprès** : l'instance de développement possède
+#: déjà une base `sysdent_modele_tenant`. Deux bases du même nom sur deux
+#: instances, et une connexion qui dérape d'une ligne suffirait à supprimer la
+#: mauvaise. Un nom distinct rend l'erreur visible au lieu de la rendre
+#: irrattrapable.
+MODELE_TENANT = "sysdent_modele_tenant_test"
 
 _modele_prete: bool = False
 
 
 def _creds() -> str:
-    return (
-        f"{settings.TENANT_DB_USER}:{settings.TENANT_DB_PASSWORD}"
-        f"@{settings.TENANT_DB_HOST}:{settings.TENANT_DB_PORT}"
-    )
+    """Identifiants de l'instance de tests, **jamais ceux du développement**.
+
+    Avant, ce module lisait `settings.TENANT_DB_*` : il créait et détruisait donc
+    des bases sur l'instance qui porte les cabinets. Il lit désormais la même
+    variable que `conftest.py`, dont la garde de démarrage a vérifié qu'elle
+    désigne une instance marquée comme instance de tests.
+    """
+    base = os.environ.get("TEST_DATABASE_URL", "").strip()
+    if not base:
+        raise RuntimeError(
+            "TEST_DATABASE_URL absente : la garde de demarrage des tests devrait "
+            "avoir arrete la session avant ce point."
+        )
+    _, _, reste = base.partition("://")
+    return reste.rstrip("/").rsplit("/", 1)[0]
 
 
 def _async_url(db_name: str) -> str:

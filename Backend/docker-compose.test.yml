@@ -1,0 +1,41 @@
+# Instance PostgreSQL **dédiée aux tests**.
+#
+# Volontairement distincte de l'instance de développement :
+#
+#   - port différent (55436 ; le développement est sur 55435, et 5432/5433 sont
+#     pris par d'autres projets) ;
+#   - volume **tmpfs** : rien n'est écrit sur le disque. Une session de tests qui
+#     laisse une base derrière disparaît au redémarrage du conteneur, ce qui est
+#     exactement le comportement voulu pour une instance jetable ;
+#   - **identifiants imposés par variable d'environnement**, sans valeur par
+#     défaut : ils ne peuvent donc pas être ceux du développement, et ils ne
+#     sont pas écrits dans le dépôt ;
+#   - une base-témoin `sysdent_instance_test_marker` est créée au démarrage.
+#     C'est elle que vérifie la garde de démarrage de `tests/conftest.py` : sans
+#     elle, la session de tests refuse de s'exécuter.
+#
+# Lancement : voir `docs/TESTS.md`.
+
+services:
+  postgres_test:
+    image: postgres:16-alpine
+    container_name: sysdent_test_pg
+    restart: "no"
+    environment:
+      POSTGRES_USER: ${TEST_PG_USER:-sysdent_tests}
+      POSTGRES_PASSWORD: ${TEST_PG_PASSWORD:?TEST_PG_PASSWORD est obligatoire - voir docs/TESTS.md}
+      POSTGRES_DB: postgres
+    ports:
+      # 55436 est distinct de 55435 (développement), 5433 et 5432.
+      - "${TEST_PG_PORT:-55436}:5432"
+    volumes:
+      # Éphémère : le répertoire de données vit en RAM, jamais sur le disque.
+      - type: tmpfs
+        target: /var/lib/postgresql/data
+      # Base-témoin, créée au tout premier démarrage de cette instance.
+      - ./docker/init-test:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TEST_PG_USER:-sysdent_tests} -d postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 20

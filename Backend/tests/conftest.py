@@ -15,6 +15,7 @@ import gc
 import hashlib
 import hmac
 import os
+import pathlib
 import re
 import sys
 import uuid
@@ -29,6 +30,94 @@ import structlog
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+# ---------------------------------------------------------------------------
+# Reorientation de la configuration applicative, AVANT tout import de `src`
+# ---------------------------------------------------------------------------
+#: **Pourquoi ici, et pas dans une fixture.** L'application tient ses connexions
+#: dans des moteurs globaux (`master_engine`, `platform_engine`,
+#: `tenant_db_manager`) construits a partir de `settings`, donc au moment ou
+#: `src.core.config` est importe. Un test qui passe par l'application - login,
+#: creation de cabinet via l'API, health - utilise ces moteurs : ils visent
+#: l'instance de developpement, et y ecrivent. Rediriger une fixture ne
+#: suffirait pas ; il faut que `settings` ne regarde jamais l'instance de
+#: developpement pendant une session de tests.
+#:
+#: L'instance de developpement est lue **avant** ecrasement, et seulement son
+#: hote et son port : la garde en a besoin pour reconnaitre une URL qui y
+#: pointerait. Aucun mot de passe n'est lu ici, ni conserve.
+
+BASE_MASTER_TESTS = "sysdent_master_test"
+BASE_PLATEFORME_TESTS = "sysdent_platform_test"
+BASE_TENANT_TESTS = "sysdent_modele_tenant_test"
+
+#: Definie ici, avant la reorientation plus bas, qui en a besoin.
+VARS_URL_TESTS = "TEST_DATABASE_URL"
+
+
+def _lire_env_de_developpement() -> tuple[str, int]:
+    """`(hote, port)` de l'instance de developpement, lus dans `.env`.
+
+    Lecture directe du fichier, avant tout import de `src.core.config` : a cet
+    instant `settings` renverrait les valeurs qu'on est en train d'ecraser.
+    """
+    hote, port = "localhost", 5432
+    fichier = pathlib.Path(__file__).resolve().parents[1] / ".env"
+    if fichier.is_file():
+        for ligne in fichier.read_text(encoding="utf-8", errors="replace").splitlines():
+            ligne = ligne.strip()
+            if ligne.startswith("#") or "=" not in ligne:
+                continue
+            cle, _, valeur = ligne.partition("=")
+            cle = cle.strip()
+            valeur = valeur.strip().strip('"').strip("'")
+            if cle == "TENANT_DB_HOST" and valeur:
+                hote = valeur
+            elif cle == "TENANT_DB_PORT" and valeur.isdigit():
+                port = int(valeur)
+    return hote, port
+
+
+INSTANCE_DEVELOPPEMENT = _lire_env_de_developpement()
+
+
+def _reorienter_configuration_vers_les_tests() -> None:
+    """Fait pointer `settings` vers l'instance de tests, avant qu'il soit cree."""
+    from urllib.parse import unquote, urlsplit
+
+    url = os.environ.get(VARS_URL_TESTS, "").strip()
+    if "://" not in url:
+        return  # la garde de demarrage refusera la session : rien a ecraser
+
+    parties = urlsplit(url)
+    identifiants = parties.netloc.rpartition("@")[0]
+    utilisateur = unquote(identifiants.partition(":")[0])
+    mot_de_passe = unquote(identifiants.partition(":")[2])
+    if not utilisateur or not mot_de_passe:
+        return
+
+    hote = parties.hostname or "localhost"
+    port = str(parties.port or 5432)
+    os.environ.update({
+        "MASTER_DB_HOST": hote,
+        "MASTER_DB_PORT": port,
+        "MASTER_DB_USER": utilisateur,
+        "MASTER_DB_PASSWORD": mot_de_passe,
+        "MASTER_DB_NAME": BASE_MASTER_TESTS,
+        "TENANT_DB_HOST": hote,
+        "TENANT_DB_PORT": port,
+        "TENANT_DB_USER": utilisateur,
+        "TENANT_DB_PASSWORD": mot_de_passe,
+        "TENANT_DB_NAME": BASE_TENANT_TESTS,
+        "PLATFORM_DB_HOST": hote,
+        "PLATFORM_DB_PORT": port,
+        "PLATFORM_DB_USER": utilisateur,
+        "PLATFORM_DB_PASSWORD": mot_de_passe,
+        "PLATFORM_DB_NAME": BASE_PLATEFORME_TESTS,
+    })
+
+
+_reorienter_configuration_vers_les_tests()
 
 from src.core.config import settings
 from src.core.database import tenant_db_manager
@@ -47,15 +136,17 @@ except ImportError:  # pragma: no cover
 structlog.configure(wrapper_class=structlog.make_filtering_bound_logger(20))
 
 
+#: **Les tests ne visent que l'instance de tests.** Il n'y a plus de repli sur la
+#: configuration de l'application : un repli est une porte de sortie, et cette
+#: porte s'est ouverte sur l'instance qui porte les cabinets.
 def _server_url() -> str:
-    """URL du serveur PostgreSQL de test (sans nom de base)."""
-    base = os.environ.get("TEST_MASTER_DB_URL")
-    if base:
-        return base
-    return (
-        f"postgresql://{settings.TENANT_DB_USER}:{settings.TENANT_DB_PASSWORD}"
-        f"@{settings.TENANT_DB_HOST}:{settings.TENANT_DB_PORT}"
-    )
+    """URL du serveur PostgreSQL de test (sans nom de base).
+
+    `TEST_DATABASE_URL` est obligatoire. Son absence a deja arrete la session dans
+    la garde de demarrage ; ici, on ne fait que la lire.
+    """
+    base = os.environ.get(VARS_URL_TESTS, "").strip()
+    return base or "postgresql+asyncpg://inconnu:inconnu@localhost:1/postgres"
 
 
 def _creds() -> str:
@@ -95,9 +186,12 @@ async def master_db() -> AsyncGenerator[AsyncSession, None]:
     """
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-    from src.core.config import settings
-
-    engine = create_async_engine(settings.master_db_async_url)
+    # **La base master des tests, pas la base master de l'application.** Avant,
+    # cette fixture ouvrait `settings.master_db_async_url`, c'est-à-dire le
+    # registre réel des cabinets : la suite y écrivait, et les tests se
+    # voyaient entre eux. Elle est créée et migrée par
+    # `_preparer_bases_de_tests`.
+    engine = create_async_engine(_url_base_de_tests(BASE_MASTER_TESTS))
     factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
     session = factory()
     try:
@@ -165,6 +259,227 @@ BASES_PROTEGEES = frozenset(
         "sysdent_tenant_ref",
     }
 )
+
+# ---------------------------------------------------------------------------
+# Instance de tests : ou les tests ont-ils le droit d'aller ?
+# ---------------------------------------------------------------------------
+#: **Pourquoi cette garde existe separement de la garde de purge.** La purge a ete
+#: neutralisee : elle ne s'execute plus. Mais les tests continuaient a creer et a
+#: detruire des bases sur l'instance de developpement, et la fixture `master_db`
+#: ecrivait dans la **vraie** base master. Une suite de tests qui vise l'instance
+#: de production reste un piege, meme avec toutes les purges inactives.
+#:
+#: La session echoue donc des le depart si `TEST_DATABASE_URL` n'est pas fixee,
+#: si elle vise le developpement, si elle nomme une base reelle, ou si l'instance
+#: ne porte pas la base-temoin. Une seule de ces quatre conditions suffit.
+
+#: `VARS_URL_TESTS` est defini plus haut, avant la reorientation de la
+#: configuration, qui en depend.
+
+#: Base-temoin de l'instance de tests. Sa presence est la preuve qu'une instance
+#: a ete provisions **volontairement** pour les tests. Aucune instance reelle ne
+#: en porte une : elle est creee par `docker/init-test/10_marqueur.sql`.
+MARQUEUR_INSTANCE_DE_TESTS = "sysdent_instance_test_marker"
+
+#: Bases nommees explicitement, qu'aucun test n'a le droit de viser. Chacune
+#: existe en developpement et contient du travail reel.
+NOMS_DE_BASES_REELLES = frozenset({"sysdent_master", "sysdent_platform"})
+
+#: Prefixe des bases de cabinet. Regle distincte de la precedente : un nom de
+#: cabinet est un `sysdent_tenant_<slug>_<hex>`, et la liste ci-dessus n'en
+#: contient aucun. Les deux regles sont donc testees separement, pour qu'en
+#: retirer l'une n'ouvre pas la porte que l'autre fermait.
+PREFIXE_BASE_CABINET = "sysdent_tenant_"
+
+
+def raison_de_refus_de_tests(
+    url: str | None, *, hote_dev: str, port_dev: int
+) -> str | None:
+    """
+    Pourquoi cette URL de tests serait refusee, ou `None` si elle convient.
+
+    Fonction **pure**, sans connexion : elle doit pouvoir etre testee sans
+    instance, et son verdict doit etre reproductible.
+
+    Les refus sont cumulatifs et independants. Une regle de moins doit laisser
+    les autres en place : c'est verifie par injection de defaut dans
+    `tests/test_garde_instance_tests.py`.
+    """
+    if not url or not url.strip():
+        return (
+            f"{VARS_URL_TESTS} n'est pas renseignee. Les tests ont besoin d'une "
+            f"instance dediee, sans valeur par defaut : lancer "
+            f"`docker compose -f docker-compose.test.yml up -d` puis fixer "
+            f"{VARS_URL_TESTS}. Voir docs/TESTS.md."
+        )
+
+    from urllib.parse import urlsplit
+
+    parties = urlsplit(url.strip())
+    if not parties.scheme or not parties.hostname:
+        return f"{VARS_URL_TESTS} n'est pas une URL exploitable : {url!r}"
+
+    port = parties.port or 5432
+    if port == port_dev:
+        return (
+            f"{VARS_URL_TESTS} vise le port {port_dev}, qui est celui de "
+            f"l'instance de developpement. Les tests ecrivent leurs bases la : "
+            f"ils destructionneraient les cabinets. Utiliser l'instance de "
+            f"tests sur un autre port (55436 par defaut). Voir docs/TESTS.md."
+        )
+
+    nom_base = (parties.path or "/").lstrip("/")
+    if nom_base in NOMS_DE_BASES_REELLES or nom_base.startswith(PREFIXE_BASE_CABINET):
+        return (
+            f"{VARS_URL_TESTS} nomme la base '{nom_base}', qui est une base "
+            f"reelle. Les tests utilisent leurs propres bases "
+            f"(sysdent_master_test, sysdent_platform_test, modele de tenant "
+            f"clone). Voir docs/TESTS.md."
+        )
+
+    return None
+
+
+async def _marqueur_present(url: str) -> bool:
+    """L'instance porte-t-elle la base-temoin des tests ? Lecture seule."""
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy.pool import NullPool
+
+    from urllib.parse import urlsplit
+
+    base = url.strip()
+    if base.startswith("postgresql://"):
+        base = "postgresql+asyncpg://" + base[len("postgresql://"):]
+    elif base.startswith("postgresql+psycopg2://"):
+        base = "postgresql+asyncpg://" + base[len("postgresql+psycopg2://"):]
+
+    parties = urlsplit(base)
+    administration = base.rsplit("/", 1)[0] + "/postgres"
+
+    moteur = create_async_engine(administration, isolation_level="AUTOCOMMIT", poolclass=NullPool)
+    try:
+        async with moteur.connect() as conn:
+            from sqlalchemy import text as _text
+
+            trouve = await conn.execute(
+                _text("SELECT 1 FROM pg_database WHERE datname = :marqueur"),
+                {"marqueur": MARQUEUR_INSTANCE_DE_TESTS},
+            )
+            return trouve.scalar_one_or_none() is not None
+    finally:
+        await moteur.dispose()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _garantir_instance_de_tests():
+    """
+    Arrete la session **avant le premier test** si elle ne vise pas une instance
+    de tests.
+
+    Cette fixture est definie avant la garde de purge, donc avant elle : un refus
+    ici interdit meme d'y penser. Un message d'erreur clair vaut mieux qu'une
+    suite verte qui a detruit des bases au passage.
+    """
+    url = os.environ.get(VARS_URL_TESTS)
+    # On compare a l'instance de developpement **telle qu'elle etait configuree**,
+    # lue avant la reorientation : apres, `settings` designate l'instance de tests,
+    # et la garde se comparerait a elle-meme.
+    hote_dev, port_dev = INSTANCE_DEVELOPPEMENT
+    refus = raison_de_refus_de_tests(url, hote_dev=hote_dev, port_dev=port_dev)
+    if refus is not None:
+        pytest.fail(f"\n  [garde] session de tests refusee : {refus}\n", pytrace=False)
+
+    try:
+        marque = asyncio.run(_marqueur_present(url or ""))
+    except Exception as exc:  # noqa: BLE001
+        pytest.fail(
+            f"\n  [garde] session de tests refusee : impossible de joindre "
+            f"l'instance de tests ({type(exc).__name__}). Verifier que "
+            f"`docker compose -f docker-compose.test.yml up -d` est lance, et que "
+            f"{VARS_URL_TESTS} est correcte.\n",
+            pytrace=False,
+        )
+
+    if not marque:
+        pytest.fail(
+            f"\n  [garde] session de tests refusee : l'instance visee ne porte "
+            f"pas la base-temoin '{MARQUEUR_INSTANCE_DE_TESTS}'. Cette base "
+            f"n'existe que sur une instance volontairement dediee aux tests ; "
+            f"son absence signifie que la cible est une instance reelle. "
+            f"Voir docs/TESTS.md.\n",
+            pytrace=False,
+        )
+
+
+#: Bases que la suite utilise : definies plus haut, avant la reorientation.
+
+
+def _url_base_de_tests(nom_base: str) -> str:
+    """URL d'une base de cette instance de tests, Credentials jamais journalisees."""
+    base = _server_url().rstrip("/")
+    return base.rsplit("/", 1)[0] + "/" + nom_base
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _preparer_bases_de_tests():
+    """
+    Cree et migre, une fois par session, les bases que la suite utilise.
+
+    La base master de la suite est **`sysdent_master_test`** : la vraie base
+    master n'est plus ni lue ni ecrite par les tests. C'etait le point ouvert
+    depuis des mois, et la raison pour laquelle une simple exécution de la suite
+    pouvait modifier le registre des cabinets.
+    """
+    from sqlalchemy import text as _text
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy.pool import NullPool
+
+    from src.core.migrations import upgrade_master_to_head, upgrade_platform_to_head
+
+    async def _creer_si_absente(noms: list[str]) -> None:
+        moteur = create_async_engine(
+            _url_base_de_tests("postgres"), isolation_level="AUTOCOMMIT", poolclass=NullPool
+        )
+        try:
+            async with moteur.connect() as conn:
+                for nom in noms:
+                    await conn.execute(_text(f'CREATE DATABASE "{nom}"'))
+        finally:
+            await moteur.dispose()
+
+    async def _existe(nom: str) -> bool:
+        moteur = create_async_engine(
+            _url_base_de_tests("postgres"), isolation_level="AUTOCOMMIT", poolclass=NullPool
+        )
+        try:
+            async with moteur.connect() as conn:
+                trouve = await conn.execute(
+                    _text("SELECT 1 FROM pg_database WHERE datname = :n"), {"n": nom}
+                )
+                return trouve.scalar_one_or_none() is not None
+        finally:
+            await moteur.dispose()
+
+    a_creer = [n for n in (BASE_MASTER_TESTS, BASE_PLATEFORME_TESTS)
+               if not asyncio.run(_existe(n))]
+    if a_creer:
+        asyncio.run(_creer_si_absente(a_creer))
+
+    # Alembic lit son URL par variable d'environnement pour ces deux chaines :
+    # on la definit pour qu'aucune migration ne soit appliquee par megarde a la
+    # base de developpement.
+    env_precedent = os.environ.get("ALEMBIC_MASTER_DB_URL")
+    os.environ["ALEMBIC_MASTER_DB_URL"] = _url_base_de_tests(BASE_MASTER_TESTS)
+    try:
+        asyncio.run(asyncio.to_thread(upgrade_master_to_head))
+    finally:
+        if env_precedent is None:
+            os.environ.pop("ALEMBIC_MASTER_DB_URL", None)
+        else:
+            os.environ["ALEMBIC_MASTER_DB_URL"] = env_precedent
+
+    yield
+
 
 #: Variable d'environnement exigee pour que la purge s'execute. Sans elle, la
 #: garde ne fait rien et le dit : une purge qui s'execute sur le mauvais serveur
@@ -247,14 +562,9 @@ def classer_base(nom: str, avant_session: frozenset[str], tenants_reels: frozens
 #: introuvable.
 #:
 #: La reponse n'est donc pas un motif de nom plus fin : aucun motif ne distingue
-#: une base de cabinet d'un residu. C'est l'**instance** qui doit etre distinguee.
-
-#: Variable d'environnement designant l'instance de tests.
-VARS_URL_TESTS = "TEST_DATABASE_URL"
-
-#: Base-temoin : sa presence sur une instance signifie qu'on l'a volontairement
-#: dediee aux tests. Aucune instance reelle n'en porte une.
-MARQUEUR_INSTANCE_DE_TESTS = "sysdent_instance_de_tests"
+#: une base de cabinet d'un residu. C'est l'**instance** qui doit etre distinguee,
+#: et la garde de demarrage plus haut s'en assure avant meme que la purge soit
+#: envisagee : `VARS_URL_TESTS` et `MARQUEUR_INSTANCE_DE_TESTS` y sont definis.
 
 #: Prefixe de toute base provisionnee pour un cabinet (`sanitize_db_name`).
 PREFIXE_TENANT = "sysdent_tenant_"
@@ -364,10 +674,11 @@ def _garder_la_purge():
         """Raison pour laquelle la garde reste inerte, ou `None` si un est ouverte."""
         if not url_tests:
             return f"{VARS_URL_TESTS} n'est pas renseignee : aucune instance de tests designee"
-        if not cible_distincte(url_tests, settings.TENANT_DB_HOST, settings.TENANT_DB_PORT):
+        hote_dev, port_dev = INSTANCE_DEVELOPPEMENT
+        if not cible_distincte(url_tests, hote_dev, port_dev):
             return (
                 f"{resume_url(url_tests)} vise l'instance des tenants "
-                f"({settings.TENANT_DB_HOST}:{settings.TENANT_DB_PORT}), pas une instance dediee"
+                f"({hote_dev}:{port_dev}), pas une instance dediee"
             )
         return None
 
