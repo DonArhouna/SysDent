@@ -57,6 +57,22 @@ CARACTERES_ADMIS = set(
     "→"  # flèche « puis, donc » : convention établie dans ce dépôt
 )
 
+#: Plages de caractères **typographiques**, admises par la règle stricte.
+#:
+#: Élargies après usage réel : en l'appliquant aux huit fichiers à corriger, la
+#: règle stricte a signalé 55 caractères, tous des traits de cadre de tableaux
+#: (U+2500) et des flèches (U+2194). Le dépôt trace ses tableaux ainsi depuis le
+#: début, et le hook bloque tout commit touchant ces fichiers : une règle que
+#: l'on contourne à chaque fois n'est plus une règle.
+#:
+#: Ces plages ne franchissent pas la frontière des écritures : la règle bloquante
+#: ci-dessous reste la seule qui juge d'une dégradation, et elle est inchangée.
+PLAGES_TYPOGRAPHIE = (
+    (0x2190, 0x21FF, "flèches"),
+    (0x2500, 0x257F, "traits de cadre"),
+    (0x2580, 0x259F, "éléments de bloc"),
+)
+
 #: Plages de caractères d'écritures non latines, et le caractère de remplacement.
 #: Intervalles inclusifs. Rien de tout cela n'a de raison d'apparaître dans un
 #: commentaire ou un identifiant français : c'est la signature du défaut que
@@ -99,7 +115,13 @@ def categorie_etrangere(caractere: str) -> str | None:
 
 
 def _admis_strict(caractere: str) -> bool:
-    return caractere in CARACTERES_ADMIS or " " <= caractere <= "~"
+    if caractere in CARACTERES_ADMIS or " " <= caractere <= "~":
+        return True
+    code = ord(caractere)
+    for debut, fin, _ in PLAGES_TYPOGRAPHIE:
+        if debut <= code <= fin:
+            return True
+    return False
 
 
 def controler_caracteres(chemins: Iterable[pathlib.Path], *, strict: bool) -> list[str]:
