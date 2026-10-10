@@ -183,7 +183,7 @@ class SupportAccessService:
     ) -> AccesSupport:
         """
         Révoque immédiatement. Un accès déjà expiré est renvoyé tel quel plutôt
-        qu'une erreur : l'opérateur doit pouvoir «确保 » l'absence d'accès sans
+        qu'une erreur : l'opérateur doit pouvoir «constater » l'absence d'accès sans
         Fail.
         """
         acces = (

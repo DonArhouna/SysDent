@@ -67,7 +67,7 @@ VALEURS = {
 }
 
 # Routes PUBLIQUES : elles n'authentifient personne, donc le contrôle du
-# périmètre support n'y est pas到達 — la validation du corps (422) répond avant
+# périmètre support n'y est pas concerné — la validation du corps (422) répond avant
 # même que les dépendances soient résolues. Un jeton support n'y ouvre rien.
 #
 # Cette liste n'est pas une exemption : `test_jeton_support_na_change_rien_sur_les_routes_publiques`

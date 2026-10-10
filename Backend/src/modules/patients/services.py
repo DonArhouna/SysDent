@@ -539,7 +539,7 @@ class PatientService:
     ) -> Patient:
         """
         Archivage (UC12). Le dossier n'est jamais supprimé : les données
-        의료 remain accessibles pour la traçabilité. Un dossier avec consultations
+        Les données remain accessibles pour la traçabilité. Un dossier avec consultations
         ne peut être archivé que s'il n'a aucune consultation en cours.
         """
         patient = await PatientService._charger_patient_avec_dossier(db, patient_id, with_antecedents=False)

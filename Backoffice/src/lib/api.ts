@@ -8,7 +8,7 @@ import type { paths } from '@/lib/openapi'
  *   écrit à la main devient une erreur de compilation, et non un 422 à
  *   l'exécution. C'est ce que la décision 7 achète : la classe de dérive
  *   « le frontend envoie un paramètre inexistant » devient impossible à écrire,
- *   là où elle suffisait de le constat��r.
+ *   là où elle suffisait de le constater.
  * - **Base URL vide en développement** : les appels partent en chemin relatif et
  *   le proxy Vite relaie. La requête reste same-origin, aucun CORS n'intervient,
  *   et le port du backend n'est connu que du proxy.

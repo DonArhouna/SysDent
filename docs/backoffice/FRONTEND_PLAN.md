@@ -18,7 +18,7 @@ dans `Backoffice/`.**
 
 1. **Zéro risque de régression sur l'application client.** Le client est en
    production et couvert par 12 tests frontend. Un package partagé impose de faire
-   évoluer les deux锁 en même temps : toute erreur de version casse le client.
+   évoluer les deux ensemble en même temps : toute erreur de version casse le client.
 2. **Le design system du client est encore en mouvement.** Les tokens, la bascule
    de thème et les composants (`PageHeader`, `KpiCard`, `StatusBadge`,
    `DataTable`, `Pagination`, `EmptyState`) viennent d'être créés ou modifiés. Un
@@ -235,7 +235,7 @@ Chaque lot : backend si nécessaire → frontend → tests → non-régression �
 | A | Copier les composants plutôt que package partagé | **Appliquer A** pour démarrer, extraire `@sysdent/ui` quand le design system se stabilise |
 | B | Endpoint d'agrégats pour le tableau de bord | **Ajouter** `GET /platform/stats/dashboard` : 9 requêtes au chargement sont un défaut, pas une optimisation |
 | C | Stockage du jeton plateforme | cookie `httpOnly` si le backend le pose ; sinon mémoire + refresh — **à vérifier** |
-| D | Codes de secours 2FA | le backend似乎 ne les prévoit pas ; à ajouter si le propriétaire les veut |
+| D | Codes de secours 2FA | le backend aujourd'hui ne les prévoit pas ; à ajouter si le propriétaire les veut |
 
 ---
 

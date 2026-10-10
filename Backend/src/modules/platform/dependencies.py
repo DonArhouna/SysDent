@@ -289,7 +289,7 @@ async def get_current_platform_user_soft(
     Trois regles, non negociables :
 
     1. **Le captage est type, pas large.** Seul `AuthenticationException` est
-       transforme en `None`. Un `except Exception` هنا avalerait un defaut de
+       transforme en `None`. Un `except Exception` élargi avalerait un defaut de
        notre code - une colonne renommee, une conversion qui echoue - et le
        transformerait en « aucun jeton », donc en 401. Une panne de notre cote
        deviendrait un refus d'authentification : impossible a diagnostiquer, et

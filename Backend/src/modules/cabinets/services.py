@@ -852,7 +852,7 @@ class DisponibiliteService:
         if data.cabinet_id:
             await CabinetService.obtenir(db, data.cabinet_id)
 
-        # Deux plages exactement identiques n'apportent rien et肆无忌惮 le
+        # Deux plages exactement identiques n'apportent rien et brouillent le
         # calcul de créneaux (fusionnées sans que personne ne s'en aperçoive).
         chevauchant = await DisponibiliteService._chevauchement_exact(
             db,

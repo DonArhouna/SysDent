@@ -353,7 +353,7 @@ class PlatformAuthService:
         Consomme un code de secours : `True` s'il etait valide.
 
         **Usage unique.** Le code est retire de la liste qu'il a servi, donc un
-        code vole et rejoue ne fonctionne qu'une fois. Si deux codes��ment a la
+        code vole et rejoue ne fonctionne qu'une fois. Si deux codes correspondant simultanement a la
         meme valeur (quasi impossible, collision sur 40 bits), tous les codes de
         cette valeur sont retires : en garder un rendrait le rejeu possible.
         """
