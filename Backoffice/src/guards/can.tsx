@@ -1,31 +1,83 @@
-import type { ReactNode } from 'react'
-
-import { possedePermission, useAuthStore } from '@/stores/auth-store'
+import { type ReactNode } from 'react'
+import { Navigate } from 'react-router-dom'
+import { useAuthStore, possedePermission } from '@/stores/auth-store'
 
 /**
- * Permissions pilotées par l'API, jamais par une table codée en dur.
- *
- * La source est la liste **`permissions` de `/platform/auth/me`** : un bouton
- * visible mais refusé en 403 est le pire des deux mondes — l'utilisateur croit
- * à un bug. Et une permission écrite en dur finit toujours par diverger du
- * backend ; c'est déjà arrivé deux fois sur les permissions de rôle.
- *
- * Ce composant ne remplace **pas** le contrôle serveur : il évite d'afficher ce
- * qui serait refusé, pas d'autoriser ce qui ne l'est pas.
+ * Vrai si le profil courant porte la permission demandée. Sans profil, aucun
+ * droit : toute navigation conditionnée doit attendre `/auth/me`.
  */
-export function usePermission(permission: string): boolean {
-  const profil = useAuthStore((etat) => etat.profil)
+export function usePermission(permission?: string): boolean {
+  const profil = useAuthStore((s) => s.profil)
+  if (!profil || !permission) return false
   return possedePermission(profil, permission)
 }
 
-export function Can({
-  permission,
-  children,
-  fallback = null,
-}: {
-  permission: string
-  children: ReactNode
+interface CanProps {
+  permission?: string
+  role?: string | string[]
   fallback?: ReactNode
+  children: ReactNode
+}
+
+/**
+ * Garde d'affichage conditionnel basé sur le RBAC.
+ * Exemple:
+ * <Can permission="PATIENTS:CREATE">
+ *   <Button>Nouveau Patient</Button>
+ * </Can>
+ */
+export function Can({ permission, role, fallback = null, children }: CanProps) {
+  const profil = useAuthStore((s) => s.profil)
+
+  if (!profil) return <>{fallback}</>
+
+  // Vérification de rôle
+  if (role) {
+    const rolesAcceptes = Array.isArray(role) ? role : [role]
+    const roleAutorise =
+      profil.role === 'ADMIN_CABINET' ||
+      profil.role === 'SUPER_ADMIN' ||
+      rolesAcceptes.includes(profil.role)
+    if (!roleAutorise) return <>{fallback}</>
+  }
+
+  // Vérification de permission
+  if (permission && !possedePermission(profil, permission)) {
+    return <>{fallback}</>
+  }
+
+  return <>{children}</>
+}
+
+/**
+ * Guard pour les routes protégées par permission RBAC.
+ * Redirige vers /403 si l'utilisateur n'a pas les droits requis.
+ */
+export function ProtectedRoute({
+  permission,
+  role,
+  children,
+}: {
+  permission?: string
+  role?: string | string[]
+  children: ReactNode
 }) {
-  return usePermission(permission) ? <>{children}</> : <>{fallback}</>
+  const profil = useAuthStore((s) => s.profil)
+
+  if (!profil) return null
+
+  if (role) {
+    const rolesAcceptes = Array.isArray(role) ? role : [role]
+    const roleAutorise =
+      profil.role === 'ADMIN_CABINET' ||
+      profil.role === 'SUPER_ADMIN' ||
+      rolesAcceptes.includes(profil.role)
+    if (!roleAutorise) return <Navigate to="/403" replace />
+  }
+
+  if (permission && !possedePermission(profil, permission)) {
+    return <Navigate to="/403" replace />
+  }
+
+  return <>{children}</>
 }

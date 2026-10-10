@@ -18,6 +18,10 @@ MIGRATION ENROLEMENT 2FA (COMPTE RENDU ANCIEN) : f2c9e5d7a3b1_enrolement_2fa_sec
 
 **STATUT 2026-10-09 (session correctif enrollement 2FA, terminee)** :
 Acces : OPERATIONNEL — rhonekane conserve, 2FA active, secret intact, 6 sessions.
+
+---
+
+SOCLE VISUEL DU BACKOFFICE : parité tokens (56), parité composants (6), design:parité exit 0, tsc+lint verts, `npm run verifier` vert.
 Migration : ecrite, validee sur copie, appliquee a la base reelle le 2026-10-10.
 Codes de secours : regenerables (endpoint + ecran `/codes-secours` + banniere).
 Suite complete : **440 passes, 3 sautes** (0 echec, 14 min 34 s).

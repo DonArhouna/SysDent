@@ -513,6 +513,38 @@
         "title": "APIResponse[CreneauxResponse]",
         "type": "object"
       },
+      "APIResponse_DashboardResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DashboardResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "title": "APIResponse[DashboardResponse]",
+        "type": "object"
+      },
       "APIResponse_DentResponse_": {
         "properties": {
           "data": {
@@ -6701,6 +6733,149 @@
           "praticien_id"
         ],
         "title": "CreneauxResponse",
+        "type": "object"
+      },
+      "DashboardItem": {
+        "description": "Un cabinet résumé pour le tableau de bord (pas de contenu clinique).",
+        "properties": {
+          "jours_inactivite": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jours Inactivite"
+          },
+          "nom": {
+            "title": "Nom",
+            "type": "string"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan"
+          },
+          "quotas": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quotas"
+          },
+          "statut": {
+            "title": "Statut",
+            "type": "string"
+          },
+          "tenant_id": {
+            "format": "uuid",
+            "title": "Tenant Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "nom",
+          "statut"
+        ],
+        "title": "DashboardItem",
+        "type": "object"
+      },
+      "DashboardResponse": {
+        "description": "Tout ce que le tableau de bord affiche, dans **un** appel HTTP.\n\nL'écran ne doit jamais faire deux requêtes pour une donnée agrégée : la\nlatence de l'agrégation est payée par le serveur, une fois. Aucun contenu\nclinique, jamais — ces listes ne sont que des compteurs et des noms de\ncabinets déjà exposés par d'autres routes du monde plateforme.",
+        "properties": {
+          "annonces": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/AnnonceResponse"
+            },
+            "title": "Annonces",
+            "type": "array"
+          },
+          "audit": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/AuditEntryResponse"
+            },
+            "title": "Audit",
+            "type": "array"
+          },
+          "essais_proches_expiration": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/DashboardItem"
+            },
+            "title": "Essais Proches Expiration",
+            "type": "array"
+          },
+          "essais_restants_jours": {
+            "default": 14,
+            "title": "Essais Restants Jours",
+            "type": "integer"
+          },
+          "inactifs_30j": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/DashboardItem"
+            },
+            "title": "Inactifs 30J",
+            "type": "array"
+          },
+          "nouveaux_30j": {
+            "default": 0,
+            "title": "Nouveaux 30J",
+            "type": "integer"
+          },
+          "par_formule": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "default": {},
+            "title": "Par Formule",
+            "type": "object"
+          },
+          "par_statut": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "default": {},
+            "title": "Par Statut",
+            "type": "object"
+          },
+          "proches_du_quota": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/DashboardItem"
+            },
+            "title": "Proches Du Quota",
+            "type": "array"
+          },
+          "sante": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Sante",
+            "type": "object"
+          },
+          "total_cabinets": {
+            "default": 0,
+            "title": "Total Cabinets",
+            "type": "integer"
+          }
+        },
+        "title": "DashboardResponse",
         "type": "object"
       },
       "DentMiseAJour": {
@@ -24120,6 +24295,28 @@
           }
         },
         "summary": "État de santé de la plateforme",
+        "tags": [
+          "Platform · Supervision & journal"
+        ]
+      }
+    },
+    "/api/v1/platform/stats/dashboard": {
+      "get": {
+        "description": "Agrégats du tableau de bord, calculés **une seule fois** : cabinets par\nstatut et par plan, nouveaux cabinets des 30 derniers jours, essais\nproches de l'expiration, cabinets proches du quota, cabinets inactifs,\nrésumé de santé, dernières annonces, dernières actions d'audit.\n\n**Aucun contenu clinique** : seuls les compteurs et les noms de cabinets\n(déjà exposés ailleurs dans le monde plateforme) apparaissent ici. Un\nDashboard doit être moins disant en données qu'en liens, et ce qu'il dit\ndoit tenir dans une requête HTTP — pas une rafale de 3, 4, 6.\n\n**Coût.** Tout vite dans des requêtes SQL sur la seule base plateforme,\nle temps de réponse est mesuré par le test de garde (visé : < 1 s a\nquelques cabinets, < 3 s à 50).",
+        "operationId": "stats_dashboard_api_v1_platform_stats_dashboard_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_DashboardResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Tout ce que le tableau de bord affiche, dans un seul appel",
         "tags": [
           "Platform · Supervision & journal"
         ]

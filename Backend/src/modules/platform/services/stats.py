@@ -328,3 +328,52 @@ class StatsService:
         from src.modules.platform.services.quotas import QuotaService
 
         return await QuotaService.cabinets_proches_du_quota(platform_db, seuil)
+
+    @staticmethod
+    async def _cabinets_essai_proches_expiration(
+        platform_db: AsyncSession, jours_avant_expiration: int = 7
+    ) -> List[Dict[str, Any]]:
+        """Essais proches de leur expiration (< `jours_avant_expiration` jours).
+
+        Ce sont les clients transformables, donc les plus intéressants à voir.
+        La date de fin d'essai est en base plateforme (`tenants_plateforme
+        .date_fin_essai`) : aucune lecture de base client. Seule la date compte —
+        on n'ecrit pas oferece à la main, la date est fait.
+        """
+        from src.modules.platform.models import TenantPlateforme
+        from src.core.database import MasterAsyncSessionFactory
+
+        aujourdhui = date.today()
+        limite = aujourdhui + timedelta(days=jours_avant_expiration)
+        lignes = (
+            (
+                await platform_db.execute(
+                    select(TenantPlateforme)
+                    .where(
+                        TenantPlateforme.statut_metier == "ESSAI",
+                        TenantPlateforme.date_fin_essai.is_(None).invert(),
+                        TenantPlateforme.date_fin_essai <= limite,
+                        TenantPlateforme.date_fin_essai >= aujourdhui - timedelta(days=7),
+                    )
+                    .order_by(TenantPlateforme.date_fin_essai)
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        noms: Dict = {}
+        async with MasterAsyncSessionFactory() as master:
+            noms = await StatsService.noms_des_cabinets(
+                master, [l.tenant_id for l in lignes]
+            )
+
+        return [
+            {
+                "tenant_id": str(l.tenant_id),
+                "nom": noms.get(l.tenant_id),
+                "statut": "ESSAI",
+                "jours_restants": (l.date_fin_essai - aujourdhui).days if l.date_fin_essai else None,
+            }
+            for l in lignes
+        ]

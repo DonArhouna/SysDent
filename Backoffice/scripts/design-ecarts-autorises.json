@@ -1,0 +1,4 @@
+{
+  "ecarts_autorises": {},
+  "_note": "Chaque clé est un token censé exister chez le client, avec justification du droit à différer. Le socle du backoffice ne doit différer d'aucun token. Ajouter une entrée nécessite une justification écrite : « pourquoi ce backoffice diffère »."
+}

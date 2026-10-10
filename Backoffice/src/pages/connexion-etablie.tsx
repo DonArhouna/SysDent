@@ -4,6 +4,8 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuthStore } from '@/stores/auth-store'
+import { AppShell } from '@/components/layout/app-shell'
+
 
 /**
  * Première page atteinte après une connexion réussie.
@@ -40,16 +42,17 @@ export function ConnexionEtabliePage() {
   if (!token) return <Navigate to={vers} replace />
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-6">
-      <Card className="w-full max-w-md">
+    <AppShell>
+      <div className="max-w-2xl mx-auto pb-12 pt-6"/>
+      <Card className="max-w-2xl">
         <CardHeader>
           <CardTitle>Connexion établie</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
             Session ouverte pour <strong>{profil?.email ?? 'votre compte'}</strong>, second
             facteur actif. L'accès au backoffice est opérationnel.
           </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
 
           {profil?.codes_secours_a_regenerer && (
             <div role="status" className="space-y-2 rounded-xl border border-amber-500/50 bg-amber-500/10 p-4 text-sm">
@@ -83,6 +86,6 @@ export function ConnexionEtabliePage() {
           </Button>
         </CardContent>
       </Card>
-    </div>
+    </AppShell>
   )
 }

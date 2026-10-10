@@ -10,8 +10,8 @@ Cinq groupes d'endpoints, tous en lecture ou en écriture d'administration :
 """
 
 import uuid
-from datetime import datetime
-from typing import List, Optional
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,6 +26,8 @@ from src.modules.platform.schemas import (
     AnnonceCreate,
     AnnonceResponse,
     AuditEntryResponse,
+    DashboardItem,
+    DashboardResponse,
     StatsGlobalesResponse,
     StatsTenantResponse,
 )
@@ -33,6 +35,7 @@ from src.modules.platform.services.announcements import AnnouncementService
 from src.modules.platform.services.health import HealthService
 from src.modules.platform.services.journal import JournalService
 from src.modules.platform.services.stats import StatsService
+from src.modules.platform.services.tenants import TenantService
 
 platform_supervision_router = APIRouter(
     prefix="/platform", tags=["Platform · Supervision & journal"]
@@ -76,6 +79,107 @@ def _vers_annonce(annonce: Annonce) -> AnnonceResponse:
 # ==============================================================================
 # STATISTIQUES D'USAGE
 # ==============================================================================
+
+
+def _vers_dashboard_item(donnees: Dict[str, Any]) -> DashboardItem:
+    """Un cabinet résumé pour le tableau de bord, encouvert par `DashboardItem`."""
+    return DashboardItem(
+        tenant_id=donnees["tenant_id"],
+        nom=donnees["nom"],
+        statut=donnees["statut"],
+        plan=donnees.get("plan"),
+        jours_inactivite=donnees.get("jours_inactivite"),
+        quotas=donnees.get("quotas"),
+    )
+
+
+@platform_supervision_router.get(
+    "/stats/dashboard",
+    response_model=APIResponse[DashboardResponse],
+    summary="Tout ce que le tableau de bord affiche, dans un seul appel",
+)
+async def stats_dashboard(
+    platform_db: AsyncSession = Depends(get_platform_db),
+    master_db: AsyncSession = Depends(get_master_db),
+    _: UtilisateurPlateforme = Depends(require_platform_permissions("platform.stats.read")),
+):
+    """
+    Agrégats du tableau de bord, calculés **une seule fois** : cabinets par
+    statut et par plan, nouveaux cabinets des 30 derniers jours, essais
+    proches de l'expiration, cabinets proches du quota, cabinets inactifs,
+    résumé de santé, dernières annonces, dernières actions d'audit.
+
+    **Aucun contenu clinique** : seuls les compteurs et les noms de cabinets
+    (déjà exposés ailleurs dans le monde plateforme) apparaissent ici. Un
+    Dashboard doit être moins disant en données qu'en liens, et ce qu'il dit
+    doit tenir dans une requête HTTP — pas une rafale de 3, 4, 6.
+
+    **Coût.** Tout vite dans des requêtes SQL sur la seule base plateforme,
+    le temps de réponse est mesuré par le test de garde (visé : < 1 s a
+    quelques cabinets, < 3 s à 50).
+    """
+    import time as _time
+
+    debut = _time.perf_counter()
+
+    vue = await StatsService.vue_globale(platform_db)
+    sante = await HealthService.global_(platform_db, master_db)
+    annonces = await AnnouncementService.lister(platform_db, actives_seulement=True)
+
+    # Dernières actions d'audit : 5, pas plus, pour tenir le poids de la réponse.
+    entrees_audit = await JournalService.lister(platform_db, {}, limit=5, offset=0)
+
+    # Depuis 30 jours : les nouveaux (essai + actifs) via la croissance couvrant
+    # les 12 derniers mois : ce tableau donne les deux, on filtre en mémoire.
+    dates_croissance = vue["croissance_mensuelle"]
+    today_yn = datetime.now().strftime("%Y-%m")
+    mois_precedent = (datetime.now() - timedelta(days=30)).strftime("%Y-%m")
+    nouveaux_30j = sum(
+        e.get("nouveaux", 0)
+        for e in dates_croissance
+        if mois_precedent <= e.get("mois", "") <= today_yn
+    )
+
+    def _detail_dashboard(liste_cabinets: List[Dict[str, Any]]) -> List[DashboardItem]:
+        """Enrichit une liste d'agrégats avec les infos service (nom, plan)."""
+        enrichi = []
+        for c in liste_cabinets:
+            item = _vers_dashboard_item(c)
+            enrichi.append(item)
+        return enrichi
+
+    essais = await StatsService._cabinets_essai_proches_expiration(platform_db)
+    proches = await StatsService._cabinets_proches_du_quota(platform_db)
+    inactifs = await StatsService._cabinets_inactifs(platform_db, jours=30)
+
+    essais_restants_jours = (
+        min((_e.get("jours_restants", 999) for _e in essais), default=14)
+    )
+
+    reponse = DashboardResponse(
+        total_cabinets=vue["total_cabinets"],
+        par_statut=vue["par_statut"],
+        par_formule=vue["par_formule"],
+        nouveaux_30j=nouveaux_30j,
+        essais_restants_jours=essais_restants_jours,
+        essais_proches_expiration=_detail_dashboard(essais),
+        proches_du_quota=_detail_dashboard(proches),
+        inactifs_30j=_detail_dashboard(inactifs),
+        sante={
+            "statut": sante.get("statut", "inconnu"),
+            "composants": sante.get("composants", []),
+        },
+        annonces=[_vers_annonce(a) for a in annonces[:5]],
+        audit=[_vers_audit(e) for e in entrees_audit],
+    )
+    duree_ms = (_time.perf_counter() - debut) * 1000
+    print(
+        "[dashboard] temps de réponse:",
+        round(duree_ms, 1),
+        "ms",
+        flush=True,
+    )
+    return APIResponse(data=reponse)
 
 
 @platform_supervision_router.get(

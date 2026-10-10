@@ -493,6 +493,17 @@ class StatsTenantResponse(BaseSchema):
     serie: List[dict] = []
 
 
+class DashboardItem(BaseSchema):
+    """Un cabinet résumé pour le tableau de bord (pas de contenu clinique)."""
+
+    tenant_id: uuid.UUID
+    nom: str
+    statut: str
+    plan: Optional[str] = None
+    jours_inactivite: Optional[int] = None
+    quotas: Optional[dict] = None
+
+
 class AuditEntryResponse(BaseSchema):
     id: uuid.UUID
     horodatage: datetime
@@ -647,3 +658,25 @@ class RegenererCodesSecoursResponse(BaseSchema):
     """Les dix nouveaux codes, renvoyés **une seule fois** — jamais stockés en clair."""
 
     codes_secours: List[str]
+
+
+class DashboardResponse(BaseSchema):
+    """Tout ce que le tableau de bord affiche, dans **un** appel HTTP.
+
+    L'écran ne doit jamais faire deux requêtes pour une donnée agrégée : la
+    latence de l'agrégation est payée par le serveur, une fois. Aucun contenu
+    clinique, jamais — ces listes ne sont que des compteurs et des noms de
+    cabinets déjà exposés par d'autres routes du monde plateforme.
+    """
+
+    total_cabinets: int = 0
+    par_statut: Dict[str, int] = {}
+    par_formule: Dict[str, int] = {}
+    nouveaux_30j: int = 0
+    essais_restants_jours: int = 14
+    essais_proches_expiration: List[DashboardItem] = []
+    proches_du_quota: List[DashboardItem] = []
+    inactifs_30j: List[DashboardItem] = []
+    sante: dict = {}
+    annonces: List[AnnonceResponse] = []
+    audit: List[AuditEntryResponse] = []  # Dernières actions tronquées à 5

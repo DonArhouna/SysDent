@@ -2284,6 +2284,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/stats/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tout ce que le tableau de bord affiche, dans un seul appel
+         * @description Agrégats du tableau de bord, calculés **une seule fois** : cabinets par
+         *     statut et par plan, nouveaux cabinets des 30 derniers jours, essais
+         *     proches de l'expiration, cabinets proches du quota, cabinets inactifs,
+         *     résumé de santé, dernières annonces, dernières actions d'audit.
+         *
+         *     **Aucun contenu clinique** : seuls les compteurs et les noms de cabinets
+         *     (déjà exposés ailleurs dans le monde plateforme) apparaissent ici. Un
+         *     Dashboard doit être moins disant en données qu'en liens, et ce qu'il dit
+         *     doit tenir dans une requête HTTP — pas une rafale de 3, 4, 6.
+         *
+         *     **Coût.** Tout vite dans des requêtes SQL sur la seule base plateforme,
+         *     le temps de réponse est mesuré par le test de garde (visé : < 1 s a
+         *     quelques cabinets, < 3 s à 50).
+         */
+        get: operations["stats_dashboard_api_v1_platform_stats_dashboard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/stats/globales": {
         parameters: {
             query?: never;
@@ -4380,6 +4412,17 @@ export interface components {
              */
             success: boolean;
         };
+        /** APIResponse[DashboardResponse] */
+        APIResponse_DashboardResponse_: {
+            data?: components["schemas"]["DashboardResponse"] | null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
         /** APIResponse[DentResponse] */
         APIResponse_DentResponse_: {
             data?: components["schemas"]["DentResponse"] | null;
@@ -6153,6 +6196,101 @@ export interface components {
              * Format: uuid
              */
             praticien_id: string;
+        };
+        /**
+         * DashboardItem
+         * @description Un cabinet résumé pour le tableau de bord (pas de contenu clinique).
+         */
+        DashboardItem: {
+            /** Jours Inactivite */
+            jours_inactivite?: number | null;
+            /** Nom */
+            nom: string;
+            /** Plan */
+            plan?: string | null;
+            /** Quotas */
+            quotas?: {
+                [key: string]: unknown;
+            } | null;
+            /** Statut */
+            statut: string;
+            /**
+             * Tenant Id
+             * Format: uuid
+             */
+            tenant_id: string;
+        };
+        /**
+         * DashboardResponse
+         * @description Tout ce que le tableau de bord affiche, dans **un** appel HTTP.
+         *
+         *     L'écran ne doit jamais faire deux requêtes pour une donnée agrégée : la
+         *     latence de l'agrégation est payée par le serveur, une fois. Aucun contenu
+         *     clinique, jamais — ces listes ne sont que des compteurs et des noms de
+         *     cabinets déjà exposés par d'autres routes du monde plateforme.
+         */
+        DashboardResponse: {
+            /**
+             * Annonces
+             * @default []
+             */
+            annonces: components["schemas"]["AnnonceResponse"][];
+            /**
+             * Audit
+             * @default []
+             */
+            audit: components["schemas"]["AuditEntryResponse"][];
+            /**
+             * Essais Proches Expiration
+             * @default []
+             */
+            essais_proches_expiration: components["schemas"]["DashboardItem"][];
+            /**
+             * Essais Restants Jours
+             * @default 14
+             */
+            essais_restants_jours: number;
+            /**
+             * Inactifs 30J
+             * @default []
+             */
+            inactifs_30j: components["schemas"]["DashboardItem"][];
+            /**
+             * Nouveaux 30J
+             * @default 0
+             */
+            nouveaux_30j: number;
+            /**
+             * Par Formule
+             * @default {}
+             */
+            par_formule: {
+                [key: string]: number;
+            };
+            /**
+             * Par Statut
+             * @default {}
+             */
+            par_statut: {
+                [key: string]: number;
+            };
+            /**
+             * Proches Du Quota
+             * @default []
+             */
+            proches_du_quota: components["schemas"]["DashboardItem"][];
+            /**
+             * Sante
+             * @default {}
+             */
+            sante: {
+                [key: string]: unknown;
+            };
+            /**
+             * Total Cabinets
+             * @default 0
+             */
+            total_cabinets: number;
         };
         /**
          * DentMiseAJour
@@ -14322,6 +14460,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["APIResponse_dict_"];
+                };
+            };
+        };
+    };
+    stats_dashboard_api_v1_platform_stats_dashboard_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_DashboardResponse_"];
                 };
             };
         };
