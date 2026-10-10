@@ -173,3 +173,8 @@ desktop.ini
 # Sauvegardes PostgreSQL : pg_dump produit du .sql par defaut, non couvert par *.sql.gz
 *.sql
 *.backup
+
+# Les scripts d'initialisation de l'instance de TESTS doivent etre versionnes :
+# sans eux, un clone frais ne cree pas la base-temoin et la garde refuse
+# toute session de tests. L'exclusion ci-dessus est plus large que necessaire.
+!Backend/docker/init-test/*.sql
