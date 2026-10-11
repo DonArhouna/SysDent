@@ -16,9 +16,12 @@ from __future__ import annotations
 
 import json
 import sys
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+import pytest_asyncio
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
@@ -137,6 +140,87 @@ async def test_le_nouveau_controle_est_branche_a_la_sante_globale(master_db) -> 
 
 
 # ---------------------------------------------------------------------------
+# 2bis. Les cas que le controle doit voir, fabriqués sur l'instance de tests
+# ---------------------------------------------------------------------------
+#:
+#: **Pourquoi cette section existe.** Ces tests-là affirmaient des faits sur des
+#: bases de développement : « cinq bases ne sont pas migrées », « cette base est
+#: lisible ». Le 11/10, après la réorientation de `settings` vers l'instance de
+#: tests, ces bases n'y étaient plus : deux tests échouaient, et un troisième
+#: passait à vide — il vérifiait qu'un nom **absent du catalogue** ne figurait
+#: pas parmi les bases sans table de migrations. Il aurait été vert pour la
+#: mauvaise raison.
+#:
+#: Un test de supervision qui dépend de l'état réel d'une autre machine n'est pas
+#: un test : c'est une observation, qui devient fausse sans prévenir et ne peut
+#: pas être reproduite. Les cas sont donc **fabriqués ici**, sur l'instance de
+#: tests, et supprimés après.
+
+
+@pytest_asyncio.fixture
+async def cabinets_de_supervision(master_db):
+    """
+    Deux bases sur l'instance de tests, et deux lignes de registre correspondantes.
+
+    - l'une **migrée** jusqu'à la tête : elle ne doit être ni « en retard » ni
+      « sans table de migrations » ;
+    - l'autre **vide**, sans table `alembic_version` : c'est l'état de cinq
+      bases de démonstration, et c'est un état distinct du « retard ».
+
+    Les deux sont `ACTIVE` : c'est le seul statut qui doit dégrader la santé,
+    et le test doit donc pouvoir le fabriquer.
+    """
+    from sqlalchemy import text as _text
+
+    from tests.conftest import creer_base_jetable, supprimer_base_jetable
+
+    from src.modules.master.models import Societe, TenantDB
+
+    suffixe = uuid.uuid4().hex[:6]
+    migree = f"jetable_sante_migree_{suffixe}"
+    non_migree = f"jetable_sante_vide_{suffixe}"
+
+    await creer_base_jetable(migree, migrer=True)
+    try:
+        await creer_base_jetable(non_migree, migrer=False)
+
+        for nom in (migree, non_migree):
+            societe_id = uuid.uuid4()
+            master_db.add(
+                Societe(
+                    id=societe_id,
+                    nom=f"Cabinet de supervision {nom}",
+                    pays="SN",
+                    actif=True,
+                    date_creation=datetime.now(timezone.utc),
+                )
+            )
+            master_db.add(
+                TenantDB(
+                    id=uuid.uuid4(),
+                    societe_id=societe_id,
+                    db_name=nom,
+                    db_host=settings.TENANT_DB_HOST,
+                    db_port=settings.TENANT_DB_PORT,
+                    db_user=settings.TENANT_DB_USER,
+                    db_password="chiffre-de-test",
+                    statut="ACTIVE",
+                    schema_version="tete",
+                )
+            )
+        await master_db.commit()
+
+        yield {"migree": migree, "non_migree": non_migree}
+    finally:
+        # `finally` : une assertion qui echoue ne doit pas laisser deux bases
+        # derriere. C'etait precisement le genre de fuite que la garde de fin de
+        # session a mis au jour.
+        await master_db.rollback()
+        for nom in (migree, non_migree):
+            await supprimer_base_jetable(nom)
+
+
+# ---------------------------------------------------------------------------
 # 3. Écart de révision de schéma, par cabinet
 # ---------------------------------------------------------------------------
 #:
@@ -147,7 +231,9 @@ async def test_le_nouveau_controle_est_branche_a_la_sante_globale(master_db) -> 
 
 
 @pytest.mark.asyncio
-async def test_le_controle_expose_lecart_de_revision(master_db) -> None:
+async def test_le_controle_expose_lecart_de_revision(
+    master_db, cabinets_de_supervision
+) -> None:
     from src.modules.platform.services.health import HealthService as HS
 
     assert hasattr(HS, "schemas_tenants"), "le contrôle d'écart de schéma n'existe pas"
@@ -160,7 +246,11 @@ async def test_le_controle_expose_lecart_de_revision(master_db) -> None:
     # écrite en dur : une tête écrite en dur devient fausse sans prévenir.
     assert resultat["tete_attendue"]
     assert len(resultat["tete_attendue"]) == 12, "une révision Alembic fait 12 caractères"
-    assert resultat["bases_analysees"] > 0
+    # Le compte n'est plus une observation du developpement : il vient des deux
+    # bases que la fixture vient de fabriquer sur l'instance de tests.
+    assert resultat["bases_analysees"] >= 2, (
+        "les deux bases de la fixture doivent avoir ete inspectees"
+    )
     assert isinstance(resultat["derriere_tete"], list)
     assert isinstance(resultat["sans_table_migrations"], list)
 
@@ -181,56 +271,67 @@ def test_lecalcul_du_retard_utilise_la_chaine_reelle() -> None:
 
 
 @pytest.mark.asyncio
-async def test_une_base_sans_table_migrations_nest_pas_dite_en_retard(master_db) -> None:
+async def test_une_base_sans_table_migrations_nest_pas_dite_en_retard(
+    master_db, cabinets_de_supervision
+) -> None:
     """
-    Cinq bases ne sont pas migrées du tout : elles n'ont aucune table
-    `alembic_version`. Les compter comme « en retard de N migrations » serait
-    faux — et les confondre avec un retard fait perdre le contrôle entier.
+    Une base vide n'a aucune table `alembic_version`. La compter comme « en
+    retard de N migrations » serait faux, et la confondre avec un retard fait
+    perdre le contrôle entier.
+
+    Le cas est **fabriqué** : une base vide portant une ligne ACTIVE au registre.
+    L'ancien test affirmait « cinq bases ne sont pas migrées » sur le
+    développement — un fait observé, pas une propriété vérifiée.
     """
     from src.modules.platform.services.health import HealthService as HS
+
+    vide = cabinets_de_supervision["non_migree"]
 
     resultat = await HS.schemas_tenants(master_db)
 
     en_retard = {e["db_name"] for e in resultat["derriere_tete"]}
     sans_table = set(resultat["sans_table_migrations"])
-    assert sans_table, "les bases non migrées doivent être signalées"
-    assert not (en_retard & sans_table)
-    for nom in sans_table:
-        assert nom not in en_retard
+
+    assert vide in sans_table, "la base vide doit être signalée à part"
+    assert vide not in en_retard, "une base non migrée n'est pas 'en retard de N'"
 
 
 @pytest.mark.asyncio
-async def test_une_base_migree_est_lisible_puis_qu_absente_du_bruit(master_db) -> None:
+async def test_une_base_migree_est_lisible_puis_qu_absente_du_bruit(
+    master_db, cabinets_de_supervision
+) -> None:
     """
     **Le piège PostgreSQL.** Il n'existe aucune syntaxe `base.table` : une
     requête inter-base échoue et fait croire que la table n'existe pas. Le
     symptôme est discret et faux — une base parfaitement migrée, puisée comme
     non migrée, et un contrôle qui ne contrôle rien.
 
-    Une base connue comme migrée doit donc être lisible, et ne pas figurer
-    parmi les bases sans table de migrations.
+    L'ancien test lisait une base **de développement** nommée en dur. Sur
+    l'instance de tests elle n'existait pas : il échouait. Et le test voisin,
+    qui affirmait que cette base n'était pas « en retard », passait **à vide**,
+    puisque le nom était absent du registre : vert pour la mauvaise raison.
     """
     import asyncpg
 
-    from src.core.config import settings
     from src.modules.platform.services.health import HealthService as HS
 
-    cible = "sysdent_tenant_clinique_cabinet_sn_5bd215"
+    migree = cabinets_de_supervision["migree"]
+
     conn = await asyncpg.connect(
         host=settings.TENANT_DB_HOST,
         port=settings.TENANT_DB_PORT,
         user=settings.TENANT_DB_USER,
         password=settings.TENANT_DB_PASSWORD,
-        database=cible,
+        database=migree,
     )
     try:
         revision = await conn.fetchval("SELECT version_num FROM alembic_version")
     finally:
         await conn.close()
-    assert revision, "la base de référence doit être migrée"
+    assert revision, "la base migrée doit l'être réellement"
 
     resultat = await HS.schemas_tenants(master_db)
-    assert cible not in resultat["sans_table_migrations"], (
+    assert migree not in resultat["sans_table_migrations"], (
         "une base migrée ne doit pas être déclarée sans table de migrations"
     )
 
@@ -253,18 +354,32 @@ async def test_la_chaine_de_migrations_a_une_seule_tete() -> None:
 
 
 @pytest.mark.asyncio
-async def test_un_cabinet_a_jour_nest_pas_signale_comme_en_retard(master_db) -> None:
+async def test_un_cabinet_a_jour_nest_pas_signale_comme_en_retard(
+    master_db, cabinets_de_supervision
+) -> None:
     """
     Une base migrée jusqu'à la tête ne doit pas apparaître dans la liste : sinon
     l'écran de santé devient un bruit que l'on cesse de regarder.
+
+    Ce test vérifiait auparavant qu'un nom **absent du registre** ne figurait pas
+    dans la liste. Il était donc vert pour la mauvaise raison : une base qu'on ne
+    trouve pas ne peut évidemment pas être trouvée en retard.
     """
     from src.modules.platform.services.health import HealthService as HS
+
+    migree = cabinets_de_supervision["migree"]
 
     resultat = await HS.schemas_tenants(master_db)
     en_retard = {e["db_name"] for e in resultat["derriere_tete"]}
 
-    # Le cabinet restauré le 10/10 est à la tête : il ne doit pas être listé.
-    assert "sysdent_tenant_clinique_cabinet_sn_5bd215" not in en_retard
+    assert migree not in en_retard, "une base à la tête ne doit pas être signalée"
+    # La preuve qu'il s'agit bien de bases **présentes et inspectées** : sans
+    # cela, l'assertion passerait encore pour une base introuvable. Les deux
+    # bases sont candidates, donc deux connexions ont ete ouvertes.
+    assert resultat["bases_analysees"] >= 2, "les deux bases doivent etre inspectees"
+    assert cabinets_de_supervision["non_migree"] in set(
+        resultat["sans_table_migrations"]
+    ), "la base vide est la preuve directe qu'une connexion a abouti"
 
 
 @pytest.mark.asyncio

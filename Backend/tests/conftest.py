@@ -81,6 +81,14 @@ def _lire_env_de_developpement() -> tuple[str, int]:
 INSTANCE_DEVELOPPEMENT = _lire_env_de_developpement()
 
 
+def _hote_et_port_de_l_url_de_tests(url: str) -> tuple[str, int]:
+    """`(hote, port)` de l'instance de tests, lus dans `TEST_DATABASE_URL`."""
+    from urllib.parse import urlsplit as _urlsplit
+
+    p = _urlsplit(url.strip())
+    return p.hostname or "", p.port or 5432
+
+
 def _reorienter_configuration_vers_les_tests() -> None:
     """Fait pointer `settings` vers l'instance de tests, avant qu'il soit cree."""
     from urllib.parse import unquote, urlsplit
@@ -410,6 +418,40 @@ def _garantir_instance_de_tests():
             pytrace=False,
         )
 
+    # **La redirection doit avoir pris.** Un test qui lit `settings.TENANT_DB_*`
+    # pour se connecter directement - c'est ce que faisaient deux tests le
+    # 11/10 - verifierait alors que la configuration pointe bien ailleurs. La
+    # garde le constate une fois pour toutes, plutot que de le laisser decouvrir
+    # par un echec incoherent.
+    hote_tests, port_tests = _hote_et_port_de_l_url_de_tests(url or "")
+    # `settings` porte un port entier, l'URL une chaine : on compare en texte,
+    # sinon un simple `!=` entre 55436 et "55436" condamnerait une redirection
+    # parfaitement faite.
+    ecarts = [
+        f"{nom}={getattr(settings, nom)}"
+        for nom in (
+            "MASTER_DB_HOST",
+            "MASTER_DB_PORT",
+            "TENANT_DB_HOST",
+            "TENANT_DB_PORT",
+            "PLATFORM_DB_HOST",
+            "PLATFORM_DB_PORT",
+        )
+        if str(getattr(settings, nom, "")) != str(
+            port_tests if nom.endswith("_PORT") else hote_tests
+        )
+    ]
+    if ecarts:
+        pytest.fail(
+            f"\n  [garde] session de tests refusee : la configuration "
+            f"applicative n'a pas ete reorientee vers l'instance de tests.\n"
+            f"    {VARS_URL_TESTS} vise {hote_tests}:{port_tests}\n"
+            f"    mais settings indique : {', '.join(ecarts)}\n"
+            f"    Un test qui lit ces valeurs se connecterait a une autre "
+            f"instance, peut-etre la reelle.\n",
+            pytrace=False,
+        )
+
 
 #: Bases que la suite utilise : definies plus haut, avant la reorientation.
 
@@ -493,6 +535,212 @@ def _preparer_bases_de_tests():
                 os.environ[variable] = precedent
 
     yield
+
+
+def pytest_addoption(parser) -> None:
+    """`--nettoyer-instance-test` : le seul moyen de supprimer les residus.
+
+    Une option explicite, parce que la suppression doit être une **decision**.
+    Par defaut la garde signale et n'efface rien.
+    """
+    parser.addoption(
+        "--nettoyer-instance-test",
+        action="store_true",
+        default=False,
+        help=(
+            "Supprime a la fin de la session les bases residuelles de "
+            "l'instance de tests. Refuse toute cible qui ne porte pas la "
+            "base-temoin sur le port 55436."
+        ),
+    )
+
+
+def pytest_configure(config) -> None:
+    if config.getoption("--nettoyer-instance-test"):
+        os.environ["SYSDENT_TESTS_NETTOYER"] = "1"
+
+
+# ---------------------------------------------------------------------------
+# Bases creees par la session : un registre, et une garde de fin de session
+# ---------------------------------------------------------------------------
+#: Bases autorisees sur l'instance de tests. **La liste est unilocale** : elle
+#: porte ce que la session a le droit de laisser derriere. Toute autre base est
+#: un residu, et un residu doit se voir.
+BASES_PROTEGEES_INSTANCE_DE_TESTS = frozenset(
+    {
+        "postgres",
+        "template0",
+        "template1",
+        MARQUEUR_INSTANCE_DE_TESTS,
+        BASE_MASTER_TESTS,
+        BASE_PLATEFORME_TESTS,
+        BASE_TENANT_TESTS,
+    }
+)
+
+#: Port de l'instance de tests. Le mode de nettoyage refuse toute autre cible :
+#: `TEST_DATABASE_URL` pourrait etre redirige entre le demarrage et la fin.
+PORT_INSTANCE_DE_TESTS = 55436
+
+#: Chaque base creee par une fixture passe par ici. Le registre sert d'abord a
+#: etre Preuve : une base creee puis oubliee se voit.
+BASES_CREEES_PAR_LA_SESSION: list[str] = []
+
+
+async def creer_base_jetable(nom: str, *, migrer: bool = True) -> str:
+    """
+    Cree une base jetable sur l'instance de tests, et **l'enregistre**.
+
+    Le nom est choisi par l'appelant et doit commencer par un prefixe jetable :
+    une base de production ne doit pas pouvoir sortir d'ici par megarde.
+
+    `migrer=False` laisse la base vide, sans table `alembic_version`. C'est un
+    etat reel de production - cinq bases de demonstration etaient dans ce cas -
+    et un etat que le test doit pouvoir fabriquer.
+    """
+    if not nom.startswith("jetable_") and nom not in BASES_PROTEGEES_INSTANCE_DE_TESTS:
+        raise ValueError(
+            f"Une base creee par les tests doit porter un prefixe jetable : {nom!r}"
+        )
+
+    from sqlalchemy import text as _text
+    from sqlalchemy.ext.asyncio import create_async_engine as _create
+    from sqlalchemy.pool import NullPool as _NullPool
+
+    administration = create_async_engine(
+        _url_base_de_tests("postgres"),
+        isolation_level="AUTOCOMMIT",
+        poolclass=_NullPool,
+    )
+    try:
+        async with administration.connect() as conn:
+            await conn.execute(_text(f'CREATE DATABASE "{nom}"'))
+    finally:
+        await administration.dispose()
+
+    BASES_CREEES_PAR_LA_SESSION.append(nom)
+
+    if migrer:
+        from src.core.migrations import upgrade_tenant_to_head
+
+        await asyncio.to_thread(upgrade_tenant_to_head, _url_base_de_tests(nom))
+    return nom
+
+
+async def supprimer_base_jetable(nom: str) -> None:
+    """Supprime une base jetable. `FORCE` ferme les sessions restées ouvertes."""
+    from sqlalchemy import text as _text
+    from sqlalchemy.ext.asyncio import create_async_engine as _create
+    from sqlalchemy.pool import NullPool as _NullPool
+
+    administration = create_async_engine(
+        _url_base_de_tests("postgres"),
+        isolation_level="AUTOCOMMIT",
+        poolclass=_NullPool,
+    )
+    try:
+        async with administration.connect() as conn:
+            await conn.execute(_text(f'DROP DATABASE IF EXISTS "{nom}" WITH (FORCE)'))
+    finally:
+        await administration.dispose()
+    if nom in BASES_CREEES_PAR_LA_SESSION:
+        BASES_CREEES_PAR_LA_SESSION.remove(nom)
+
+
+async def bases_presentes_sur_instance_de_tests() -> list[str]:
+    """Catalogue de l'instance de tests. Lecture seule."""
+    from sqlalchemy import text as _text
+    from sqlalchemy.ext.asyncio import create_async_engine as _create
+    from sqlalchemy.pool import NullPool as _NullPool
+
+    administration = create_async_engine(
+        _url_base_de_tests("postgres"), isolation_level="AUTOCOMMIT", poolclass=_NullPool
+    )
+    try:
+        async with administration.connect() as conn:
+            lignes = await conn.execute(
+                _text("SELECT datname FROM pg_database WHERE datistemplate = false")
+            )
+            return sorted(ligne[0] for ligne in lignes.fetchall())
+    finally:
+        await administration.dispose()
+
+
+def _cibles_de_nettoyage() -> tuple[bool, str]:
+    """
+    Le mode de nettoyage est-il demande, et sur quoi ?
+
+    Une triple verification avant toute suppression : le mode demande, l'instance
+    porte le marqueur, et l'URL vise bien le port de tests. Un `--nettoyer`
+    execute sur une mauvaise instance doit echouer, jamais nettoyer.
+    """
+    if os.environ.get("SYSDENT_TESTS_NETTOYER", "") != "1":
+        return False, ""
+
+    url = os.environ.get(VARS_URL_TESTS, "").strip()
+    from urllib.parse import urlsplit
+
+    port = urlsplit(url).port if url else None
+    if port != PORT_INSTANCE_DE_TESTS:
+        return False, (
+            f"refus de nettoyer : {VARS_URL_TESTS} ne vise pas le port "
+            f"{PORT_INSTANCE_DE_TESTS} de l'instance de tests"
+        )
+
+    try:
+        marque = asyncio.run(_marqueur_present(url))
+    except Exception as exc:  # noqa: BLE001 - l'indisponibilite doit etre dite
+        return False, f"refus de nettoyer : instance injoignable ({type(exc).__name__})"
+    if not marque:
+        return False, f"refus de nettoyer : base-temoin '{MARQUEUR_INSTANCE_DE_TESTS}' absente"
+    return True, ""
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _garde_fin_de_session():
+    """
+    **Ne supprime rien.** Au terme de la session, elle liste les bases presentes
+    sur l'instance de tests et absentes de la liste de protection, et **echoue**.
+
+    Supprimer a l'aveugle serait la faute inverse : une base qu'on ne reconnait
+    pas peut etre celle d'un debug ouvert a la main. La garde signale donc, et
+    laisse la decision au mode explicite `--nettoyer-instance-test`.
+
+    Cette fixture est definie **avant** `_preparer_bases_de_tests` afin de se
+    demonter en dernier : elle doit voir l'etat final, pas un etat intermediaire.
+    """
+    yield
+
+    try:
+        presentes = asyncio.run(bases_presentes_sur_instance_de_tests())
+    except Exception as exc:  # noqa: BLE001 - l'indisponibilite doit etre dite
+        pytest.fail(
+            f"\n  [garde] fin de session : instance de tests injoignable "
+            f"({type(exc).__name__}). Les bases residuelles n'ont pas pu etre "
+            f"inventoriees.\n",
+            pytrace=False,
+        )
+
+    residuelles = [nom for nom in presentes if nom not in BASES_PROTEGEES_INSTANCE_DE_TESTS]
+    if not residuelles:
+        return
+
+    nettoyer, refus = _cibles_de_nettoyage()
+    if nettoyer:
+        for nom in residuelles:
+            asyncio.run(supprimer_base_jetable(nom))
+        return
+    if refus:
+        pytest.fail(f"\n  [garde] fin de session : {refus}\n", pytrace=False)
+
+    pytest.fail(
+        "\n  [garde] fin de session : bases residuelles sur l'instance de tests\n"
+        + "".join(f"    - {nom}\n" for nom in residuelles)
+        + "\n  Elles n'ont pas ete supprimees : une base non reconnue peut etre\n"
+        "  un debug ouvert a la main. Pour les supprimer explicitement :\n\n"
+        "      pytest --nettoyer-instance-test\n",
+        pytrace=False,
+    )
 
 
 #: Variable d'environnement exigee pour que la purge s'execute. Sans elle, la
