@@ -351,7 +351,16 @@ class StatsService:
                     select(TenantPlateforme)
                     .where(
                         TenantPlateforme.statut_metier == "ESSAI",
-                        TenantPlateforme.date_fin_essai.is_(None).invert(),
+                        # **Pas de `.invert()` ici.** `is_(None)` renvoie deja
+                        # un `BinaryExpression`, qu'on ne peut pas inverser :
+                        # l'appel levait un `AttributeError` a la construction
+                        # du `select`, et le tableau de bord repondait 500.
+                        #
+                        # La condition disparue n'exprimait de toute facon rien :
+                        # en SQL, comparer `NULL` donne `NULL`, donc les deux
+                        # conditions de date ci-dessous ecartaient deja les
+                        # essais sans date de fin. Elle etait a la fois fausse
+                        # et sans effet.
                         TenantPlateforme.date_fin_essai <= limite,
                         TenantPlateforme.date_fin_essai >= aujourdhui - timedelta(days=7),
                     )
