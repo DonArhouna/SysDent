@@ -19,10 +19,9 @@ tête `e8b2c4a7d1e5`, login **200**. Aucun compte réel n'a jamais été utilis�
 
 Instance dédiée `sysdent_test_pg`, port **55436**, volume **tmpfs**, base-témoin
 `sysdent_instance_test_marker`. `settings` est réorienté **avant tout import de
-`src`**, et la garde de démarrage **vérifie que la redirection a pris** : sans
-cela, un test lisant `settings` pour se connecter directement pouvait changer de
-cible. Quatre refus cumulatifs : URL absente, port du développement, nom de base
-réelle, absence du marqueur.
+`src`**, et la garde **vérifie que la redirection a pris**. Quatre refus
+cumulatifs : URL absente, port du développement, nom de base réelle, marqueur
+absent.
 
 Les tests de supervision **fabricent leurs propres cas** — une base migrée, une
 base vide, leurs lignes de registre — et les suppriment en `finally`. Deux
@@ -50,13 +49,12 @@ rejouées par test n'ont **pas** été mesurés.
 
 ## Écart de schéma des cabinets (lecture seule)
 
-12 bases de cabinets existent. **5 à la tête**, aucun cabinet réel en retard.
-**5 bases sans table `alembic_version`** : des bases de démonstration
-(`clinique_demo_*`, `clinique_trace_3_*`, `clinique_diagnostic_dakar_*`,
-`clinique_d_mo_dakar_*`), pas des cabinets en service. Une seule en retard :
-`sysdent_tenant_ref`, à `c4f8a2d91e05`, le **tenant de référence des tests**.
-Commande, sur accord : `pg_dump` puis `alembic -c alembic_tenant.ini upgrade
-head`. Aucune base migrée.
+12 bases existent. **5 à la tête**, aucun cabinet réel en retard. **5 bases sans
+table `alembic_version`** : des démonstrations (`clinique_demo_*`,
+`clinique_trace_3_*`, `clinique_diagnostic_dakar_*`, `clinique_d_mo_dakar_*`).
+Une seule en retard : `sysdent_tenant_ref` (`c4f8a2d91e05`), le **tenant de
+référence des tests**. Sur accord : `pg_dump` puis `alembic -c
+alembic_tenant.ini upgrade head`. Aucune base migrée.
 
 ## Registre : 129 lignes sans base, toutes conservées
 
