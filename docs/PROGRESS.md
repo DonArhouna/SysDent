@@ -25,9 +25,9 @@ cible. Quatre refus cumulatifs : URL absente, port du développement, nom de bas
 réelle, absence du marqueur.
 
 Les tests de supervision **fabricent leurs propres cas** — une base migrée, une
-base vide, leurs lignes de registre ACTIVE — et les suppriment en `finally`.
-Deux d'entre eux visaient le développement ; un troisième passait **à vide**,
-donc vert pour la mauvaise raison. Un test qui dépend de l'état réel d'une autre
+base vide, leurs lignes de registre — et les suppriment en `finally`. Deux
+d'entre eux visaient le développement ; un troisième passait **à vide**, donc
+vert pour la mauvaise raison. Un test qui dépend de l'état réel d'une autre
 machine est une observation, pas un test.
 
 Chaque base créée est enregistrée. En fin de session, les bases hors liste de
@@ -85,8 +85,8 @@ venant de la base plateforme et les bases du registre maître. **Aucune
 connexion à une base de cabinet**, prouvé par un test.
 
 8 tests verts, `tsc` exit 0, `npm run verifier` vert. Les tests ont trouvé un
-bug réel : `StatCard` affiche `hint ?? detail`, donc le nombre passé en
-`detail` n'était jamais visible — or c'est le chiffre que la carte existe pour
+bug réel : `StatCard` affiche `hint ?? detail`, donc un nombre passé en
+`detail` n'est jamais visible — or c'est le chiffre que la carte existe pour
 montrer.
 
 **Pas d'i18n, volontairement** : ni le backoffice ni le client n'en ont
@@ -96,12 +96,11 @@ n'a. Le français est écrit comme dans toutes les autres pages. À trancher.
 
 **Échecs préexistants, prouvés antérieurs** : 2 tests de la bannière dans
 `codes-secours-page.test.tsx` pointent encore l'écran provisoire ; identiques
-avec `App.tsx` remis à HEAD. À rapatrier sur le tableau de bord.
+avec `App.tsx` remis à HEAD. À rapatrier.
 
 **Non fait** : `npm run design:parite`, liste des cabinets. `/platform/tenants`,
-quotas et historique d'abonnement existent déjà côté backend.
-
-**Aucun rendu déclaré vérifié** : pas de navigateur.
+quotas et historique d'abonnement existent déjà côté backend. **Aucun rendu
+déclaré vérifié** : pas de navigateur.
 
 ## Reste à faire
 
