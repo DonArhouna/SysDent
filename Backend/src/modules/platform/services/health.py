@@ -446,16 +446,50 @@ class HealthService:
         échec de la base plateforme doit apparaître dans le corps de la réponse
         plutôt que de faire échouer l'appel : une page de supervision qui
         affiche « service indisponible » ne montre pas QUEL service.
+
+        **Chaque contrôle est donc contenu ici, et pas seulement dans son propre
+        `try`.** Les contrôles internes ne rattrapent qu'un `SQLAlchemyError`.
+        Or un échec de connexion n'est **pas** encapsulé par SQLAlchemy : il
+        remonte nu, en `ConnectionRefusedError` ou en `OSError` — c'est mesuré,
+        et c'est ce qui transformait la page de santé en 500 dès qu'une base de
+        cabinet ne répondait plus. Une promesse écrite dans une docstring et
+        tenue uniquement par le bon vouloir de chaque appelant est une
+        promesse qui tient jusqu'au premier appelant oublié.
         """
+
+        async def _contenu(composant: str, awaitable):
+            """Exécute un contrôle et garantit une réponse, quelle qu'elle soit."""
+            try:
+                return await awaitable
+            except SQLAlchemyError as exc:
+                return {"composant": composant, "ok": False, "detail": _tronquer(str(exc))}
+            except Exception as exc:  # noqa: BLE001
+                # Forms non encapsulees : echec de connexion, liste vide
+                # malformee, valeur absente. La page doit rester lisible.
+                # Le type est journalise, pas la requete : un detail SQL ne
+                # doit pas sortir vers le client.
+                logger.error(
+                    "controle_sante_en_panne",
+                    composant=composant,
+                    erreur=type(exc).__name__,
+                )
+                return {
+                    "composant": composant,
+                    "ok": False,
+                    "detail": f"Contrôle indisponible : {type(exc).__name__}.",
+                }
+
         controles: List[Dict[str, Any]] = [
-            await HealthService.base_plateforme(platform_db),
-            await HealthService.base_master(),
-            await HealthService.files_clients(master_db),
-            await HealthService.bases_absentes(master_db),
-            await HealthService.schemas_tenants(master_db),
-            await HealthService.migrations_par_tenant(platform_db),
-            await HealthService.catalogue(platform_db),
-            await HealthService.jobs_planifies(platform_db),
+            await _contenu("base_plateforme", HealthService.base_plateforme(platform_db)),
+            await _contenu("base_master", HealthService.base_master()),
+            await _contenu("files_clients", HealthService.files_clients(master_db)),
+            await _contenu("bases_absentes", HealthService.bases_absentes(master_db)),
+            await _contenu("schemas_tenants", HealthService.schemas_tenants(master_db)),
+            await _contenu(
+                "migrations_par_tenant", HealthService.migrations_par_tenant(platform_db)
+            ),
+            await _contenu("catalogue", HealthService.catalogue(platform_db)),
+            await _contenu("jobs_planifies", HealthService.jobs_planifies(platform_db)),
         ]
         en_panne = [c for c in controles if not c["ok"]]
         return {
