@@ -1,98 +1,100 @@
 # SysDent Pro — état de reprise
 
-> Une page, ce qui est **prouvé** aujourd'hui. L'historique session par session
-> (1461 lignes au 10/10) reste dans l'historique git : `git log -p -- docs/PROGRESS.md`.
-> Mis à jour à chaque étape, un commit atomique par étape.
+> Une page, ce qui est **prouvé**. L'historique session par session reste dans
+> l'historique git : `git log -p -- docs/PROGRESS.md`.
 
 ---
 
 ## ACCÈS
 
 **Opérationnel.** Le cabinet `sysdent_tenant_clinique_cabinet_sn_5bd215` est
-restauré, migré à la tête, et son login répond **200**. Le propriétaire doit
-vérifier lui-même avec ses comptes — aucun compte réel n'a été utilisé par l'agent.
+restauré, migré à la tête `e8b2c4a7d1e5`, et son login répond **200**. Vérification
+sur compte de test créé puis supprimé ; aucun compte réel utilisé.
 
-## Ce qui a été fait le 10/10 (restauration du cabinet 5bd215)
+## Dégradations de texte : 9 corrigées sur 8 fichiers
 
-- Base supprimée le 08/10 par la purge de fin de session, qui classait les bases
-  par leur **nom seul**. Aucune migration n'était en cause.
-- Sauvegardes sorties du conteneur : `C:\sauvegardes_sysdent\cabinet_sn_5bd215\`
-  (7 dumps, empreintes SHA-256 vérifiées). Registre `sysdent_master` sauvegardé
-  avant toute écriture.
-- Restauration depuis `save_avant_users_20261006_181439.sql` : 32 patients,
-  10 utilisateurs, 30 consultations, 43 factures. **Exit 0, 0 erreur.**
-- Puis `alembic -c alembic_tenant.ini upgrade head` : **2 migrations**
-  (`d7f2a9c4b6e1` cabinet_id, `e8b2c4a7d1e5` salle d'attente) → tête `e8b2c4a7d1e5`,
-  49 tables, backfill complet, **comptages inchangés**.
-- Validation préalable sur base jetable : upgrade → downgrade → upgrade, et
-  **0 écart de schéma** contre une base saine (519 colonnes, 230 contraintes,
-  191 index). Base jetable supprimée.
-- Preuve HTTP : login 200 sur compte de test créé puis supprimé (retour à 10/10/32),
-  mauvais mot de passe 401 générique, email inexistant 401.
+Aucune version saine n'existait dans l'historique : le texte a été **reconstitué**
+depuis le contexte, pas restauré. Neuf reconstructions, à relire par le
+propriétaire :
 
-## Protections ajoutées
+| Fichier | Texte retenu |
+|---|---|
+| `cabinets/services.py` | et **brouillent** le calcul |
+| `platform/services/support.py` | « **constater** » |
+| `patients/services.py` | **Les données** restent |
+| `platform/dependencies.py` | un `except Exception` **élargi** |
+| `platform/services/auth.py` | deux codes **correspondant simultanément** |
+| `Backoffice/src/lib/api.ts` | de le **constater** |
+| `test_perimetre_support.py` | n'y est pas **concerné** |
+| `FRONTEND_PLAN.md:21` | les deux **ensemble** |
+| `FRONTEND_PLAN.md:238` | le backend **aujourd'hui** |
 
-| Protection | Commit | Effet |
-|---|---|---|
-| Garde de purge | `d0774a6` | N'agit que sur une instance de tests **dédiée et marquée** ; jamais une base du registre ni une `sysdent_tenant_*` hors session. **Neutralisée en production par défaut.** |
-| Login — base absente | `6f05874` | 503 générique au lieu de 500 ; journal avec l'identifiant du cabinet, jamais de secret |
-| Login — schéma périmé | `6f05874` | `UndefinedColumn`/`Table` → 503 contrôlé ; un SQL cassé par le code reste visible |
-| Supervision `bases_absentes` | `6f05874` | Liste les lignes du registre dont la base a disparu |
-| Supervision `schemas_tenants` | `6f05874` | Écart de révision par cabinet, tête lue sur la chaîne (jamais en dur) |
-| Configuration Alembic | `598af6e` | Les trois `env.py` normalisent l'URL ; contrat de `upgrade_tenant_to_head` clarifié |
-| Contrôle d'intégrité | `598af6e` | Compilation, une tête par chaîne, caractères d'écritures non latines. Hook pre-commit actif. |
+Seule la plage de caractères parasites a été remplacée : 9 lignes, 9 insertions,
+9 suppressions. `auth-store.ts` ne contenait **aucun** caractère CJK ; l'affirmation
+antérieure qui le citait était fausse.
 
-`docs/OPERATIONS.md` : correspondance exacte entre fichier `.ini`, chaîne et base.
+Contrôle : dépôt entier à **0** caractère suspect. Hook pre-commit actif et testé.
 
-## Registre : 129 lignes sans base
+## Instance de tests dédiée : prouvée
 
-| Catégorie | n | Base de la catégorie |
-|---|---|---|
-| Manifestement de test | 91 | Motif jetable du projet (`tests/conftest.py`) : `partage_[ab]` 62, `cabinet_verif_[bcde]` 24, `onboarding` 4, `recette` 1, `essai` 1 |
-| Provisionnement échoué | 2 | Statut `PROVISIONING` : `cabinet_rollback`, 1 `verif_b` |
-| **Douteux** | 33 | `clinique_provisionnement_*` : aucun motif connu, 1 compte chacun, **jamais connecté** |
-| **Possiblement réel** | 3 | `clinique_cabinet_sn_*` (2f36e8, cb3730, e7cd42) : la famille du propriétaire, PROVISIONING, 0 compte |
+| Élément | Valeur |
+|---|---|
+| Instance | `sysdent_test_pg`, port **55436**, volume **tmpfs** |
+| Base-témoin | `sysdent_instance_test_marker`, preuve de l'instance dédiée |
+| Bases des tests | `sysdent_master_test`, `sysdent_platform_test`, `sysdent_modele_tenant_test` |
 
-**Aucun dump n'existe** pour les 33 douteux ni pour les 3 possiblement réels.
-Les seuls dumps disponibles sont ceux de `5bd215`, plus master et plateforme.
-**Aucune ligne du registre n'a été supprimée.**
+Quatre refus cumulatifs avant le premier test : `TEST_DATABASE_URL` absente, port
+du développement, nom de base réelle, absence du marqueur. `settings` est
+réorienté vers l'instance de tests **avant tout import de `src`**, sinon les
+moteurs globaux de l'application visent le développement.
 
-## Corruptions de texte : 9 cas dans 8 fichiers, non corrigés
+**Preuve** : 77 tests verts dont 5 créant deux cabinets ; développement inchangé
+avant/après (17 bases, liste identique, registre 137/137/105).
+Preuve par mutation : garde neutralisée, **11 tests échouent**.
 
-Relevé par `python Backend/scripts/controle_integrite.py --tout` :
+Docs : `docs/TESTS.md`, `docs/OPERATIONS.md`.
 
-| Fichier | Ligne | Caractères |
-|---|---|---|
-| `Backend/src/modules/cabinets/services.py` | 855 | CJK (4) |
-| `Backend/src/modules/platform/services/support.py` | 186 | CJK (2) |
-| `Backend/src/modules/patients/services.py` | 542 | hangul (2) |
-| `Backend/src/modules/platform/dependencies.py` | 292 | arabe (3) |
-| `Backend/src/modules/platform/services/auth.py` | 356 | U+FFFD (2) |
-| `Backoffice/src/lib/api.ts` | 11 | U+FFFD (2) |
-| `Backend/tests/platform/test_perimetre_support.py` | 70 | CJK (2) |
-| `docs/backoffice/FRONTEND_PLAN.md` | 21 et 238 | CJK (1 et 2) |
+## Suite complète : **NON VÉRIFIÉE**
 
-**À corriger par restauration depuis l'historique git**, un fichier à la fois.
+Lancée une fois sur l'instance de tests, elle a atteint **64 %** puis a dépassé
+**90 minutes** sans finir (objectif : moins de 15 min). Aucun verdict à annoncer.
+Constats : des erreurs et des échecs dès les premiers 14 % ; sur le premier
+fichier, 13 tests passent en 71 s, le temps passant en `setup` (2 à 15 s par
+test). Cause du ralentissement **non établie**.
 
-ATTENTION : une affirmation antérieure disait que
-`Backoffice/src/stores/auth-store.ts` contenait des caractères chinois : **c'est
-faux, il n'en contient aucun**. Ne pas propager cette affirmation, et ne pas
-élargir aux fichiers non listés ci-dessus.
+## Registre : 129 lignes sans base, toutes conservées
+
+Décision du propriétaire : **aucune suppression**, pas même les 83 de
+l'inventaire précédent. Elles restent visibles dans l'écran de santé.
+
+| Catégorie | n |
+|---|---|
+| Manifestement de test (motif du projet, `tests/conftest.py`) | 91 |
+| Provisionnement échoué | 2 |
+| Douteux (`clinique_provisionnement_*`, jamais connectés) | 33 |
+| Possiblement réel (`clinique_cabinet_sn_*`) | 3 |
+
+Aucun dump pour les 33 douteux ni pour les 3 possiblement réels.
+
+## Backoffice : état des lieux, Lot 1 non fait
+
+`/dashboard` affiche encore `ConnexionEtabliePage` : le tableau de bord a été
+annulé en cours de route par l'agent précédent. **Le socle, lui, est intact** :
+`dashboard-store.ts` (un seul appel, états chargement / erreur / vide / prêt,
+« Réessayer », jamais un zéro pour une panne), `StatCard` à parité du client,
+et 21 composants d'interface réutilisables. Les Lots 1 et 2 restent à faire.
 
 ## Règle de rapport
 
-Avant d'écrire un fait dans un document : relire la sortie brute de la commande
-qui l'établit. **Ne jamais attribuer un fait à un commit sans avoir vérifié que
-l'objet existe** (`git cat-file -t <sha>`). Après chaque écriture ou édition d'un
-fichier de code ou de migration, le relire et le compiler.
+Relire la sortie brute avant d'écrire un fait. Vérifier qu'un objet git existe
+(`git cat-file -t`) avant de lui attribuer quoi que ce soit. Après chaque
+écriture, relire et compiler le fichier.
 
 ## Reste à faire
 
-1. **Instance de test dédiée** (`TEST_DATABASE_URL` vers une instance portant la
-   base-témoin `sysdent_instance_de_tests`) — sans elle, la purge ne s'exécute
-   plus du tout et les bases de test s'accumulent.
-2. **Rapprochement du registre** : décider du sort des 33 douteux et des 3
-   possiblement réels. Aucun dump disponible, la décision est commerciale.
-3. **Corriger les 10 fichiers dégradés** depuis l'historique git.
-4. **Backoffice Lots 1 et 2**.
-5. Suite complète : à ne relancer qu'une fois l'instance de test dédiée en place.
+1. **Comprendre le ralentissement de la suite**, puis obtenir un verdict réel.
+2. **Backoffice Lots 1 et 2** : tableau de bord sur `/platform/stats/dashboard`,
+   puis cabinets en lecture avec badge « base absente ».
+3. **Rapprochement du registre** : décider du sort des 33 douteux et des 3
+   possiblement réels, après sauvegarde du registre.
+4. Faire relire les **9 reconstructions** de texte par le propriétaire.
