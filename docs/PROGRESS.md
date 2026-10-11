@@ -40,11 +40,9 @@ de suite, 5 bases avant et après** ; une base laissée volontairement fait éch
 la session ; développement inchangé (17 bases, registre 137/137).
 
 ## Suite complète : **NON VÉRIFIÉE**
-
 64 % puis **90 minutes** sans finir (objectif : moins de 15). Cause du
 ralentissement **non établie**. Un facteur corrigé depuis : la base plateforme
 de tests n'était jamais migrée, ce qui levait 4 erreurs au chargement.
-
 Mesures qui **écartent** deux hypothèses : `tmpfs` à 8 %, 6 connexions ouvertes
 pour un maximum de 100. Ni saturation, ni pression de connexions. Fuite de bases
 **corrigée et prouvée**. Le clonage de modèle, le coût Argon2 et les migrations
