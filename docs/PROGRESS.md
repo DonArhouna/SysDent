@@ -65,40 +65,46 @@ manifestement de test, 2 provisionnements échoués, 33 douteux
 (`clinique_provisionnement_*`), 3 possiblement réels (`clinique_cabinet_sn_*`).
 Aucun dump pour ces 36 dernières.
 
-## Backoffice : tableau de bord écrit et testé, écrans suivants non faits
+## Backoffice : tableau de bord écrit, layout réparé
 
-`/dashboard` affiche le **tableau de bord**, un seul appel. Le total et la part
-dont la base est absente sont **deux lignes distinctes** : l'écran n'affiche
-jamais un « actif » qui cache les bases absentes. Erreur = message +
-« Réessayer », **jamais un zéro** ; vide = « Aucun cabinet », sans « Réessayer ».
-Bannière des codes de secours conservée, conditionnée par le profil ; écran
-`/codes-secours` intact. Aucun style inventé : composants du dépôt.
+`/dashboard` rend le tableau de bord **dans `AppShell`**. La page livrée
+précédemment s'en oubliait : `AppShell` (sidebar, navbar, thème) n'était
+utilisé que par l'écran provisoire qu'elle remplaçait. Le type ne le voyait pas,
+les tests passaient. Deux tests exigent désormais un `aside` et un `header`, avec
+un témoin sur `AppShell` seul ; **preuve par mutation** : sans enveloppe, le
+test échoue.
 
-Backend : par statut `total` et `dont_base_absente`, lus dans la **même**
-requête que les absences — sinon le ratio serait faux, les statuts métier
-venant de la base plateforme et les bases du registre maître. **Aucune
-connexion à une base de cabinet**, prouvé par un test.
+Le harnais ne simulait pas `window.matchMedia`, que la bascule de thème appelle :
+**toute** page rendue dans le layout échouait. C'est là que se expliquaient les
+2 tests de bannière en échec depuis le début — ils rendent l'écran provisoire,
+qui utilise `AppShell`. **7 fichiers, 42 tests, tous verts.**
 
-8 tests verts, `tsc` exit 0, `npm run verifier` vert. Les tests ont trouvé un
-bug réel : `StatCard` affiche `hint ?? detail`, donc un nombre passé en
-`detail` n'est jamais visible — or c'est le chiffre que la carte existe pour
-montrer.
+Un seul appel, total et part sans base sur deux lignes distinctes, erreur avec
+« Réessayer » et jamais un zéro, vide sans « Réessayer », bannière conditionnée.
+Pas d'i18n : ni le backoffice ni le client n'en ont — à trancher.
 
-**Pas d'i18n, volontairement** : ni le backoffice ni le client n'en ont
-(ce qui est vérifié : aucune dépendance, aucun fichier de traduction). En
-inventer un divergerait des deux applications. À trancher.
+## Le 500 du tableau de bord : une voie prouvée, le déclencheur non reproduit
 
-**Échecs préexistants, prouvés antérieurs** : 2 tests de la bannière dans
-`codes-secours-page.test.tsx` pointent encore l'écran provisoire ; identiques
-avec `App.tsx` remis à HEAD.
+**Prouvé** : `HealthService.global_` promettait en docstring qu'un échec
+apparaîtrait dans le corps de la réponse. Le code ne le faisait pas : les huit
+contrôles étaient appelés sans `try`, et chacun ne rattrape qu'un
+`SQLAlchemyError`. Or **un échec de connexion n'est pas encapsulé** par
+SQLAlchemy — mesuré le 11/10. Un seul contrôle suffisait à faire un 500. Corrigé,
+rouge puis vert, les deux formes mesurées couvertes.
 
-**Non fait** : `npm run design:parite`, liste des cabinets. `/platform/tenants`,
-quotas et historique d'abonnement existent déjà côté backend. **Aucun rendu
-déclaré vérifié** : pas de navigateur.
+**Non reproduit** : le déclencheur exact sur les données du propriétaire. Aucun
+journal du backend n'est écrit sur disque, et la connexion exigerait un compte
+réel. Hypothèse **écartée par la mesure** : la pression de connexions (6
+ouvertes pour 100). En HTTP, sur une instance de test, l'endpoint sans jeton
+répond **401, pas 500** — routage sain. Le **200 authentifié n'est pas vérifié**.
+
+**Non fait** : `design:parite`, liste des cabinets. **Aucun rendu déclaré
+vérifié** : pas de navigateur.
 
 ## Reste à faire
 
-1. **Rapatrier** les 2 tests de bannière sur le tableau de bord.
-2. `npm run design:parite`, puis la liste des cabinets.
-3. **Comprendre le ralentissement** de la suite, puis un verdict réel.
+1. **Rejouer `/dashboard` dans un vrai navigateur** : sidebar, navbar, onglet
+   Réseau sans 500.
+2. Si le 500 subsiste, le **traceback** du backend : le lire, puis le reproduire.
+3. `npm run design:parite`, puis la liste des cabinets.
 4. Rapprochement du registre : arbitrage sur les 36 lignes non jetables.
