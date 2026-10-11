@@ -15,19 +15,22 @@ n'examinait pas. Vérifié en HTTP : 500 devenu 503, détails vides.
 Le cabinet `sysdent_tenant_clinique_cabinet_sn_5bd215` est restauré, migré à la
 tête `e8b2c4a7d1e5`, login **200**. Aucun compte réel n'a jamais été utilisé.
 
-## Tests : ce qui est isolé, et ce qui le prouve
+## Tests : instance dédiée et preuves
 
-Instance dédiée `sysdent_test_pg`, port **55436**, volume **tmpfs**, base-témoin
-`sysdent_instance_test_marker`. `settings` est réorienté **avant tout import de
-`src`**, et la garde **vérifie que la redirection a pris**. Quatre refus
-cumulatifs : URL absente, port du développement, nom de base réelle, marqueur
-absent.
+Instance `sysdent_test_pg`, port **55436**, volume **tmpfs**, base-témoin
+`sysdent_instance_test_marker`. `settings` réorienté **avant tout import de
+`src`**, et la garde **vérifie que la redirection a pris** ; quatre refus
+cumulatifs. Les tests de supervision **fabricent leurs propres cas** et les
+suppriment en `finally` : trois affirmaient des faits sur le développement,
+l'un passant **à vide**, donc vert pour la mauvaise raison.
 
-Les tests de supervision **fabricent leurs propres cas** — une base migrée, une
-base vide, leurs lignes de registre — et les suppriment en `finally`. Deux
-d'entre eux visaient le développement ; un troisième passait **à vide**, donc
-vert pour la mauvaise raison. Un test qui dépend de l'état réel d'une autre
-machine est une observation, pas un test.
+Chaque base créée est enregistrée ; en fin de session les bases hors liste de
+protection font **échouer la session**. `--nettoyer-instance-test` les
+supprime, après contrôle du port **et** du marqueur.
+
+Preuves : trois exécutions de suite, **5 bases avant et après** ; une base
+laissée volontairement fait échouer la session ; développement inchangé
+(17 bases, registre 137/137).
 
 Chaque base créée est enregistrée. En fin de session, les bases hors liste de
 protection sont **listées et la session échoue** : rien n'est supprimé à l'aveugle.
