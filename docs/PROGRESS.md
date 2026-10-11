@@ -101,21 +101,24 @@ régression. Le test échouait pour la même raison, au même endroit.
 laisse une base `sysdent_platform_test_<hex>` par paramètre — 6 bases
 accumulées. Non corrigée, signalée.
 
-## Couple 401 / 500 : mesuré, et non lié
+## Couple 401 / 500 : hypothèse écartée par les tests
 
-401 sans jeton et 401 avec jeton invalide, distincts et stables. Le 500 ne
-résulte pas d'une requête partie sans authentification : il venait de la
-construction d'une requête, comme le prouve le traceback. **L'analyse front du
-renouvellement de session n'a pas été faite** — pas de teste, donc rien
-n'est affirmé.
+L'hypothèse du propriétaire — 401 puis 500, donc un rejeu sans jeton frais —
+est **écartée**. `api.ts` renouvelle **une** fois puis rejoue **une** fois ; si
+le renouvellement échoue, la session est purgée et la requête **n'est pas
+rejouée** — c'est ce qui évite le couple décrit. Une route `/platform/auth/*`
+n'est jamais rejouée (son 401 veut dire « mauvais mot de passe »), et un 403 ne
+déclenche rien. Preuve par mutation : le garde `/auth` retiré, son test échoue.
+
+5 tests qui **comptent les appels** : 47 tests fronts verts sur 8 fichiers.
 
 **Non fait** : `design:parite`, liste des cabinets. **Aucun rendu déclaré
 vérifié** : pas de navigateur.
 
 ## Reste à faire
 
-1. **Analyser le 401 côté front** : que fait `api.ts` sur un 401, et le test
-   qui le prouve. Rien n'est affirmé aujourd'hui.
-2. Corriger la fuite des bases `sysdent_platform_test_<hex>`.
+1. Condenser `PROGRESS.md` sous 80 lignes.
+2. Corriger la fuite des bases `sysdent_platform_test_<hex>` (fixture
+   paramétrée de `conftest` : une base par paramètre, 6 accumulées).
 3. `npm run design:parite`, puis la liste des cabinets.
 4. Rapprochement du registre : arbitrage sur les 36 lignes non jetables.
