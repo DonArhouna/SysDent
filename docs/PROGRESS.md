@@ -70,12 +70,28 @@ manifestement de test, 2 provisionnements échoués, 33 douteux
 (`clinique_provisionnement_*`), 3 possiblement réels (`clinique_cabinet_sn_*`).
 Aucun dump pour ces 36 dernières.
 
-## Backoffice : socle intact, Lots 1 et 2 non faits
+## Backoffice : socle backend fait, écrans non écrits
 
-`/dashboard` affiche encore `ConnexionEtabliePage`. Le store existe
-(un appel, états chargement / erreur / vide / prêt, « Réessayer », jamais un
-zéro pour une panne), `StatCard` est à parité du client, 21 composants
-réutilisables. Aucun rendu déclaré vérifié.
+`/dashboard` affiche encore `ConnexionEtabliePage`. Le store existe (un appel,
+états chargement / erreur / vide / prêt, « Réessayer », jamais un zéro pour une
+panne), `StatCard` est à parité du client, 21 composants réutilisables.
+
+**Fait, vérifié** : le tableau de bord expose désormais, par statut, `total` et
+`dont_base_absente`, lus dans la **même** requête que les absences. Sans cela un
+écran affichait « 42 cabinets ACTIVE » sans dire que certains ont un login cassé.
+Le compte vient du registre et du catalogue `pg_database` — **aucune connexion à
+une base de cabinet**, prouvé par un test qui rend cette connexion impossible. Les
+deux comptes viennent du même registre parce que le tableau de bord lit ses
+statuts dans la base plateforme et les bases dans la base master : deux tables,
+deux vocabulaires.
+
+Types TypeScript régénérés, `npm run verifier` vert, 16 tests cibles verts. Le
+hook a refusé deux fois le commit, et avait raison : la ponctuation des fichiers
+générés, et deux caractères que j'avais moi-même écrits.
+
+**Non fait** : page du tableau de bord, liste des cabinets, fiche. `/platform/
+tenants`, les quotas et l'historique d'abonnement **existent déjà** côté backend ;
+c'est l'écran et les filtres qui manquent.
 
 ## Reste à faire
 
