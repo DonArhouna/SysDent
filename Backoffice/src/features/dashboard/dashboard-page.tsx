@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 
 import { StatCard, type AccentStat } from '@/components/dashboard/stat-card'
+import { AppShell } from '@/components/layout/app-shell'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -119,7 +120,7 @@ function ListeCabinets({
   )
 }
 
-export function DashboardPage() {
+function ContenuDashboard() {
   const etat = useDashboardStore((s) => s.etat)
   const vue = useDashboardStore((s) => s.vue)
   const messageErreur = useDashboardStore((s) => s.messageErreur)
@@ -294,6 +295,27 @@ export function DashboardPage() {
         </Card>
       </div>
     </>
+  )
+}
+
+/**
+ * Le tableau de bord, dans le layout applicatif.
+ *
+ * **L'oubli qui a coûté une session.** `AppShell` porte la sidebar, la navbar
+ * et la bascule de thème. L'écran provisoire `/dashboard` s'en enveloppait
+ * lui-même ; la page qui l'a remplacé s'en oubliait, et le tableau de bord
+ * s'affichait nu — sans aucune navigation. Le type ne voyait rien : le composant
+ * compilait, les tests passaient, et l'utilisateur, lui, n'avait plus de moyen
+ * de quitter la page.
+ *
+ * C'est pourquoi le test exige la presence de la sidebar et de la navbar : une
+ * page qui rend son contenu n'est pas une page qui rend dans l'application.
+ */
+export function DashboardPage() {
+  return (
+    <AppShell>
+      <ContenuDashboard />
+    </AppShell>
   )
 }
 

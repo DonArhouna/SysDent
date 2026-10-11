@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { AppShell } from '@/components/layout/app-shell'
 import { DashboardPage } from '@/features/dashboard/dashboard-page'
 import { ApiError } from '@/lib/api'
 import type { ApiReponse } from '@/lib/api'
@@ -58,6 +59,10 @@ function afficher() {
 
 function profil(aRegenerer: boolean) {
   useAuthStore.setState({
+    // Le jeton est indispensable : `AppShell` redirige vers `/login` sans
+    // session. Sans lui, le layout ne se rend pas du tout - et le test
+    // echouerait sur une absence de layout qui n'existe que dans le test.
+    token: 'jeton-de-test',
     profil: {
       id: 'u1',
       email: 'a@b.fr',
@@ -75,6 +80,35 @@ describe('tableau de bord', () => {
     get.mockReset()
     profil(false)
     repondre(vue)
+  })
+
+  it('se rend DANS le layout : sidebar et navbar presentes', async () => {
+    // Ce test existe parce que la page a ete livree sans layout, et que rien
+    // ne l'avait vu : le composant compilait, les tests passaient, et
+    // l'utilisateur se retrouvait sans aucune navigation.
+    const { container } = afficher()
+
+    await waitFor(() => expect(screen.getByText('3 sans base')).toBeTruthy())
+
+    // Les reperes que pose le layout. On les lit sur le composant lui-meme
+    // plutot que sur des libelles : un libelle peut changer, une region
+    // d'accessibilite non.
+    expect(container.querySelector('aside')).not.toBeNull()
+    expect(container.querySelector('header')).not.toBeNull()
+  })
+
+  it('le layout rend bien les reperes attendus', async () => {
+    // Temoin du test precedent : si AppShell change de balise, celui-la doit
+    // echouer aussi, plutot que de laisser croire que le layout est intact.
+    const { container } = render(
+      <MemoryRouter>
+        <AppShell>
+          <p>contenu</p>
+        </AppShell>
+      </MemoryRouter>,
+    )
+    expect(container.querySelector('aside')).not.toBeNull()
+    expect(container.querySelector('header')).not.toBeNull()
   })
 
   it('affiche le total et la part sans base comme deux nombres distincts', async () => {
