@@ -91,12 +91,11 @@ montrer.
 
 **Pas d'i18n, volontairement** : ni le backoffice ni le client n'en ont
 (ce qui est vérifié : aucune dépendance, aucun fichier de traduction). En
-inventer un serait introduire une architecture qu'aucune des deux applications
-n'a. Le français est écrit comme dans toutes les autres pages. À trancher.
+inventer un divergerait des deux applications. À trancher.
 
 **Échecs préexistants, prouvés antérieurs** : 2 tests de la bannière dans
 `codes-secours-page.test.tsx` pointent encore l'écran provisoire ; identiques
-avec `App.tsx` remis à HEAD. À rapatrier.
+avec `App.tsx` remis à HEAD.
 
 **Non fait** : `npm run design:parite`, liste des cabinets. `/platform/tenants`,
 quotas et historique d'abonnement existent déjà côté backend. **Aucun rendu
@@ -104,7 +103,7 @@ déclaré vérifié** : pas de navigateur.
 
 ## Reste à faire
 
-1. **Diagnostiquer le ralentissement** : clonage du modèle, Argon2, migrations.
-2. Obtenir un verdict réel de la suite complète.
-3. **Backoffice Lots 1 et 2**, sans navigateur : parcours à comparer à la main.
+1. **Rapatrier** les 2 tests de bannière sur le tableau de bord.
+2. `npm run design:parite`, puis la liste des cabinets.
+3. **Comprendre le ralentissement** de la suite, puis un verdict réel.
 4. Rapprochement du registre : arbitrage sur les 36 lignes non jetables.
