@@ -6855,6 +6855,14 @@
             "title": "Par Statut",
             "type": "object"
           },
+          "par_statut_base": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DashboardStatutBase"
+            },
+            "default": {},
+            "title": "Par Statut Base",
+            "type": "object"
+          },
           "proches_du_quota": {
             "default": [],
             "items": {
@@ -6869,6 +6877,11 @@
             "title": "Sante",
             "type": "object"
           },
+          "total_bases_absentes": {
+            "default": 0,
+            "title": "Total Bases Absentes",
+            "type": "integer"
+          },
           "total_cabinets": {
             "default": 0,
             "title": "Total Cabinets",
@@ -6876,6 +6889,23 @@
           }
         },
         "title": "DashboardResponse",
+        "type": "object"
+      },
+      "DashboardStatutBase": {
+        "description": "Un statut de cabinet, décomposé en deux nombres qui doivent se lire ensemble.\n\n**Pourquoi décomposer.** Un tableau de bord qui affiche « 42 cabinets ACTIVE »\nsans dire combien ont une base fait croire que 42 cabinets fonctionnent. Ce\nn'est pas vrai aujourd'hui : un dossier ACTIVE sans base a un login cassé.\nLes deux chiffres sont donc toujours renvoyés **ensemble**, et l'écran ne\npeut pas en afficher un seul.\n\nLes deux comptes proviennent de la même lecture du registre maître : les\nopposer à des totaux issus d'une autre table donnerait un compte faux.",
+        "properties": {
+          "dont_base_absente": {
+            "default": 0,
+            "title": "Dont Base Absente",
+            "type": "integer"
+          },
+          "total": {
+            "default": 0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "title": "DashboardStatutBase",
         "type": "object"
       },
       "DentMiseAJour": {
@@ -23126,7 +23156,7 @@
         },
         "summary": "Lister les annonces",
         "tags": [
-          "Platform · Supervision & journal"
+          "Platform - Supervision & journal"
         ]
       },
       "post": {
@@ -23166,7 +23196,7 @@
         },
         "summary": "Publier une annonce",
         "tags": [
-          "Platform · Supervision & journal"
+          "Platform - Supervision & journal"
         ]
       }
     },
@@ -23210,7 +23240,7 @@
         },
         "summary": "Désactiver une annonce",
         "tags": [
-          "Platform · Supervision & journal"
+          "Platform - Supervision & journal"
         ]
       }
     },
@@ -23366,7 +23396,7 @@
         },
         "summary": "Consulter le journal d'audit plateforme",
         "tags": [
-          "Platform · Supervision & journal"
+          "Platform - Supervision & journal"
         ]
       }
     },
@@ -23479,7 +23509,7 @@
         },
         "summary": "Exporter le journal d'audit en CSV",
         "tags": [
-          "Platform · Supervision & journal"
+          "Platform - Supervision & journal"
         ]
       }
     },
@@ -24296,7 +24326,7 @@
         },
         "summary": "État de santé de la plateforme",
         "tags": [
-          "Platform · Supervision & journal"
+          "Platform - Supervision & journal"
         ]
       }
     },
@@ -24318,7 +24348,7 @@
         },
         "summary": "Tout ce que le tableau de bord affiche, dans un seul appel",
         "tags": [
-          "Platform · Supervision & journal"
+          "Platform - Supervision & journal"
         ]
       }
     },
@@ -24340,7 +24370,7 @@
         },
         "summary": "Vue d'ensemble de la base installée",
         "tags": [
-          "Platform · Supervision & journal"
+          "Platform - Supervision & journal"
         ]
       }
     },
@@ -24399,7 +24429,7 @@
         },
         "summary": "Statistiques d'un cabinet",
         "tags": [
-          "Platform · Supervision & journal"
+          "Platform - Supervision & journal"
         ]
       }
     },

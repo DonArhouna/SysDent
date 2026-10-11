@@ -660,6 +660,23 @@ class RegenererCodesSecoursResponse(BaseSchema):
     codes_secours: List[str]
 
 
+class DashboardStatutBase(BaseSchema):
+    """Un statut de cabinet, décomposé en deux nombres qui doivent se lire ensemble.
+
+    **Pourquoi décomposer.** Un tableau de bord qui affiche « 42 cabinets ACTIVE »
+    sans dire combien ont une base fait croire que 42 cabinets fonctionnent. Ce
+    n'est pas vrai aujourd'hui : un dossier ACTIVE sans base a un login cassé.
+    Les deux chiffres sont donc toujours renvoyés **ensemble**, et l'écran ne
+    peut pas en afficher un seul.
+
+    Les deux comptes proviennent de la même lecture du registre maître : les
+    opposer à des totaux issus d'une autre table donnerait un compte faux.
+    """
+
+    total: int = 0
+    dont_base_absente: int = 0
+
+
 class DashboardResponse(BaseSchema):
     """Tout ce que le tableau de bord affiche, dans **un** appel HTTP.
 
@@ -671,6 +688,10 @@ class DashboardResponse(BaseSchema):
 
     total_cabinets: int = 0
     par_statut: Dict[str, int] = {}
+    #: Statuts du registre **maître**, avec la part dont la base est absente.
+    #: Clé distincte de `par_statut` : les deux ne lisent pas la même table.
+    par_statut_base: Dict[str, DashboardStatutBase] = {}
+    total_bases_absentes: int = 0
     par_formule: Dict[str, int] = {}
     nouveaux_30j: int = 0
     essais_restants_jours: int = 14

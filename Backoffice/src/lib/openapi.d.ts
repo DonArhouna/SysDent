@@ -6275,6 +6275,13 @@ export interface components {
                 [key: string]: number;
             };
             /**
+             * Par Statut Base
+             * @default {}
+             */
+            par_statut_base: {
+                [key: string]: components["schemas"]["DashboardStatutBase"];
+            };
+            /**
              * Proches Du Quota
              * @default []
              */
@@ -6287,10 +6294,40 @@ export interface components {
                 [key: string]: unknown;
             };
             /**
+             * Total Bases Absentes
+             * @default 0
+             */
+            total_bases_absentes: number;
+            /**
              * Total Cabinets
              * @default 0
              */
             total_cabinets: number;
+        };
+        /**
+         * DashboardStatutBase
+         * @description Un statut de cabinet, décomposé en deux nombres qui doivent se lire ensemble.
+         *
+         *     **Pourquoi décomposer.** Un tableau de bord qui affiche « 42 cabinets ACTIVE »
+         *     sans dire combien ont une base fait croire que 42 cabinets fonctionnent. Ce
+         *     n'est pas vrai aujourd'hui : un dossier ACTIVE sans base a un login cassé.
+         *     Les deux chiffres sont donc toujours renvoyés **ensemble**, et l'écran ne
+         *     peut pas en afficher un seul.
+         *
+         *     Les deux comptes proviennent de la même lecture du registre maître : les
+         *     opposer à des totaux issus d'une autre table donnerait un compte faux.
+         */
+        DashboardStatutBase: {
+            /**
+             * Dont Base Absente
+             * @default 0
+             */
+            dont_base_absente: number;
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
         };
         /**
          * DentMiseAJour

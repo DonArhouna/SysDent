@@ -200,6 +200,16 @@ class HealthService:
         for _, statut in absentes:
             par_statut[statut] = par_statut.get(statut, 0) + 1
 
+        # **Le total par statut, depuis la meme source que les absences.**
+        # Le tableau de bord lit ses statuts metier dans la base *plateforme*,
+        # et le registre *master* ici : deux tables, deux vocabulaires de
+        # statut. Melanger les deux produirait un « total » incoherent avec le
+        # « dont base absente » qu'on lui oppose. On expose donc les deux
+        # comptes depuis la meme lecture, pour qu'ils soient comparables.
+        total_par_statut: Dict[str, int] = {}
+        for _, statut in lignes:
+            total_par_statut[statut] = total_par_statut.get(statut, 0) + 1
+
         # Un dossier PROVISIONING sans base est normal, c'est l'état transitoire
         # d'une création. Un dossier **ACTIVE** sans base, c'est un cabinet dont
         # le login est cassé : c'est le seul cas qui dégrade la santé.
@@ -215,6 +225,7 @@ class HealthService:
             "total_registre": len(lignes),
             "absentes": len(absentes),
             "absentes_par_statut": par_statut,
+            "total_par_statut": total_par_statut,
             "exemples": [
                 {"db_name": db, "statut": statut} for db, statut in absentes[:LIMITE_AFFICHEE]
             ],

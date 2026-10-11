@@ -114,6 +114,16 @@ def categorie_etrangere(caractere: str) -> str | None:
     return None
 
 
+#: Fichiers **produits par une generation**, jamais edited a la main. Ils
+#: recopient les docstrings du backend, ponctuation comprise : exiger d'eux
+#: l'ASCII strict obligeait soit a ecrire 73 exceptions, soit a contourner le
+#: hook a chaque regeneration.
+FRAGMENTS_GENERES = (
+    "openapi.json",
+    "openapi.d.ts",
+)
+
+
 def _admis_strict(caractere: str) -> bool:
     if caractere in CARACTERES_ADMIS or " " <= caractere <= "~":
         return True
@@ -128,6 +138,24 @@ def controler_caracteres(chemins: Iterable[pathlib.Path], *, strict: bool) -> li
     """
     `strict=False` : seuls les caractères d'une écriture non latine sont refusés.
     `strict=True` : en plus, tout ce qui n'est ni ASCII ni accent français.
+
+    **Les fichiers générés échappent à la règle stricte, jamais à la règle
+    bloquante.** `openapi.json` et `openapi.d.ts` recopient fidèlement les
+    docstrings du backend, et donc la ponctuation de la documentation : points
+    médians, signes de multiplication, paragraphes, comparaisons, triangles
+    d'alerte. Les nommer ici les aurait fait entrer dans le dépôt, et le
+    contrôle les aurait alors signalés lui-même : on les décrit, on ne les
+    écrit pas.
+
+    Signaler 73 occurrences à chaque régénération ne les rend pas plus
+    innocentes : cela rend le contrôle contournable, et un contrôle contournable
+    est un contrôle perdu. La règle stricte exigeait soit 73 exceptions, soit un
+    `--no-verify` à chaque régénération du contrat.
+
+    La règle qui juge d'une **dégradation** — une écriture non latine, un
+    caractère de remplacement — reste appliquée sans exception. Et si une
+    docstring du backend contenait un jour un caractère CJK, c'est le fichier
+    source, lui-même contrôlé, qui serait signalé.
     """
     echecs: list[str] = []
     for chemin in chemins:
@@ -139,13 +167,15 @@ def controler_caracteres(chemins: Iterable[pathlib.Path], *, strict: bool) -> li
             echecs.append(f"{chemin.relative_to(RACINE)}: illisible en UTF-8")
             continue
 
+        genere = chemin.as_posix().endswith(FRAGMENTS_GENERES)
+
         for numero, ligne in enumerate(contenu.splitlines(), 1):
             trouves: list[tuple[int, str, str]] = []
             for position, caractere in enumerate(ligne):
                 nom = categorie_etrangere(caractere)
                 if nom is not None:
                     trouves.append((position, f"U+{ord(caractere):04X}", nom))
-                elif strict and not _admis_strict(caractere):
+                elif strict and not genere and not _admis_strict(caractere):
                     trouves.append(
                         (position, f"U+{ord(caractere):04X}", "hors ASCII et accents")
                     )

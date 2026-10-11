@@ -28,6 +28,7 @@ from src.modules.platform.schemas import (
     AuditEntryResponse,
     DashboardItem,
     DashboardResponse,
+    DashboardStatutBase,
     StatsGlobalesResponse,
     StatsTenantResponse,
 )
@@ -38,7 +39,7 @@ from src.modules.platform.services.stats import StatsService
 from src.modules.platform.services.tenants import TenantService
 
 platform_supervision_router = APIRouter(
-    prefix="/platform", tags=["Platform · Supervision & journal"]
+    prefix="/platform", tags=["Platform - Supervision & journal"]
 )
 
 
@@ -156,9 +157,27 @@ async def stats_dashboard(
         min((_e.get("jours_restants", 999) for _e in essais), default=14)
     )
 
+    # **La part « base absente », sans jamais se connecter à une base de
+    # cabinet.** `bases_absentes` compare le registre maître au catalogue
+    # `pg_database` : deux requêtes, quel que soit le nombre de cabinets. Le
+    # tableau de bord ne doit surtout pas ouvrir 137 connexions — il rendrait
+    # l'instance de données indisponible et le temps de réponse imprévisible.
+    bases = await HealthService.bases_absentes(master_db)
+    absentes_par_statut = bases.get("absentes_par_statut") or {}
+    total_par_statut = bases.get("total_par_statut") or {}
+    par_statut_base = {
+        statut: DashboardStatutBase(
+            total=total_par_statut.get(statut, 0),
+            dont_base_absente=absentes_par_statut.get(statut, 0),
+        )
+        for statut in sorted(set(total_par_statut) | set(absentes_par_statut))
+    }
+
     reponse = DashboardResponse(
         total_cabinets=vue["total_cabinets"],
         par_statut=vue["par_statut"],
+        par_statut_base=par_statut_base,
+        total_bases_absentes=bases.get("absentes", 0) or 0,
         par_formule=vue["par_formule"],
         nouveaux_30j=nouveaux_30j,
         essais_restants_jours=essais_restants_jours,
