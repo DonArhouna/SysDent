@@ -372,13 +372,29 @@ async def test_reproduction_reelle_colonne_absente(monkeypatch) -> None:
     )
     monkeypatch.setattr(services, "decrypt_secret", lambda valeur: "clair")
 
-    with pytest.raises(TenantConnectionException) as recolte:
-        await AuthService.authenticate(
-            email=email, password="MotDePasseFictif_123", master_db=None
-        )
+    try:
+        with pytest.raises(TenantConnectionException) as recolte:
+            await AuthService.authenticate(
+                email=email, password="MotDePasseFictif_123", master_db=None
+            )
 
-    assert recolte.value.status_code == 503
-    assert recolte.value.details == {}
-    for fragment in (recolte.value.message, str(recolte.value.details)):
-        assert "cabinet_id" not in fragment
-        assert nom not in fragment
+        assert recolte.value.status_code == 503
+        assert recolte.value.details == {}
+        for fragment in (recolte.value.message, str(recolte.value.details)):
+            assert "cabinet_id" not in fragment
+            assert nom not in fragment
+    finally:
+        # **Une base jetable par execution, et elle doit partir avec elle.**
+        # Sans ce `finally`, chaque passage laissait une base derriere : neuf
+        # s'etaient accumulees sur l'instance de tests avant que je les compte.
+        # Une fuite de ce genre rend la suite plus lente a chaque execution, et
+        # c'est l'une des hypotheses de la mission 2.
+        #
+        # `WITH (FORCE)` termine les sessions ouvertes : le moteur de la session
+        # de reproduction garde une connexion, et le `DROP` echouerait sinon.
+        admin = await _moteur("postgres")
+        try:
+            async with admin.connect() as conn:
+                await conn.execute(text(f'DROP DATABASE IF EXISTS "{nom}" WITH (FORCE)'))
+        finally:
+            await admin.dispose()
