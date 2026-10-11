@@ -81,28 +81,47 @@ Un seul appel, total et part sans base sur deux lignes distinctes, erreur avec
 « Réessayer » et jamais un zéro, vide sans « Réessayer », bannière conditionnée.
 Pas d'i18n : ni le backoffice ni le client n'en ont — à trancher.
 
-## Le 500 du tableau de bord : une voie prouvée, le déclencheur non reproduit
+## Le 500 du tableau de bord : **cause nommée, reproduite, corrigée**
 
-**Prouvé** : `HealthService.global_` promettait en docstring qu'un échec
-apparaîtrait dans le corps de la réponse. Le code ne le faisait pas : les huit
-contrôles étaient appelés sans `try`, et chacun ne rattrape qu'un
-`SQLAlchemyError`. Or **un échec de connexion n'est pas encapsulé** par
-SQLAlchemy — mesuré le 11/10. Un seul contrôle suffisait à faire un 500. Corrigé,
-rouge puis vert, les deux formes mesurées couvertes.
+Sur le HEAD, instance de test, jeton plateforme valide :
 
-**Non reproduit** : le déclencheur exact sur les données du propriétaire. Aucun
-journal du backend n'est écrit sur disque, et la connexion exigerait un compte
-réel. Hypothèse **écartée par la mesure** : la pression de connexions (6
-ouvertes pour 100). En HTTP, sur une instance de test, l'endpoint sans jeton
-répond **401, pas 500** — routage sain. Le **200 authentifié n'est pas vérifié**.
+| | avant | après |
+|---|---|---|
+| sans jeton | 401 | 401 |
+| jeton invalide | 401 | 401 |
+| login + 2FA | 200 | 200 |
+| **tableau de bord** | **500** | **200** |
+
+Traceback : `stats.py:354`, `_cabinets_essai_proches_expiration` —
+`TenantPlateforme.date_fin_essai.is_(None).invert()`. `is_(None)` renvoie déjà
+un `BinaryExpression`, qu'on ne peut pas inverser. L'appel lève à la
+**construction** du `select`, avant tout accès à la base : le 500 ne dépendait
+d'aucune donnée. La condition était de plus sans effet — en SQL, comparer
+`NULL` donne `NULL`, et les deux conditions de date voisines excluaient déjà
+les essais sans date.
+
+Code **antérieur** aux travaux sur le tableau de bord : ce n'est pas une
+régression. Le test échouait pour la même raison, au même endroit.
+
+**Fuite trouvée au passage** : la fixture plateforme paramétrée de `conftest`
+laisse une base `sysdent_platform_test_<hex>` par paramètre — 6 bases
+accumulées. Non corrigée, signalée.
+
+## Couple 401 / 500 : mesuré, et non lié
+
+401 sans jeton et 401 avec jeton invalide, distincts et stables. Le 500 ne
+résulte pas d'une requête partie sans authentification : il venait de la
+construction d'une requête, comme le prouve le traceback. **L'analyse front du
+renouvellement de session n'a pas été faite** — pas de teste, donc rien
+n'est affirmé.
 
 **Non fait** : `design:parite`, liste des cabinets. **Aucun rendu déclaré
 vérifié** : pas de navigateur.
 
 ## Reste à faire
 
-1. **Rejouer `/dashboard` dans un vrai navigateur** : sidebar, navbar, onglet
-   Réseau sans 500.
-2. Si le 500 subsiste, le **traceback** du backend : le lire, puis le reproduire.
+1. **Analyser le 401 côté front** : que fait `api.ts` sur un 401, et le test
+   qui le prouve. Rien n'est affirmé aujourd'hui.
+2. Corriger la fuite des bases `sysdent_platform_test_<hex>`.
 3. `npm run design:parite`, puis la liste des cabinets.
 4. Rapprochement du registre : arbitrage sur les 36 lignes non jetables.
