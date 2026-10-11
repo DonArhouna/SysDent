@@ -32,15 +32,6 @@ Preuves : trois exécutions de suite, **5 bases avant et après** ; une base
 laissée volontairement fait échouer la session ; développement inchangé
 (17 bases, registre 137/137).
 
-Chaque base créée est enregistrée. En fin de session, les bases hors liste de
-protection sont **listées et la session échoue** : rien n'est supprimé à l'aveugle.
-`--nettoyer-instance-test` les supprime, après vérification du port 55436 **et**
-de la base-témoin.
-
-Preuves : 14 verts sur le fichier de supervision ; 19 verts, **trois exécutions
-de suite, 5 bases avant et après** ; une base laissée volontairement fait échouer
-la session ; développement inchangé (17 bases, registre 137/137).
-
 ## Suite complète : **NON VÉRIFIÉE**
 64 % puis **90 minutes** sans finir (objectif : moins de 15). Cause du
 ralentissement **non établie**. Un facteur corrigé depuis : la base plateforme
