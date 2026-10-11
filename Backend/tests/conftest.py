@@ -468,15 +468,29 @@ def _preparer_bases_de_tests():
     # Alembic lit son URL par variable d'environnement pour ces deux chaines :
     # on la definit pour qu'aucune migration ne soit appliquee par megarde a la
     # base de developpement.
-    env_precedent = os.environ.get("ALEMBIC_MASTER_DB_URL")
-    os.environ["ALEMBIC_MASTER_DB_URL"] = _url_base_de_tests(BASE_MASTER_TESTS)
-    try:
-        asyncio.run(asyncio.to_thread(upgrade_master_to_head))
-    finally:
-        if env_precedent is None:
-            os.environ.pop("ALEMBIC_MASTER_DB_URL", None)
-        else:
-            os.environ["ALEMBIC_MASTER_DB_URL"] = env_precedent
+    #
+    # **Les deux chaines.** La base plateforme etait creee mais jamais migree :
+    # `upgrade_platform_to_head` etait importe et jamais appele. Toute la suite
+    # plateforme echouait alors sur `relation "tenants_plateforme" does not
+    # exist` - quatre erreurs au chargement, et un echec de moins a expliquer.
+    for variable, base in (
+        ("ALEMBIC_MASTER_DB_URL", BASE_MASTER_TESTS),
+        ("ALEMBIC_PLATFORM_DB_URL", BASE_PLATEFORME_TESTS),
+    ):
+        precedent = os.environ.get(variable)
+        os.environ[variable] = _url_base_de_tests(base)
+        try:
+            migration = (
+                upgrade_master_to_head
+                if base == BASE_MASTER_TESTS
+                else upgrade_platform_to_head
+            )
+            asyncio.run(asyncio.to_thread(migration))
+        finally:
+            if precedent is None:
+                os.environ.pop(variable, None)
+            else:
+                os.environ[variable] = precedent
 
     yield
 
