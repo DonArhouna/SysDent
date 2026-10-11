@@ -70,28 +70,38 @@ manifestement de test, 2 provisionnements échoués, 33 douteux
 (`clinique_provisionnement_*`), 3 possiblement réels (`clinique_cabinet_sn_*`).
 Aucun dump pour ces 36 dernières.
 
-## Backoffice : socle backend fait, écrans non écrits
+## Backoffice : tableau de bord écrit et testé, écrans suivants non faits
 
-`/dashboard` affiche encore `ConnexionEtabliePage`. Le store existe (un appel,
-états chargement / erreur / vide / prêt, « Réessayer », jamais un zéro pour une
-panne), `StatCard` est à parité du client, 21 composants réutilisables.
+`/dashboard` affiche le **tableau de bord**, un seul appel. Le total et la part
+dont la base est absente sont **deux lignes distinctes** : l'écran n'affiche
+jamais un « actif » qui cache les bases absentes. Erreur = message +
+« Réessayer », **jamais un zéro** ; vide = « Aucun cabinet », sans « Réessayer ».
+Bannière des codes de secours conservée, conditionnée par le profil ; écran
+`/codes-secours` intact. Aucun style inventé : composants du dépôt.
 
-**Fait, vérifié** : le tableau de bord expose désormais, par statut, `total` et
-`dont_base_absente`, lus dans la **même** requête que les absences. Sans cela un
-écran affichait « 42 cabinets ACTIVE » sans dire que certains ont un login cassé.
-Le compte vient du registre et du catalogue `pg_database` — **aucune connexion à
-une base de cabinet**, prouvé par un test qui rend cette connexion impossible. Les
-deux comptes viennent du même registre parce que le tableau de bord lit ses
-statuts dans la base plateforme et les bases dans la base master : deux tables,
-deux vocabulaires.
+Backend : par statut `total` et `dont_base_absente`, lus dans la **même**
+requête que les absences — sinon le ratio serait faux, les statuts métier
+venant de la base plateforme et les bases du registre maître. **Aucune
+connexion à une base de cabinet**, prouvé par un test.
 
-Types TypeScript régénérés, `npm run verifier` vert, 16 tests cibles verts. Le
-hook a refusé deux fois le commit, et avait raison : la ponctuation des fichiers
-générés, et deux caractères que j'avais moi-même écrits.
+8 tests verts, `tsc` exit 0, `npm run verifier` vert. Les tests ont trouvé un
+bug réel : `StatCard` affiche `hint ?? detail`, donc le nombre passé en
+`detail` n'était jamais visible — or c'est le chiffre que la carte existe pour
+montrer.
 
-**Non fait** : page du tableau de bord, liste des cabinets, fiche. `/platform/
-tenants`, les quotas et l'historique d'abonnement **existent déjà** côté backend ;
-c'est l'écran et les filtres qui manquent.
+**Pas d'i18n, volontairement** : ni le backoffice ni le client n'en ont
+(ce qui est vérifié : aucune dépendance, aucun fichier de traduction). En
+inventer un serait introduire une architecture qu'aucune des deux applications
+n'a. Le français est écrit comme dans toutes les autres pages. À trancher.
+
+**Échecs préexistants, prouvés antérieurs** : 2 tests de la bannière dans
+`codes-secours-page.test.tsx` pointent encore l'écran provisoire ; identiques
+avec `App.tsx` remis à HEAD. À rapatrier sur le tableau de bord.
+
+**Non fait** : `npm run design:parite`, liste des cabinets. `/platform/tenants`,
+quotas et historique d'abonnement existent déjà côté backend.
+
+**Aucun rendu déclaré vérifié** : pas de navigateur.
 
 ## Reste à faire
 
