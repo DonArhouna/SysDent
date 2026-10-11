@@ -1,8 +1,10 @@
 import uuid
 from collections import OrderedDict
 from typing import AsyncGenerator, Dict, Optional
+import asyncpg
 import structlog
 from sqlalchemy import select
+from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -10,9 +12,30 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from .config import settings
-from .exceptions import TenantConnectionException
+from .exceptions import MasterDatabaseUnavailableException, TenantConnectionException
 
 logger = structlog.get_logger(__name__)
+
+#: Échecs qui signifient « le registre est injoignable ». Liste fermée, pour la
+#: même raison que celle du login : un `except Exception` déguiserait un bug en
+#: panne d'infrastructure, et le bug deviendrait invisible.
+#:
+#: L'ouverture de connexion n'étant pas encapsulée par SQLAlchemy, l'erreur
+#: remonte nue : `ConnectionRefusedError` sur une adresse, `OSError` quand
+#: l'hôte résout en plusieurs et qu'asyncpg agrège leurs échecs. Les deux ont
+#: été mesurés, le 11/10, avant d'être nommés ici.
+REGISTRE_INJOIGNABLE = (
+    ConnectionError,
+    OSError,
+    OperationalError,
+    InterfaceError,
+    asyncpg.exceptions.InvalidCatalogNameError,
+    asyncpg.exceptions.PostgresConnectionError,
+    asyncpg.exceptions.ClientCannotConnectError,
+    asyncpg.exceptions.AdminShutdownError,
+    asyncpg.exceptions.TooManyConnectionsError,
+    asyncpg.exceptions.ConnectionDoesNotExistError,
+)
 
 # Engine Master pour la gestion centrale
 master_engine: AsyncEngine = create_async_engine(
@@ -158,11 +181,34 @@ tenant_db_manager = TenantDatabaseManager()
 
 
 async def get_master_db() -> AsyncGenerator[AsyncSession, None]:
-    """Dépendance FastAPI pour obtenir une session de la base Master."""
+    """Dépendance FastAPI pour obtenir une session de la base Master.
+
+    **Une panne du registre est une panne d'infrastructure, pas un bug.** Le 11/10,
+    le conteneur PostgreSQL de développement s'était arrêté ; le login renvoyait
+    alors un 500 dont la réponse exposait `Connect call failed ('::1', 55435, 0, 0)`.
+    Le client apprenait l'hôte et le port du serveur.
+
+    L'échec d'ouverture de connexion n'est pas encapsulé par SQLAlchemy : il
+    remonte **nu**, en `ConnectionRefusedError`, ou en `OSError` quand l'hôte
+    résout en plusieurs adresses et qu'asyncpg agrège leurs échecs. Les deux
+    formes sont converties ici en 503 générique, sans détail.
+
+    La session est paresseuse : la connexion s'établit à la première requête,
+    donc **après** le `yield`. L'erreur remonte alors par la dépendance ; c'est
+    ici qu'elle est rattrapée, et nulle part ailleurs.
+    """
     async with MasterAsyncSessionFactory() as session:
         try:
             yield session
             await session.commit()
+        except REGISTRE_INJOIGNABLE as exc:
+            await session.rollback()
+            logger.error(
+                "registre_injoignable",
+                erreur=type(exc).__name__,
+                detail=" ".join(str(exc).split())[:200],
+            )
+            raise MasterDatabaseUnavailableException() from exc
         except Exception:
             await session.rollback()
             raise

@@ -39,6 +39,14 @@ BASE_TENANT_INJOIGNABLE = (
     # Ce que SQLAlchemy substitue lorsque c'est le pilote qui échoue à connecter.
     OperationalError,
     InterfaceError,
+    # **Ajouté le 11/10, sur mesure.** Un echec de connexion a l'ouverture n'est
+    # pas encapsule par SQLAlchemy : il remonte **nu**. Mesure sur un port mort,
+    # c'est un `ConnectionRefusedError`. Et quand l'hote resout en plusieurs
+    # adresses — `localhost` donne `::1` et `127.0.0.1` — asyncpg agrege leurs
+    # echecs et leve le plus petit ancetre commun, c'est-a-dire un `OSError`.
+    # Les deux formes ont produit un 500 le 11/10 ; aucune ne passait la liste.
+    ConnectionError,
+    OSError,
 )
 
 #: Erreurs qui signifient « la base répond, mais plus comme le code l'attend ».
@@ -57,18 +65,61 @@ SCHEMA_PERIME = (
     asyncpg.exceptions.UndefinedFunctionError,
 )
 
+#: Les memes divergences, dites par leur code PostgreSQL.
+#:
+#: Un `sqlstate` est plus fiable qu'un nom de classe : il est porte par le
+#: serveur, il traverse les couches sans se transformer, et il ne depend ni de
+#: la version de SQLAlchemy ni de celle du pilote. On reconnait donc les deux.
+#: 42703 colonne absente, 42P01 table absente, 42883 fonction absente.
+SQLSTATE_SCHEMA_PERIME = frozenset({"42703", "42P01", "42883"})
+
+#: Combien de niveaux d'encapsulation on descend. Mesure le 11/10 : l'erreur
+#: asyncpg est deux niveaux sous le `ProgrammingError` attrape, pas un. Une
+#: profondeur bornee evite une boucle sur une chaine circulaire.
+PROFONDEUR_CHAINE = 6
+
 
 def _est_divergence_de_schema(exc: BaseException) -> bool:
     """
     L'erreur vient-elle d'un schéma périmé, ou d'une requête de code cassée ?
 
+    **Il faut descendre la chaîne entière.** Mesuré le 11/10 sur une base
+    réelle dont on avait supprimé une colonne, SQLAlchemy empile :
+
+        niveau 0  sqlalchemy.exc.ProgrammingError
+          .orig -> niveau 1  ...postgresql.asyncpg.ProgrammingError  sqlstate=42703
+                  .orig -> niveau 2  asyncpg.exceptions.UndefinedColumnError
+
+    Le tri d'origine s'arrêtait au niveau 1, où il ne trouve qu'un
+    `ProgrammingError` : il concluait « pas une divergence » et laissait
+    remonter un 500. C'est exactement la panne qu'il devait empêcher.
+
     SQLAlchemy conserve l'erreur du pilote dans `.orig` : c'est là qu'il faut
     regarder. S'arrêter à la surface confondrait les deux, et une faute de
     frappe deviendrait « service indisponible » — donc invisible.
     """
-    for cause in (exc, getattr(exc, "orig", None), exc.__cause__, exc.__context__):
-        if isinstance(cause, SCHEMA_PERIME):
+    vues: set[int] = set()
+    courant: BaseException | None = exc
+    for _ in range(PROFONDEUR_CHAINE):
+        if courant is None or id(courant) in vues:
+            return False
+        vues.add(id(courant))
+
+        if isinstance(courant, SCHEMA_PERIME):
             return True
+        if getattr(courant, "sqlstate", None) in SQLSTATE_SCHEMA_PERIME:
+            return True
+
+        origine = getattr(courant, "orig", None)
+        suivant = origine if isinstance(origine, BaseException) else courant.__cause__
+        if suivant is None or suivant is courant:
+            # On tente aussi `__context__` : une exception levee pendant le
+            # traitement d'une autre peut porter la divergence.
+            if courant.__context__ is not None and courant.__context__ is not courant:
+                courant = courant.__context__
+                continue
+            return False
+        courant = suivant
     return False
 
 

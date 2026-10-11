@@ -104,6 +104,30 @@ class TenantConnectionException(AppException):
         )
 
 
+class MasterDatabaseUnavailableException(AppException):
+    """La base master — le registre des cabinets — est injoignable.
+
+    **Constat du 11/10.** Le conteneur PostgreSQL de développement s'était arrêté
+    ; `POST /auth/login` renvoyait alors un 500 dont la réponse exposait, en
+    clair, `Connect call failed ('::1', 55435, 0, 0)`. Le client apprenait
+    l'hôte et le port du serveur, et surtout : qu'une panne d'infrastructure
+    n'est pas un bug de l'application.
+
+    **Pourquoi une exception à part.** Il n'y a ici aucun cabinet : l'identifiant
+    du tenant est inconnu, et `TenantConnectionException` aurait porté un
+    identifiant qui n'existe pas. La réponse reste la même — générique, vide,
+    sans hôte ni port — mais la distinction reste visible dans les journaux.
+    """
+
+    def __init__(self, original_error: Optional[str] = None):
+        super().__init__(
+            message="Service momentanément indisponible. Veuillez réessayer dans quelques instants.",
+            code="SERVICE_INDISPONIBLE",
+            status_code=503,
+            details={},
+        )
+
+
 class TooManyRequestsException(AppException):
     """Levée lorsqu'un client dépasse une limite de débit (force brute sur le login)."""
 
