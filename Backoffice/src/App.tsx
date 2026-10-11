@@ -7,7 +7,7 @@ import { EnrolementPage } from '@/features/auth/enrolement-page'
 import { CodesSecoursPage } from '@/features/auth/codes-secours-page'
 import { ForbiddenPage } from '@/pages/forbidden'
 import { NotFoundPage } from '@/pages/not-found'
-import { ConnexionEtabliePage } from '@/pages/connexion-etablie'
+import { DashboardPage } from '@/features/dashboard/dashboard-page'
 
 /**
  * Racine du backoffice.
@@ -46,7 +46,7 @@ export default function App() {
           path="/dashboard"
           element={
             <RouteGuard>
-              <ConnexionEtabliePage />
+              <DashboardPage />
             </RouteGuard>
           }
         />
