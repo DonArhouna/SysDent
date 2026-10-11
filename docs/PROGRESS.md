@@ -52,16 +52,13 @@ rejouées par test n'ont **pas** été mesurés.
 
 ## Écart de schéma des cabinets (lecture seule)
 
-12 bases de cabinets existent sur le développement. **5 à la tête**, aucune en
-retard parmi les cabinets réels. **5 bases sans table `alembic_version`** : ce
-sont des bases de démonstration (`clinique_demo_*`, `clinique_trace_3_*`,
-`clinique_diagnostic_dakar_*`, `clinique_d_mo_dakar_*`), pas des cabinets en
-service. Une seule base est en retard : `sysdent_tenant_ref`, à `c4f8a2d91e05` —
-**le tenant de référence des tests**, pas un client.
-
-Commande, si un accord est donné pour une base réellement en retard :
-sauvegarde `pg_dump` puis, depuis `Backend/`, `alembic -c alembic_tenant.ini
-upgrade head`. Aucune base n'a été migrée.
+12 bases de cabinets existent. **5 à la tête**, aucun cabinet réel en retard.
+**5 bases sans table `alembic_version`** : des bases de démonstration
+(`clinique_demo_*`, `clinique_trace_3_*`, `clinique_diagnostic_dakar_*`,
+`clinique_d_mo_dakar_*`), pas des cabinets en service. Une seule en retard :
+`sysdent_tenant_ref`, à `c4f8a2d91e05`, le **tenant de référence des tests**.
+Commande, sur accord : `pg_dump` puis `alembic -c alembic_tenant.ini upgrade
+head`. Aucune base migrée.
 
 ## Registre : 129 lignes sans base, toutes conservées
 
