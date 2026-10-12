@@ -19,6 +19,7 @@ from src.modules.platform.routers.users import platform_users_router
 from src.modules.rbac import rbac_router
 from src.modules.rendezvous import rendezvous_router
 from src.modules.stock import stock_router
+from src.modules.tarification import router as tarification_router
 from src.modules.utilisateurs import utilisateurs_router
 
 api_v1_router = APIRouter()
@@ -30,9 +31,11 @@ api_v1_router.include_router(audit_router)
 api_v1_router.include_router(patients_router)
 api_v1_router.include_router(consultations_router)
 api_v1_router.include_router(nomenclature_router)
+# CDC 5.6 / 5.7 : tarification et prise en charge.
+api_v1_router.include_router(tarification_router)
 api_v1_router.include_router(odontogramme_router)
 
-# ⚠️ ORDRE IMPORTANT : le sous-routeur des médicaments est enregistré AVANT le
+# ATTENTION : ORDRE IMPORTANT : le sous-routeur des médicaments est enregistré AVANT le
 # routeur des ordonnances. FastAPI teste les routes dans l'ordre de
 # déclaration, et `/ordonnances/{prescription_id}` (GET) absorberait sinon
 # `/ordonnances/medicaments`, qui n'existe qu'au niveau du sous-routeur.

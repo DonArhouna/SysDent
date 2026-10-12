@@ -33,6 +33,8 @@ from src.modules.consultations.services import (
     ConsultationService,
     NomenclatureService,
 )
+from src.modules.tarification.router import creer_acte, lister_actes
+from src.modules.tarification.schemas import ActeNomenclatureResponse
 from src.modules.tenants.models import ActeNomenclature, Consultation, Utilisateur
 
 router = APIRouter(prefix="/consultations", tags=["Consultations & Actes"])
@@ -340,84 +342,29 @@ async def delete_acte(
 
 
 # ==============================================================================
-# NOMENCLATURE DES ACTES
+# NOMENCLATURE DES ACTES - alias conserve
 # ==============================================================================
+#
+# Ces deux routes etaient sous `CONSULTATIONS:READ` et `CONSULTATIONS:CREATE`,
+# avec des reponses `dict`. C'etait un defaut de fond : avoir le droit de creer
+# une consultation ne devrait pas donner le droit de fixer le prix des actes du
+# cabinet. Un praticien pouvait creer un acte de nomenclature par la porte de la
+# consultation.
+#
+# Elles passent donc sous `TARIFS:READ` / `TARIFS:WRITE`, et leurs reponses sont
+# typees. **Le travail complet se fait sous `/tarification`** ; ces deux routes
+# le deleguent, sans reimplementer la regle metier.
+#
+# Elles restent parce que des clients deja deployes les appellent, et parce que
+# `tests/conftest.py` s'en sert pour semer une nomenclature. Supprimer une URL
+# qui fonctionne n'apporte rien et casse ce qui marche.
 
-class ActeNomenclatureCreate(BaseSchema):
-    """Création d'un acte de nomenclature (tarification du cabinet)."""
-
-    code: str = Field(..., min_length=2, max_length=50, description="Code de l'acte (DT01, EXT01...)")
-    libelle: str = Field(..., min_length=2, max_length=200)
-    categorie: str = Field(..., min_length=2, max_length=100, description="SOINS, PROTHESE, CHIRURGIE, ORTHO...")
-    tarif_base: Decimal = Field(..., ge=0, description="Tarif de référence en FCFA")
-    duree_estimee_min: int = Field(30, ge=1, le=480)
-    unitaire: bool = Field(
-        False, description="Soin portant sur une dent : le numéro FDI sera alors obligatoire."
-    )
-
-
-@nomenclature_router.get("", response_model=PaginatedResponse[dict])
-async def list_nomenclature(
-    q: Optional[str] = Query(None, description="Recherche par code ou libellé"),
-    categorie: Optional[str] = Query(None, description="Filtrer par catégorie"),
-    inclure_inactifs: bool = Query(False, description="Inclure les actes retirés de la nomenclature"),
-    page: int = Query(1, ge=1),
-    limit: int = Query(50, ge=1, le=200),
-    db: AsyncSession = Depends(get_tenant_db),
-    current_user: Utilisateur = Depends(get_current_user),
-    _: bool = Depends(require_permissions("CONSULTATIONS:READ")),
-):
-    """Nomenclature des actes dentaires du cabinet."""
-    params = PaginationParams(page=page, limit=limit)
-    actes, total = await NomenclatureService.lister(
-        db, q=q, categorie=categorie, inclure_inactifs=inclure_inactifs, offset=params.offset, limit=params.limit
-    )
-    items = [
-        {
-            "id": str(a.id),
-            "code": a.code,
-            "libelle": a.libelle,
-            "categorie": a.categorie,
-            "tarif_base": a.tarif_base,
-            "duree_estimee_min": a.duree_estimee_min,
-            "unitaire": a.unitaire,
-            "actif": a.actif,
-        }
-        for a in actes
-    ]
-    return paginate(items=items, total_records=total, params=params)
-
-
-@nomenclature_router.post("", response_model=APIResponse[dict], status_code=status.HTTP_201_CREATED)
-async def create_acte_nomenclature(
-    data: ActeNomenclatureCreate,
-    request: Request,
-    db: AsyncSession = Depends(get_tenant_db),
-    current_user: Utilisateur = Depends(get_current_user),
-    _: bool = Depends(require_permissions("CONSULTATIONS:CREATE")),
-):
-    """Ajoute un acte à la nomenclature du cabinet (tarifs selon acte et praticien)."""
-    ip, ua = _ctx(request)
-    acte = await NomenclatureService.creer(
-        db,
-        code=data.code,
-        libelle=data.libelle,
-        categorie=data.categorie,
-        tarif_base=data.tarif_base,
-        duree_estimee_min=data.duree_estimee_min,
-        unitaire=data.unitaire,
-        auteur=current_user,
-    )
-    return APIResponse(
-        message="Acte ajouté à la nomenclature.",
-        data={
-            "id": str(acte.id),
-            "code": acte.code,
-            "libelle": acte.libelle,
-            "categorie": acte.categorie,
-            "tarif_base": acte.tarif_base,
-            "duree_estimee_min": acte.duree_estimee_min,
-            "unitaire": acte.unitaire,
-            "actif": acte.actif,
-        },
-    )
+nomenclature_router.get(
+    "",
+    response_model=PaginatedResponse[ActeNomenclatureResponse],
+)(lister_actes)
+nomenclature_router.post(
+    "",
+    response_model=APIResponse[ActeNomenclatureResponse],
+    status_code=status.HTTP_201_CREATED,
+)(creer_acte)

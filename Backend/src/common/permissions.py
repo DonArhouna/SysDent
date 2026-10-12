@@ -32,6 +32,12 @@ MODULE_FACTURATION = "FACTURATION"
 MODULE_STOCK = "STOCK"
 MODULE_AUDIT = "AUDIT"
 MODULE_ADMIN = "ADMIN"
+# `TARIFS` et `ASSURANCE` sont deux poles distincts. Modifier un tarif engage
+# l'argent du cabinet ; declarer une prise en charge engage la responsabilite du
+# cabinet vis-a-vis d'un payeur. Un profil qui peut l'un n'a pas pour autant
+# l'autre, d'ou deux ressources et non une seule.
+MODULE_TARIFS = "TARIFS"
+MODULE_ASSURANCE = "ASSURANCE"
 
 ACTION_READ = "READ"
 ACTION_CREATE = "CREATE"
@@ -39,6 +45,11 @@ ACTION_UPDATE = "UPDATE"
 ACTION_DELETE = "DELETE"
 ACTION_EXPORT = "EXPORT"
 ACTION_SIGN = "SIGN"
+# `WRITE` regroupe ce qui cree, modifie et desactive. Pour un referentiel comme
+# la tarification, "creer un acte" et "changer son tarif" sont le meme geste du
+# point de vue de qui peut le faire : les separer ne produirait que des
+# permissions que personne n'accorde isolement.
+ACTION_WRITE = "WRITE"
 
 
 def p(module: str, action: str) -> Permission:
@@ -109,6 +120,16 @@ CATALOGUE_PERMISSIONS: List[Permission] = [
     p(MODULE_AUDIT, ACTION_EXPORT),
     p(MODULE_ADMIN, ACTION_READ),
     p(MODULE_ADMIN, ACTION_UPDATE),
+    # -- CDC 5.6 : tarification ------------------------------------------------
+    # Uniquement READ et WRITE, et c'est volontaire. La nomenclature et ses
+    # tarifs forment un referentiel : on le lit, on le tient a jour, on ne le
+    # "supprime" pas. Un acte se desactive, ce qui est une mise a jour et non
+    # une suppression - un acte cite par une facture ne peut pas disparaitre.
+    p(MODULE_TARIFS, ACTION_READ),
+    p(MODULE_TARIFS, ACTION_WRITE),
+    # -- CDC 5.7 : prise en charge --------------------------------------------
+    p(MODULE_ASSURANCE, ACTION_READ),
+    p(MODULE_ASSURANCE, ACTION_WRITE),
 ]
 
 # Rôles qui n'ont aucun contrôle de permission (accès complet par conception).
@@ -146,6 +167,12 @@ _MEDICAL_COMPLET = [
     p(MODULE_DISPONIBILITES, ACTION_CREATE),
     p(MODULE_DISPONIBILITES, ACTION_UPDATE),
     p(MODULE_DISPONIBILITES, ACTION_DELETE),
+    # `TARIFS:READ` sans `TARIFS:WRITE` : le dentiste doit voir le prix d'un
+    # acte pour le facturer et l'expliquer au patient, mais le tarif se decide
+    # au cabinet. Meme lecture pour la prise en charge : il doit savoir qui
+    # couvre quoi avant de soin, il ne declare pas le droit.
+    p(MODULE_TARIFS, ACTION_READ),
+    p(MODULE_ASSURANCE, ACTION_READ),
 ]
 
 MATRICE_ROLES: Dict[str, List[Permission]] = {
@@ -186,6 +213,9 @@ MATRICE_ROLES: Dict[str, List[Permission]] = {
         p(MODULE_DISPONIBILITES, ACTION_READ),
         p(MODULE_AGENDA, ACTION_READ),
         p(MODULE_STOCK, ACTION_READ),
+        # L'assistant prepare les actes : il doit lire le prix, il ne le fixe pas.
+        p(MODULE_TARIFS, ACTION_READ),
+        p(MODULE_ASSURANCE, ACTION_READ),
     ],
     # Secrétariat / accueil : enregistre les patients et gère l'agenda et la caisse.
     # PAS d'accès au dossier médical (règle clinique) ni aux antécédents.
@@ -205,6 +235,13 @@ MATRICE_ROLES: Dict[str, List[Permission]] = {
         p(MODULE_FACTURATION, ACTION_READ),
         p(MODULE_FACTURATION, ACTION_CREATE),
         p(MODULE_STOCK, ACTION_READ),
+        # L'accueil enregistre la carte de mutuelle du patient au moment ou il
+        # cree sa fiche. Il ne declare donc QUE la prise en charge : le droit
+        # d'ecrire sur les organismes et sur les taux reste au cabinet, parce
+        # qu'un taux errone se reproduit sur toutes les factures du jour.
+        p(MODULE_TARIFS, ACTION_READ),
+        p(MODULE_ASSURANCE, ACTION_READ),
+        p(MODULE_ASSURANCE, ACTION_WRITE),
     ],
     # Comptable : lit et corrige la facturation, aucun accès au dossier médical.
     "COMPTABLE": [
@@ -215,6 +252,11 @@ MATRICE_ROLES: Dict[str, List[Permission]] = {
         p(MODULE_FACTURATION, ACTION_EXPORT),
         p(MODULE_STOCK, ACTION_READ),
         p(MODULE_STOCK, ACTION_UPDATE),
+        # Le comptable facture : il lit le tarif applique et le droit ouvert. Il
+        # ne modifie ni l'un ni l'autre - la ventilation d'une facture assurance
+        # contre patient vient plus tard et exigera sa propre permission.
+        p(MODULE_TARIFS, ACTION_READ),
+        p(MODULE_ASSURANCE, ACTION_READ),
         # Aucune permission AUDIT : le journal d'audit est une tracabilite de
         # plateforme. Il reste ecrit en base et consultable par le support et le
         # backoffice, mais aucun role du cabinet n'y accede — pas meme par URL
@@ -227,6 +269,9 @@ MATRICE_ROLES: Dict[str, List[Permission]] = {
         p(MODULE_STOCK, ACTION_UPDATE),
         p(MODULE_STOCK, ACTION_DELETE),
         p(MODULE_FACTURATION, ACTION_READ),
+        # Le magasinier commande au prix du cabinet et consomme en valeur : il
+        # lit le tarif, il ne le fixe pas.
+        p(MODULE_TARIFS, ACTION_READ),
     ],
 }
 
