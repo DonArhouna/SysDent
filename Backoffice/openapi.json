@@ -65,6 +65,38 @@
         "title": "APIResponse[AccesSupportResponse]",
         "type": "object"
       },
+      "APIResponse_ActeNomenclatureResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActeNomenclatureResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "title": "APIResponse[ActeNomenclatureResponse]",
+        "type": "object"
+      },
       "APIResponse_ActeRealiseResponse_": {
         "properties": {
           "data": {
@@ -287,6 +319,38 @@
           }
         },
         "title": "APIResponse[CabinetResponse]",
+        "type": "object"
+      },
+      "APIResponse_CategoriePatientResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CategoriePatientResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "title": "APIResponse[CategoriePatientResponse]",
         "type": "object"
       },
       "APIResponse_ChartingParodontalResponse_": {
@@ -671,6 +735,38 @@
           }
         },
         "title": "APIResponse[DisponibiliteResponse]",
+        "type": "object"
+      },
+      "APIResponse_DroitPriseEnChargeResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DroitPriseEnChargeResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "title": "APIResponse[DroitPriseEnChargeResponse]",
         "type": "object"
       },
       "APIResponse_Enrolement2FAResponse_": {
@@ -2040,6 +2136,38 @@
         "title": "APIResponse[OrdonnanceResponse]",
         "type": "object"
       },
+      "APIResponse_OrganismeAssuranceResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrganismeAssuranceResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "title": "APIResponse[OrganismeAssuranceResponse]",
+        "type": "object"
+      },
       "APIResponse_PaiementResponse_": {
         "properties": {
           "data": {
@@ -2776,6 +2904,38 @@
         "title": "APIResponse[SupportTokenResponse]",
         "type": "object"
       },
+      "APIResponse_TarifActeResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TarifActeResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "title": "APIResponse[TarifActeResponse]",
+        "type": "object"
+      },
       "APIResponse_TenantCreationResponse_": {
         "properties": {
           "data": {
@@ -3346,17 +3506,14 @@
         "type": "object"
       },
       "ActeNomenclatureCreate": {
-        "description": "Création d'un acte de nomenclature (tarification du cabinet).",
         "properties": {
           "categorie": {
-            "description": "SOINS, PROTHESE, CHIRURGIE, ORTHO...",
             "maxLength": 100,
             "minLength": 2,
             "title": "Categorie",
             "type": "string"
           },
           "code": {
-            "description": "Code de l'acte (DT01, EXT01...)",
             "maxLength": 50,
             "minLength": 2,
             "title": "Code",
@@ -3382,27 +3539,174 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,13}0*$)\\d{0,10}\\.\\d{0,2}0*$)",
                 "type": "string"
               }
             ],
-            "description": "Tarif de référence en FCFA",
             "title": "Tarif Base"
           },
           "unitaire": {
             "default": false,
-            "description": "Soin portant sur une dent : le numéro FDI sera alors obligatoire.",
             "title": "Unitaire",
             "type": "boolean"
           }
         },
         "required": [
-          "code",
           "libelle",
           "categorie",
+          "code",
           "tarif_base"
         ],
         "title": "ActeNomenclatureCreate",
+        "type": "object"
+      },
+      "ActeNomenclatureResponse": {
+        "properties": {
+          "actif": {
+            "title": "Actif",
+            "type": "boolean"
+          },
+          "categorie": {
+            "title": "Categorie",
+            "type": "string"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "duree_estimee_min": {
+            "title": "Duree Estimee Min",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "libelle": {
+            "title": "Libelle",
+            "type": "string"
+          },
+          "tarif_base": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Tarif Base",
+            "type": "string"
+          },
+          "tarifs": {
+            "items": {
+              "$ref": "#/components/schemas/TarifActeResponse"
+            },
+            "title": "Tarifs",
+            "type": "array"
+          },
+          "unitaire": {
+            "title": "Unitaire",
+            "type": "boolean"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "libelle",
+          "categorie",
+          "tarif_base",
+          "duree_estimee_min",
+          "unitaire",
+          "actif"
+        ],
+        "title": "ActeNomenclatureResponse",
+        "type": "object"
+      },
+      "ActeNomenclatureUpdate": {
+        "description": "Mise a jour partielle. `None` = ne pas toucher.",
+        "properties": {
+          "actif": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actif"
+          },
+          "categorie": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categorie"
+          },
+          "duree_estimee_min": {
+            "anyOf": [
+              {
+                "maximum": 480.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duree Estimee Min"
+          },
+          "libelle": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Libelle"
+          },
+          "unitaire": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unitaire"
+          }
+        },
+        "title": "ActeNomenclatureUpdate",
         "type": "object"
       },
       "ActeRealiseCreate": {
@@ -5176,6 +5480,132 @@
           }
         },
         "title": "CabinetUpdate",
+        "type": "object"
+      },
+      "CategoriePatientCreate": {
+        "properties": {
+          "code": {
+            "maxLength": 50,
+            "minLength": 2,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Code",
+            "type": "string"
+          },
+          "libelle": {
+            "maxLength": 200,
+            "minLength": 2,
+            "title": "Libelle",
+            "type": "string"
+          },
+          "ordre": {
+            "default": 100,
+            "maximum": 999.0,
+            "minimum": 0.0,
+            "title": "Ordre",
+            "type": "integer"
+          },
+          "par_defaut": {
+            "default": false,
+            "title": "Par Defaut",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "libelle",
+          "code"
+        ],
+        "title": "CategoriePatientCreate",
+        "type": "object"
+      },
+      "CategoriePatientResponse": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "libelle": {
+            "title": "Libelle",
+            "type": "string"
+          },
+          "ordre": {
+            "title": "Ordre",
+            "type": "integer"
+          },
+          "par_defaut": {
+            "title": "Par Defaut",
+            "type": "boolean"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "libelle",
+          "ordre",
+          "par_defaut"
+        ],
+        "title": "CategoriePatientResponse",
+        "type": "object"
+      },
+      "CategoriePatientUpdate": {
+        "description": "Mise a jour partielle. `None` = ne pas toucher.",
+        "properties": {
+          "libelle": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Libelle"
+          },
+          "ordre": {
+            "anyOf": [
+              {
+                "maximum": 999.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ordre"
+          }
+        },
+        "title": "CategoriePatientUpdate",
         "type": "object"
       },
       "Challenge2FARequest": {
@@ -7550,6 +7980,232 @@
           "actif"
         ],
         "title": "DisponibiliteResponse",
+        "type": "object"
+      },
+      "DroitPriseEnChargeCreate": {
+        "properties": {
+          "actif": {
+            "default": true,
+            "title": "Actif",
+            "type": "boolean"
+          },
+          "numero_police": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Police"
+          },
+          "organisme_id": {
+            "format": "uuid",
+            "title": "Organisme Id",
+            "type": "string"
+          },
+          "priorite": {
+            "default": 1,
+            "maximum": 99.0,
+            "minimum": 1.0,
+            "title": "Priorite",
+            "type": "integer"
+          },
+          "taux_prise_en_charge": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)",
+                "type": "string"
+              }
+            ],
+            "title": "Taux Prise En Charge"
+          }
+        },
+        "required": [
+          "taux_prise_en_charge",
+          "organisme_id"
+        ],
+        "title": "DroitPriseEnChargeCreate",
+        "type": "object"
+      },
+      "DroitPriseEnChargeResponse": {
+        "properties": {
+          "actif": {
+            "default": true,
+            "title": "Actif",
+            "type": "boolean"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "numero_police": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Police"
+          },
+          "organisme_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organisme Code"
+          },
+          "organisme_id": {
+            "format": "uuid",
+            "title": "Organisme Id",
+            "type": "string"
+          },
+          "organisme_nom": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organisme Nom"
+          },
+          "patient_id": {
+            "format": "uuid",
+            "title": "Patient Id",
+            "type": "string"
+          },
+          "priorite": {
+            "default": 1,
+            "maximum": 99.0,
+            "minimum": 1.0,
+            "title": "Priorite",
+            "type": "integer"
+          },
+          "taux_prise_en_charge": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)",
+            "title": "Taux Prise En Charge",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "taux_prise_en_charge",
+          "id",
+          "patient_id",
+          "organisme_id"
+        ],
+        "title": "DroitPriseEnChargeResponse",
+        "type": "object"
+      },
+      "DroitPriseEnChargeUpdate": {
+        "properties": {
+          "actif": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actif"
+          },
+          "numero_police": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Police"
+          },
+          "organisme_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organisme Id"
+          },
+          "priorite": {
+            "anyOf": [
+              {
+                "maximum": 99.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priorite"
+          },
+          "taux_prise_en_charge": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,3}|(?=[\\d.]{1,6}0*$)\\d{0,3}\\.\\d{0,2}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Taux Prise En Charge"
+          }
+        },
+        "title": "DroitPriseEnChargeUpdate",
         "type": "object"
       },
       "EcheanceResponse": {
@@ -10873,6 +11529,140 @@
         "title": "OrdonnanceUpdate",
         "type": "object"
       },
+      "OrganismeAssuranceCreate": {
+        "properties": {
+          "actif": {
+            "default": true,
+            "title": "Actif",
+            "type": "boolean"
+          },
+          "code": {
+            "maxLength": 50,
+            "minLength": 2,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Code",
+            "type": "string"
+          },
+          "nom": {
+            "maxLength": 200,
+            "minLength": 2,
+            "title": "Nom",
+            "type": "string"
+          },
+          "type_organisme": {
+            "default": "ASSURANCE",
+            "pattern": "^(ASSURANCE|MUTUELLE)$",
+            "title": "Type Organisme",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nom",
+          "code"
+        ],
+        "title": "OrganismeAssuranceCreate",
+        "type": "object"
+      },
+      "OrganismeAssuranceResponse": {
+        "properties": {
+          "actif": {
+            "title": "Actif",
+            "type": "boolean"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nom": {
+            "title": "Nom",
+            "type": "string"
+          },
+          "type_organisme": {
+            "title": "Type Organisme",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "nom",
+          "type_organisme",
+          "actif"
+        ],
+        "title": "OrganismeAssuranceResponse",
+        "type": "object"
+      },
+      "OrganismeAssuranceUpdate": {
+        "properties": {
+          "actif": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actif"
+          },
+          "nom": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nom"
+          },
+          "type_organisme": {
+            "anyOf": [
+              {
+                "pattern": "^(ASSURANCE|MUTUELLE)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Organisme"
+          }
+        },
+        "title": "OrganismeAssuranceUpdate",
+        "type": "object"
+      },
       "OuvertureCaisseCreate": {
         "additionalProperties": false,
         "properties": {
@@ -10912,6 +11702,31 @@
           "cabinet_id"
         ],
         "title": "OuvertureCaisseCreate",
+        "type": "object"
+      },
+      "PaginatedResponse_ActeNomenclatureResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ActeNomenclatureResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ],
+        "title": "PaginatedResponse[ActeNomenclatureResponse]",
         "type": "object"
       },
       "PaginatedResponse_ArticleStockResponse_": {
@@ -10989,6 +11804,31 @@
         "title": "PaginatedResponse[AuditLogResponse]",
         "type": "object"
       },
+      "PaginatedResponse_CategoriePatientResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CategoriePatientResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ],
+        "title": "PaginatedResponse[CategoriePatientResponse]",
+        "type": "object"
+      },
       "PaginatedResponse_CommandeResponse_": {
         "properties": {
           "items": {
@@ -11062,6 +11902,31 @@
           "meta"
         ],
         "title": "PaginatedResponse[DevisResponse]",
+        "type": "object"
+      },
+      "PaginatedResponse_DroitPriseEnChargeResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DroitPriseEnChargeResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ],
+        "title": "PaginatedResponse[DroitPriseEnChargeResponse]",
         "type": "object"
       },
       "PaginatedResponse_FacturePlateformeResponse_": {
@@ -11189,6 +12054,31 @@
         "title": "PaginatedResponse[OrdonnanceResponse]",
         "type": "object"
       },
+      "PaginatedResponse_OrganismeAssuranceResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OrganismeAssuranceResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ],
+        "title": "PaginatedResponse[OrganismeAssuranceResponse]",
+        "type": "object"
+      },
       "PaginatedResponse_PaiementCaisseResponse_": {
         "properties": {
           "items": {
@@ -11312,6 +12202,31 @@
           "meta"
         ],
         "title": "PaginatedResponse[SessionUtilisateurResponse]",
+        "type": "object"
+      },
+      "PaginatedResponse_TarifActeResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TarifActeResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ],
+        "title": "PaginatedResponse[TarifActeResponse]",
         "type": "object"
       },
       "PaginatedResponse_TenantResponse_": {
@@ -15379,6 +16294,67 @@
           "confirmation"
         ],
         "title": "SuppressionRequest",
+        "type": "object"
+      },
+      "TarifActeResponse": {
+        "properties": {
+          "acte_id": {
+            "format": "uuid",
+            "title": "Acte Id",
+            "type": "string"
+          },
+          "categorie_code": {
+            "title": "Categorie Code",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "montant": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Montant",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "acte_id",
+          "categorie_code",
+          "montant"
+        ],
+        "title": "TarifActeResponse",
+        "type": "object"
+      },
+      "TarifActeUpsert": {
+        "description": "Ecrit un tarif. Cree la ligne si absente, remplace le montant sinon.",
+        "properties": {
+          "categorie_code": {
+            "maxLength": 50,
+            "minLength": 2,
+            "title": "Categorie Code",
+            "type": "string"
+          },
+          "montant": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,13}0*$)\\d{0,10}\\.\\d{0,2}0*$)",
+                "type": "string"
+              }
+            ],
+            "title": "Montant"
+          }
+        },
+        "required": [
+          "categorie_code",
+          "montant"
+        ],
+        "title": "TarifActeUpsert",
         "type": "object"
       },
       "TenantCreate": {
@@ -20616,11 +21592,11 @@
     },
     "/api/v1/nomenclature/actes": {
       "get": {
-        "description": "Nomenclature des actes dentaires du cabinet.",
-        "operationId": "list_nomenclature_api_v1_nomenclature_actes_get",
+        "description": "Nomenclature des actes du cabinet, avec le tarif de chaque categorie.",
+        "operationId": "lister_actes_api_v1_nomenclature_actes_get",
         "parameters": [
           {
-            "description": "Recherche par code ou libellé",
+            "description": "Recherche par code ou libelle",
             "in": "query",
             "name": "q",
             "required": false,
@@ -20633,12 +21609,12 @@
                   "type": "null"
                 }
               ],
-              "description": "Recherche par code ou libellé",
+              "description": "Recherche par code ou libelle",
               "title": "Q"
             }
           },
           {
-            "description": "Filtrer par catégorie",
+            "description": "Filtrer par categorie d'acte",
             "in": "query",
             "name": "categorie",
             "required": false,
@@ -20651,20 +21627,26 @@
                   "type": "null"
                 }
               ],
-              "description": "Filtrer par catégorie",
+              "description": "Filtrer par categorie d'acte",
               "title": "Categorie"
             }
           },
           {
-            "description": "Inclure les actes retirés de la nomenclature",
+            "description": "Filtrer sur les actes actifs ou retires",
             "in": "query",
-            "name": "inclure_inactifs",
+            "name": "actif",
             "required": false,
             "schema": {
-              "default": false,
-              "description": "Inclure les actes retirés de la nomenclature",
-              "title": "Inclure Inactifs",
-              "type": "boolean"
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filtrer sur les actes actifs ou retires",
+              "title": "Actif"
             }
           },
           {
@@ -20684,7 +21666,7 @@
             "required": false,
             "schema": {
               "default": 50,
-              "maximum": 200,
+              "maximum": 100,
               "minimum": 1,
               "title": "Limit",
               "type": "integer"
@@ -20696,7 +21678,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaginatedResponse_dict_"
+                  "$ref": "#/components/schemas/PaginatedResponse_ActeNomenclatureResponse_"
                 }
               }
             },
@@ -20718,14 +21700,14 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "List Nomenclature",
+        "summary": "Lister Actes",
         "tags": [
           "Nomenclature des Actes"
         ]
       },
       "post": {
-        "description": "Ajoute un acte à la nomenclature du cabinet (tarifs selon acte et praticien).",
-        "operationId": "create_acte_nomenclature_api_v1_nomenclature_actes_post",
+        "description": "Ajoute un acte a la nomenclature, avec son tarif de reference.",
+        "operationId": "creer_acte_api_v1_nomenclature_actes_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -20741,7 +21723,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/APIResponse_dict_"
+                  "$ref": "#/components/schemas/APIResponse_ActeNomenclatureResponse_"
                 }
               }
             },
@@ -20763,7 +21745,7 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Create Acte Nomenclature",
+        "summary": "Creer Acte",
         "tags": [
           "Nomenclature des Actes"
         ]
@@ -28356,6 +29338,1179 @@
         "summary": "Enregistrer Reception",
         "tags": [
           "Stock & Fournisseurs"
+        ]
+      }
+    },
+    "/api/v1/tarification/actes": {
+      "get": {
+        "description": "Nomenclature des actes du cabinet, avec le tarif de chaque categorie.",
+        "operationId": "lister_actes_api_v1_tarification_actes_get",
+        "parameters": [
+          {
+            "description": "Recherche par code ou libelle",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Recherche par code ou libelle",
+              "title": "Q"
+            }
+          },
+          {
+            "description": "Filtrer par categorie d'acte",
+            "in": "query",
+            "name": "categorie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filtrer par categorie d'acte",
+              "title": "Categorie"
+            }
+          },
+          {
+            "description": "Filtrer sur les actes actifs ou retires",
+            "in": "query",
+            "name": "actif",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filtrer sur les actes actifs ou retires",
+              "title": "Actif"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_ActeNomenclatureResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Lister Actes",
+        "tags": [
+          "Tarification et prise en charge"
+        ]
+      },
+      "post": {
+        "description": "Ajoute un acte a la nomenclature, avec son tarif de reference.",
+        "operationId": "creer_acte_api_v1_tarification_actes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActeNomenclatureCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_ActeNomenclatureResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Creer Acte",
+        "tags": [
+          "Tarification et prise en charge"
+        ]
+      }
+    },
+    "/api/v1/tarification/actes/{acte_id}": {
+      "get": {
+        "operationId": "obtenir_acte_api_v1_tarification_actes__acte_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "acte_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Acte Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_ActeNomenclatureResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Obtenir Acte",
+        "tags": [
+          "Tarification et prise en charge"
+        ]
+      },
+      "patch": {
+        "description": "Edition d'un acte.\n\n`tarif_base` n'est pas un champ modifiable ici, et c'est volontaire : le\nchanger passe par un tarif de categorie. Un PATCH general qui l'accepterait\nfinirait par etre appele par une edition ordinaire, et le prix changerait\nsous les factures deja emises.",
+        "operationId": "modifier_acte_api_v1_tarification_actes__acte_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "acte_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Acte Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActeNomenclatureUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_ActeNomenclatureResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Modifier Acte",
+        "tags": [
+          "Tarification et prise en charge"
+        ]
+      }
+    },
+    "/api/v1/tarification/actes/{acte_id}/tarifs": {
+      "get": {
+        "description": "Tarifs d'un acte, tries par categorie puis par id.",
+        "operationId": "lister_tarifs_acte_api_v1_tarification_actes__acte_id__tarifs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "acte_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Acte Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_TarifActeResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Lister Tarifs Acte",
+        "tags": [
+          "Tarification et prise en charge"
+        ]
+      },
+      "put": {
+        "description": "Ecrit le tarif d'un acte pour une categorie ; cree la ligne si absente.",
+        "operationId": "definir_tarif_acte_api_v1_tarification_actes__acte_id__tarifs_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "acte_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Acte Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TarifActeUpsert"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_TarifActeResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Definir Tarif Acte",
+        "tags": [
+          "Tarification et prise en charge"
+        ]
+      }
+    },
+    "/api/v1/tarification/actes/{acte_id}/tarifs/{tarif_id}": {
+      "delete": {
+        "description": "Retire un tarif de variante. Le tarif standard est protege.",
+        "operationId": "supprimer_tarif_acte_api_v1_tarification_actes__acte_id__tarifs__tarif_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "acte_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Acte Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tarif_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tarif Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Supprimer Tarif Acte",
+        "tags": [
+          "Tarification et prise en charge"
+        ]
+      }
+    },
+    "/api/v1/tarification/categories": {
+      "get": {
+        "operationId": "lister_categories_api_v1_tarification_categories_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_CategoriePatientResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Lister Categories",
+        "tags": [
+          "Tarification et prise en charge"
+        ]
+      },
+      "post": {
+        "operationId": "creer_categorie_api_v1_tarification_categories_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoriePatientCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_CategoriePatientResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Creer Categorie",
+        "tags": [
+          "Tarification et prise en charge"
+        ]
+      }
+    },
+    "/api/v1/tarification/categories/{code}": {
+      "delete": {
+        "description": "Refuse si des tarifs s'y rattachent : desactiver est le geste correct.",
+        "operationId": "supprimer_categorie_api_v1_tarification_categories__code__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Supprimer Categorie",
+        "tags": [
+          "Tarification et prise en charge"
+        ]
+      },
+      "patch": {
+        "operationId": "modifier_categorie_api_v1_tarification_categories__code__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoriePatientUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_CategoriePatientResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Modifier Categorie",
+        "tags": [
+          "Tarification et prise en charge"
+        ]
+      }
+    },
+    "/api/v1/tarification/droits/{droit_id}": {
+      "delete": {
+        "operationId": "supprimer_droit_patient_api_v1_tarification_droits__droit_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "droit_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Droit Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Supprimer Droit Patient",
+        "tags": [
+          "Tarification et prise en charge"
+        ]
+      },
+      "patch": {
+        "operationId": "modifier_droit_patient_api_v1_tarification_droits__droit_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "droit_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Droit Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DroitPriseEnChargeUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_DroitPriseEnChargeResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Modifier Droit Patient",
+        "tags": [
+          "Tarification et prise en charge"
+        ]
+      }
+    },
+    "/api/v1/tarification/organismes": {
+      "get": {
+        "operationId": "lister_organismes_api_v1_tarification_organismes_get",
+        "parameters": [
+          {
+            "description": "Recherche par code ou nom",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Recherche par code ou nom",
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "type_organisme",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^(ASSURANCE|MUTUELLE)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type Organisme"
+            }
+          },
+          {
+            "in": "query",
+            "name": "actif",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actif"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_OrganismeAssuranceResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Lister Organismes",
+        "tags": [
+          "Tarification et prise en charge"
+        ]
+      },
+      "post": {
+        "operationId": "creer_organisme_api_v1_tarification_organismes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganismeAssuranceCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_OrganismeAssuranceResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Creer Organisme",
+        "tags": [
+          "Tarification et prise en charge"
+        ]
+      }
+    },
+    "/api/v1/tarification/organismes/{organisme_id}": {
+      "delete": {
+        "description": "Refuse si des droits de patients y sont rattaches.",
+        "operationId": "supprimer_organisme_api_v1_tarification_organismes__organisme_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organisme_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Organisme Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Supprimer Organisme",
+        "tags": [
+          "Tarification et prise en charge"
+        ]
+      },
+      "get": {
+        "operationId": "obtenir_organisme_api_v1_tarification_organismes__organisme_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organisme_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Organisme Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_OrganismeAssuranceResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Obtenir Organisme",
+        "tags": [
+          "Tarification et prise en charge"
+        ]
+      },
+      "patch": {
+        "operationId": "modifier_organisme_api_v1_tarification_organismes__organisme_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organisme_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Organisme Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganismeAssuranceUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_OrganismeAssuranceResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Modifier Organisme",
+        "tags": [
+          "Tarification et prise en charge"
+        ]
+      }
+    },
+    "/api/v1/tarification/patients/{patient_id}/droits": {
+      "get": {
+        "description": "Droits de prise en charge d'un patient, tries par priorite puis organisme.",
+        "operationId": "lister_droits_patient_api_v1_tarification_patients__patient_id__droits_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "patient_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Patient Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_DroitPriseEnChargeResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Lister Droits Patient",
+        "tags": [
+          "Tarification et prise en charge"
+        ]
+      },
+      "post": {
+        "operationId": "creer_droit_patient_api_v1_tarification_patients__patient_id__droits_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "patient_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Patient Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DroitPriseEnChargeCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_DroitPriseEnChargeResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Creer Droit Patient",
+        "tags": [
+          "Tarification et prise en charge"
         ]
       }
     },

@@ -1070,16 +1070,16 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List Nomenclature
-         * @description Nomenclature des actes dentaires du cabinet.
+         * Lister Actes
+         * @description Nomenclature des actes du cabinet, avec le tarif de chaque categorie.
          */
-        get: operations["list_nomenclature_api_v1_nomenclature_actes_get"];
+        get: operations["lister_actes_api_v1_nomenclature_actes_get"];
         put?: never;
         /**
-         * Create Acte Nomenclature
-         * @description Ajoute un acte à la nomenclature du cabinet (tarifs selon acte et praticien).
+         * Creer Acte
+         * @description Ajoute un acte a la nomenclature, avec son tarif de reference.
          */
-        post: operations["create_acte_nomenclature_api_v1_nomenclature_actes_post"];
+        post: operations["creer_acte_api_v1_nomenclature_actes_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3554,6 +3554,218 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tarification/actes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lister Actes
+         * @description Nomenclature des actes du cabinet, avec le tarif de chaque categorie.
+         */
+        get: operations["lister_actes_api_v1_tarification_actes_get"];
+        put?: never;
+        /**
+         * Creer Acte
+         * @description Ajoute un acte a la nomenclature, avec son tarif de reference.
+         */
+        post: operations["creer_acte_api_v1_tarification_actes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tarification/actes/{acte_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Obtenir Acte */
+        get: operations["obtenir_acte_api_v1_tarification_actes__acte_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Modifier Acte
+         * @description Edition d'un acte.
+         *
+         *     `tarif_base` n'est pas un champ modifiable ici, et c'est volontaire : le
+         *     changer passe par un tarif de categorie. Un PATCH general qui l'accepterait
+         *     finirait par etre appele par une edition ordinaire, et le prix changerait
+         *     sous les factures deja emises.
+         */
+        patch: operations["modifier_acte_api_v1_tarification_actes__acte_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/tarification/actes/{acte_id}/tarifs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lister Tarifs Acte
+         * @description Tarifs d'un acte, tries par categorie puis par id.
+         */
+        get: operations["lister_tarifs_acte_api_v1_tarification_actes__acte_id__tarifs_get"];
+        /**
+         * Definir Tarif Acte
+         * @description Ecrit le tarif d'un acte pour une categorie ; cree la ligne si absente.
+         */
+        put: operations["definir_tarif_acte_api_v1_tarification_actes__acte_id__tarifs_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tarification/actes/{acte_id}/tarifs/{tarif_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Supprimer Tarif Acte
+         * @description Retire un tarif de variante. Le tarif standard est protege.
+         */
+        delete: operations["supprimer_tarif_acte_api_v1_tarification_actes__acte_id__tarifs__tarif_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tarification/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lister Categories */
+        get: operations["lister_categories_api_v1_tarification_categories_get"];
+        put?: never;
+        /** Creer Categorie */
+        post: operations["creer_categorie_api_v1_tarification_categories_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tarification/categories/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Supprimer Categorie
+         * @description Refuse si des tarifs s'y rattachent : desactiver est le geste correct.
+         */
+        delete: operations["supprimer_categorie_api_v1_tarification_categories__code__delete"];
+        options?: never;
+        head?: never;
+        /** Modifier Categorie */
+        patch: operations["modifier_categorie_api_v1_tarification_categories__code__patch"];
+        trace?: never;
+    };
+    "/api/v1/tarification/droits/{droit_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Supprimer Droit Patient */
+        delete: operations["supprimer_droit_patient_api_v1_tarification_droits__droit_id__delete"];
+        options?: never;
+        head?: never;
+        /** Modifier Droit Patient */
+        patch: operations["modifier_droit_patient_api_v1_tarification_droits__droit_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/tarification/organismes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lister Organismes */
+        get: operations["lister_organismes_api_v1_tarification_organismes_get"];
+        put?: never;
+        /** Creer Organisme */
+        post: operations["creer_organisme_api_v1_tarification_organismes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tarification/organismes/{organisme_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Obtenir Organisme */
+        get: operations["obtenir_organisme_api_v1_tarification_organismes__organisme_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Supprimer Organisme
+         * @description Refuse si des droits de patients y sont rattaches.
+         */
+        delete: operations["supprimer_organisme_api_v1_tarification_organismes__organisme_id__delete"];
+        options?: never;
+        head?: never;
+        /** Modifier Organisme */
+        patch: operations["modifier_organisme_api_v1_tarification_organismes__organisme_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/tarification/patients/{patient_id}/droits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lister Droits Patient
+         * @description Droits de prise en charge d'un patient, tries par priorite puis organisme.
+         */
+        get: operations["lister_droits_patient_api_v1_tarification_patients__patient_id__droits_get"];
+        put?: never;
+        /** Creer Droit Patient */
+        post: operations["creer_droit_patient_api_v1_tarification_patients__patient_id__droits_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/utilisateurs": {
         parameters: {
             query?: never;
@@ -3799,20 +4011,11 @@ export interface components {
             /** Ticket */
             ticket?: string | null;
         };
-        /**
-         * ActeNomenclatureCreate
-         * @description Création d'un acte de nomenclature (tarification du cabinet).
-         */
+        /** ActeNomenclatureCreate */
         ActeNomenclatureCreate: {
-            /**
-             * Categorie
-             * @description SOINS, PROTHESE, CHIRURGIE, ORTHO...
-             */
+            /** Categorie */
             categorie: string;
-            /**
-             * Code
-             * @description Code de l'acte (DT01, EXT01...)
-             */
+            /** Code */
             code: string;
             /**
              * Duree Estimee Min
@@ -3821,17 +4024,57 @@ export interface components {
             duree_estimee_min: number;
             /** Libelle */
             libelle: string;
-            /**
-             * Tarif Base
-             * @description Tarif de référence en FCFA
-             */
+            /** Tarif Base */
             tarif_base: number | string;
             /**
              * Unitaire
-             * @description Soin portant sur une dent : le numéro FDI sera alors obligatoire.
              * @default false
              */
             unitaire: boolean;
+        };
+        /** ActeNomenclatureResponse */
+        ActeNomenclatureResponse: {
+            /** Actif */
+            actif: boolean;
+            /** Categorie */
+            categorie: string;
+            /** Code */
+            code: string;
+            /** Created At */
+            created_at?: string | null;
+            /** Duree Estimee Min */
+            duree_estimee_min: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Libelle */
+            libelle: string;
+            /** Tarif Base */
+            tarif_base: string;
+            /** Tarifs */
+            tarifs?: components["schemas"]["TarifActeResponse"][];
+            /** Unitaire */
+            unitaire: boolean;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /**
+         * ActeNomenclatureUpdate
+         * @description Mise a jour partielle. `None` = ne pas toucher.
+         */
+        ActeNomenclatureUpdate: {
+            /** Actif */
+            actif?: boolean | null;
+            /** Categorie */
+            categorie?: string | null;
+            /** Duree Estimee Min */
+            duree_estimee_min?: number | null;
+            /** Libelle */
+            libelle?: string | null;
+            /** Unitaire */
+            unitaire?: boolean | null;
         };
         /**
          * ActeRealiseCreate
@@ -4258,6 +4501,17 @@ export interface components {
              */
             success: boolean;
         };
+        /** APIResponse[ActeNomenclatureResponse] */
+        APIResponse_ActeNomenclatureResponse_: {
+            data?: components["schemas"]["ActeNomenclatureResponse"] | null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
         /** APIResponse[ActeRealiseResponse] */
         APIResponse_ActeRealiseResponse_: {
             data?: components["schemas"]["ActeRealiseResponse"] | null;
@@ -4327,6 +4581,17 @@ export interface components {
         /** APIResponse[CabinetResponse] */
         APIResponse_CabinetResponse_: {
             data?: components["schemas"]["CabinetResponse"] | null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
+        /** APIResponse[CategoriePatientResponse] */
+        APIResponse_CategoriePatientResponse_: {
+            data?: components["schemas"]["CategoriePatientResponse"] | null;
             /** Message */
             message?: string | null;
             /**
@@ -4473,6 +4738,17 @@ export interface components {
         /** APIResponse[DisponibiliteResponse] */
         APIResponse_DisponibiliteResponse_: {
             data?: components["schemas"]["DisponibiliteResponse"] | null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
+        /** APIResponse[DroitPriseEnChargeResponse] */
+        APIResponse_DroitPriseEnChargeResponse_: {
+            data?: components["schemas"]["DroitPriseEnChargeResponse"] | null;
             /** Message */
             message?: string | null;
             /**
@@ -4947,6 +5223,17 @@ export interface components {
              */
             success: boolean;
         };
+        /** APIResponse[OrganismeAssuranceResponse] */
+        APIResponse_OrganismeAssuranceResponse_: {
+            data?: components["schemas"]["OrganismeAssuranceResponse"] | null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
         /** APIResponse[PaiementResponse] */
         APIResponse_PaiementResponse_: {
             data?: components["schemas"]["PaiementResponse"] | null;
@@ -5192,6 +5479,17 @@ export interface components {
         /** APIResponse[SupportTokenResponse] */
         APIResponse_SupportTokenResponse_: {
             data?: components["schemas"]["SupportTokenResponse"] | null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
+        /** APIResponse[TarifActeResponse] */
+        APIResponse_TarifActeResponse_: {
+            data?: components["schemas"]["TarifActeResponse"] | null;
             /** Message */
             message?: string | null;
             /**
@@ -5592,6 +5890,53 @@ export interface components {
             telephone?: string | null;
             /** Ville */
             ville?: string | null;
+        };
+        /** CategoriePatientCreate */
+        CategoriePatientCreate: {
+            /** Code */
+            code: string;
+            /** Libelle */
+            libelle: string;
+            /**
+             * Ordre
+             * @default 100
+             */
+            ordre: number;
+            /**
+             * Par Defaut
+             * @default false
+             */
+            par_defaut: boolean;
+        };
+        /** CategoriePatientResponse */
+        CategoriePatientResponse: {
+            /** Code */
+            code: string;
+            /** Created At */
+            created_at?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Libelle */
+            libelle: string;
+            /** Ordre */
+            ordre: number;
+            /** Par Defaut */
+            par_defaut: boolean;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /**
+         * CategoriePatientUpdate
+         * @description Mise a jour partielle. `None` = ne pas toucher.
+         */
+        CategoriePatientUpdate: {
+            /** Libelle */
+            libelle?: string | null;
+            /** Ordre */
+            ordre?: number | null;
         };
         /** Challenge2FARequest */
         Challenge2FARequest: {
@@ -6607,6 +6952,81 @@ export interface components {
             praticien_id: string;
             /** Type */
             type: string;
+        };
+        /** DroitPriseEnChargeCreate */
+        DroitPriseEnChargeCreate: {
+            /**
+             * Actif
+             * @default true
+             */
+            actif: boolean;
+            /** Numero Police */
+            numero_police?: string | null;
+            /**
+             * Organisme Id
+             * Format: uuid
+             */
+            organisme_id: string;
+            /**
+             * Priorite
+             * @default 1
+             */
+            priorite: number;
+            /** Taux Prise En Charge */
+            taux_prise_en_charge: number | string;
+        };
+        /** DroitPriseEnChargeResponse */
+        DroitPriseEnChargeResponse: {
+            /**
+             * Actif
+             * @default true
+             */
+            actif: boolean;
+            /** Created At */
+            created_at?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Numero Police */
+            numero_police?: string | null;
+            /** Organisme Code */
+            organisme_code?: string | null;
+            /**
+             * Organisme Id
+             * Format: uuid
+             */
+            organisme_id: string;
+            /** Organisme Nom */
+            organisme_nom?: string | null;
+            /**
+             * Patient Id
+             * Format: uuid
+             */
+            patient_id: string;
+            /**
+             * Priorite
+             * @default 1
+             */
+            priorite: number;
+            /** Taux Prise En Charge */
+            taux_prise_en_charge: string;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** DroitPriseEnChargeUpdate */
+        DroitPriseEnChargeUpdate: {
+            /** Actif */
+            actif?: boolean | null;
+            /** Numero Police */
+            numero_police?: string | null;
+            /** Organisme Id */
+            organisme_id?: string | null;
+            /** Priorite */
+            priorite?: number | null;
+            /** Taux Prise En Charge */
+            taux_prise_en_charge?: number | string | null;
         };
         /** EcheanceResponse */
         EcheanceResponse: {
@@ -7853,6 +8273,52 @@ export interface components {
             /** Notes Generales */
             notes_generales?: string | null;
         };
+        /** OrganismeAssuranceCreate */
+        OrganismeAssuranceCreate: {
+            /**
+             * Actif
+             * @default true
+             */
+            actif: boolean;
+            /** Code */
+            code: string;
+            /** Nom */
+            nom: string;
+            /**
+             * Type Organisme
+             * @default ASSURANCE
+             */
+            type_organisme: string;
+        };
+        /** OrganismeAssuranceResponse */
+        OrganismeAssuranceResponse: {
+            /** Actif */
+            actif: boolean;
+            /** Code */
+            code: string;
+            /** Created At */
+            created_at?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Nom */
+            nom: string;
+            /** Type Organisme */
+            type_organisme: string;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** OrganismeAssuranceUpdate */
+        OrganismeAssuranceUpdate: {
+            /** Actif */
+            actif?: boolean | null;
+            /** Nom */
+            nom?: string | null;
+            /** Type Organisme */
+            type_organisme?: string | null;
+        };
         /** OuvertureCaisseCreate */
         OuvertureCaisseCreate: {
             /**
@@ -7867,6 +8333,17 @@ export interface components {
              * @default 0.00
              */
             ouverture_especes: number | string;
+        };
+        /** PaginatedResponse[ActeNomenclatureResponse] */
+        PaginatedResponse_ActeNomenclatureResponse_: {
+            /** Items */
+            items: components["schemas"]["ActeNomenclatureResponse"][];
+            meta: components["schemas"]["PaginationMeta"];
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
         };
         /** PaginatedResponse[ArticleStockResponse] */
         PaginatedResponse_ArticleStockResponse_: {
@@ -7894,6 +8371,17 @@ export interface components {
         PaginatedResponse_AuditLogResponse_: {
             /** Items */
             items: components["schemas"]["AuditLogResponse"][];
+            meta: components["schemas"]["PaginationMeta"];
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
+        /** PaginatedResponse[CategoriePatientResponse] */
+        PaginatedResponse_CategoriePatientResponse_: {
+            /** Items */
+            items: components["schemas"]["CategoriePatientResponse"][];
             meta: components["schemas"]["PaginationMeta"];
             /**
              * Success
@@ -7940,6 +8428,17 @@ export interface components {
             items: {
                 [key: string]: unknown;
             }[];
+            meta: components["schemas"]["PaginationMeta"];
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
+        /** PaginatedResponse[DroitPriseEnChargeResponse] */
+        PaginatedResponse_DroitPriseEnChargeResponse_: {
+            /** Items */
+            items: components["schemas"]["DroitPriseEnChargeResponse"][];
             meta: components["schemas"]["PaginationMeta"];
             /**
              * Success
@@ -8002,6 +8501,17 @@ export interface components {
              */
             success: boolean;
         };
+        /** PaginatedResponse[OrganismeAssuranceResponse] */
+        PaginatedResponse_OrganismeAssuranceResponse_: {
+            /** Items */
+            items: components["schemas"]["OrganismeAssuranceResponse"][];
+            meta: components["schemas"]["PaginationMeta"];
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
         /** PaginatedResponse[PaiementCaisseResponse] */
         PaginatedResponse_PaiementCaisseResponse_: {
             /** Items */
@@ -8050,6 +8560,17 @@ export interface components {
         PaginatedResponse_SessionUtilisateurResponse_: {
             /** Items */
             items: components["schemas"]["SessionUtilisateurResponse"][];
+            meta: components["schemas"]["PaginationMeta"];
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
+        /** PaginatedResponse[TarifActeResponse] */
+        PaginatedResponse_TarifActeResponse_: {
+            /** Items */
+            items: components["schemas"]["TarifActeResponse"][];
             meta: components["schemas"]["PaginationMeta"];
             /**
              * Success
@@ -9655,6 +10176,33 @@ export interface components {
              * @description Motif obligatoire (journalisé)
              */
             motif: string;
+        };
+        /** TarifActeResponse */
+        TarifActeResponse: {
+            /**
+             * Acte Id
+             * Format: uuid
+             */
+            acte_id: string;
+            /** Categorie Code */
+            categorie_code: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Montant */
+            montant: string;
+        };
+        /**
+         * TarifActeUpsert
+         * @description Ecrit un tarif. Cree la ligne si absente, remplace le montant sinon.
+         */
+        TarifActeUpsert: {
+            /** Categorie Code */
+            categorie_code: string;
+            /** Montant */
+            montant: number | string;
         };
         /**
          * TenantCreate
@@ -12266,16 +12814,16 @@ export interface operations {
             };
         };
     };
-    list_nomenclature_api_v1_nomenclature_actes_get: {
+    lister_actes_api_v1_nomenclature_actes_get: {
         parameters: {
             query?: {
-                /** @description Filtrer par catégorie */
+                /** @description Filtrer sur les actes actifs ou retires */
+                actif?: boolean | null;
+                /** @description Filtrer par categorie d'acte */
                 categorie?: string | null;
-                /** @description Inclure les actes retirés de la nomenclature */
-                inclure_inactifs?: boolean;
                 limit?: number;
                 page?: number;
-                /** @description Recherche par code ou libellé */
+                /** @description Recherche par code ou libelle */
                 q?: string | null;
             };
             header?: never;
@@ -12290,7 +12838,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PaginatedResponse_dict_"];
+                    "application/json": components["schemas"]["PaginatedResponse_ActeNomenclatureResponse_"];
                 };
             };
             /** @description Validation Error */
@@ -12304,7 +12852,7 @@ export interface operations {
             };
         };
     };
-    create_acte_nomenclature_api_v1_nomenclature_actes_post: {
+    creer_acte_api_v1_nomenclature_actes_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -12323,7 +12871,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["APIResponse_dict_"];
+                    "application/json": components["schemas"]["APIResponse_ActeNomenclatureResponse_"];
                 };
             };
             /** @description Validation Error */
@@ -16833,6 +17381,668 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["APIResponse_ReceptionResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lister_actes_api_v1_tarification_actes_get: {
+        parameters: {
+            query?: {
+                /** @description Filtrer sur les actes actifs ou retires */
+                actif?: boolean | null;
+                /** @description Filtrer par categorie d'acte */
+                categorie?: string | null;
+                limit?: number;
+                page?: number;
+                /** @description Recherche par code ou libelle */
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedResponse_ActeNomenclatureResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    creer_acte_api_v1_tarification_actes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActeNomenclatureCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_ActeNomenclatureResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    obtenir_acte_api_v1_tarification_actes__acte_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                acte_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_ActeNomenclatureResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    modifier_acte_api_v1_tarification_actes__acte_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                acte_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActeNomenclatureUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_ActeNomenclatureResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lister_tarifs_acte_api_v1_tarification_actes__acte_id__tarifs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                page?: number;
+            };
+            header?: never;
+            path: {
+                acte_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedResponse_TarifActeResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    definir_tarif_acte_api_v1_tarification_actes__acte_id__tarifs_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                acte_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TarifActeUpsert"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_TarifActeResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    supprimer_tarif_acte_api_v1_tarification_actes__acte_id__tarifs__tarif_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                acte_id: string;
+                tarif_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lister_categories_api_v1_tarification_categories_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedResponse_CategoriePatientResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    creer_categorie_api_v1_tarification_categories_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoriePatientCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_CategoriePatientResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    supprimer_categorie_api_v1_tarification_categories__code__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    modifier_categorie_api_v1_tarification_categories__code__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoriePatientUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_CategoriePatientResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    supprimer_droit_patient_api_v1_tarification_droits__droit_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                droit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    modifier_droit_patient_api_v1_tarification_droits__droit_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                droit_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DroitPriseEnChargeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_DroitPriseEnChargeResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lister_organismes_api_v1_tarification_organismes_get: {
+        parameters: {
+            query?: {
+                actif?: boolean | null;
+                limit?: number;
+                page?: number;
+                /** @description Recherche par code ou nom */
+                q?: string | null;
+                type_organisme?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedResponse_OrganismeAssuranceResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    creer_organisme_api_v1_tarification_organismes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrganismeAssuranceCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_OrganismeAssuranceResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    obtenir_organisme_api_v1_tarification_organismes__organisme_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organisme_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_OrganismeAssuranceResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    supprimer_organisme_api_v1_tarification_organismes__organisme_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organisme_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    modifier_organisme_api_v1_tarification_organismes__organisme_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organisme_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrganismeAssuranceUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_OrganismeAssuranceResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lister_droits_patient_api_v1_tarification_patients__patient_id__droits_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                page?: number;
+            };
+            header?: never;
+            path: {
+                patient_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedResponse_DroitPriseEnChargeResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    creer_droit_patient_api_v1_tarification_patients__patient_id__droits_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patient_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DroitPriseEnChargeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_DroitPriseEnChargeResponse_"];
                 };
             };
             /** @description Validation Error */
