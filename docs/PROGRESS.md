@@ -88,6 +88,28 @@ pour ces 36 dernières.
 n'ont pas de table `alembic_version`. `sysdent_tenant_ref` est le tenant de
 référence des tests. Aucune base migrée.
 
+## Odontogramme et 403 `/cabinets` (12/10)
+
+**422, cause nommée.** Le tiroir de dent envoie **toujours les cinq faces**,
+donc un seul code hors nomenclature fait échouer toute la sauvegarde. Quatre
+des cinq divergeaient : `OCCLUSALE`, `LINGUALE`, `MESIALE`, `DISTALE` côté
+client, contre `OCCLUSAL_INCISAL`, `LINGUAL_PALATIN`, `MESIAL`, `DISTAL` côté
+serveur. Le serveur fait autorité. Test de contrat qui lit le `.tsx` **et** le
+`.py` : un code changé d'un seul côté fait échouer. Preuve : `MESIALE` rétabli,
+le test échoue.
+
+**403, cause nommée.** `GET /cabinets` exige `CABINETS:READ` ; l'odontogramme
+n'affiche aucun site, l'appel ne lui servait à rien, et `chargerCabinets`
+avalait l'erreur en silence. Permission désormais lue dans le profil livré par
+`/auth/me`, sans liste de rôles codée. Un 403 n'est pas rejoué et ne se traduit
+pas par une liste vide trompeuse.
+
+16 tests clients verts, lint et build verts. Le client n'a **pas** de script
+`verifier` : l'équivalent est `lint` + `test` + `build`.
+
+**Non vérifié** : aucun appel HTTP n'a été rejoué pour ces deux routes, donc le
+200 du praticien autorisé n'est pas confirmé par une preuve de bout en bout.
+
 ## Non vérifié
 
 - **Rendu navigateur** : jamais contrôlé. Checklist dans
