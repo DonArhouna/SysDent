@@ -31,50 +31,46 @@ Instance `sysdent_test_pg`, port **55436**, **tmpfs**, base-témoin
 exécution. Après correction : **5 bases avant et après trois exécutions, 0
 erreur.** Les tests de supervision **fabricent leurs propres cas** : l'un
 passait à vide, donc vert pour la mauvaise raison.
-## Tarification — phase 1 **livrée, non appliquée**
-Migration `b3d7f1a9c2e4` (chaîne tenant). **Vérifiée sur base jetable,
-appliquée nulle part** : le propriétaire valide le plan et le diff avant.
-Quatre tables : `categories_patient` (`standard` créée par la migration),
-`tarifs_actes` (unique sur `(acte_id, categorie_code)`, catégorie référencée
-par son **code**), `organismes_assurance` (assurance et mutuelle ont les mêmes
-données ; `type_organisme` porte la différence), `droits_prise_en_charge`.
-`CHECK` taux 0-100 et montant non négatif, `RESTRICT` sur un organisme porté par
-un droit. La migration reprend `tarif_base` dans `tarifs_actes` sous
-`standard` au moment où elle est appliquée : rien n'est déplacé ni supprimé.
-Aller-retour `upgrade`/`downgrade`/`upgrade` : 53 tables, aucune résiduelle
-après downgrade, actes conservés, type enum supprimé, reprise des 3 actes à
-l'identique, quatre contraintes refusées par PostgreSQL.
-`TARIFS:READ`/`TARIFS:WRITE` et `ASSURANCE:READ`/`ASSURANCE:WRITE` au
-catalogue. `TARIFS:WRITE` : `ADMIN_CABINET` seul. `ASSURANCE:WRITE` aussi
-`SECRETAIRE`, qui saisit la carte de mutuelle à la création de fiche — pas les
-organismes, pas les taux. **La nomenclature passe sous `TARIFS:*`** : elle
-demandait `CONSULTATIONS:READ` et `CONSULTATIONS:CREATE`, donc créer une
-consultation suffisait à fixer le prix des actes. URL inchangées, droit changé,
-réponses typées (elles étaient en `dict`). Praticiens, assistants, secrétaires
-et comptables gardent la lecture : le dentiste doit voir le prix pour le
-facturer au patient.
-**Preuve** : 22 tests verts, dont le tarif figé (par mutation : `15000.00 au
-lieu de 7500.00`). HTTP réel sur l'instance de test : **14 appels, 14 résultats
-attendus, 0 écart**, dont les 403 de `PRATICIEN`. 130 tests verts au total.
-Routes et matrice : `docs/TARIFICATION.md`.
-## Non vérifié
-**Backoffice** : `/dashboard` rend dans `AppShell`, la page livrée s'en
-oubliait ; deux tests l'exigent, preuve par mutation. **47 tests verts**, le
-500 du tableau de bord (`stats.py:354`) est **200 en HTTP**, couple 401/500
-écarté par test.
-**Rendu navigateur** : jamais contrôlé, checklist
-`docs/backoffice/VERIFICATION_NAVIGATEUR.md`. **Pas d'i18n** : ni le client ni
-le backoffice n'en ont, **à trancher**. **Suite complète jamais jouée** : 64 %
-puis 90 minutes sans finir, cause non établie. **Registre** : 129 lignes sans
-base, conservées (décision du propriétaire) ; aucune base migrée.
+## Tarification et prise en charge — phases 1 et 2 livrees
+Migration `b3d7f1a9c2e4` (chaine tenant), **verifiee sur base jetable, appliquee
+nulle part** : le proprietaire valide le plan et le diff avant. Quatre tables :
+`categories_patient` (`standard` creee par la migration), `tarifs_actes` (unique
+sur `(acte_id, categorie_code)`, categorie referencee par son **code**),
+`organismes_assurance`, `droits_prise_en_charge`. `CHECK` taux 0-100 et montant
+non negatif, `RESTRICT` sur un organisme porte par un droit. La migration
+reprend `tarif_base` dans `tarifs_actes` sous `standard` : rien de deplace.
+Aller-retour `upgrade`/`downgrade`/`upgrade` : 53 tables, aucune residuelle, actes
+conserves, type enum supprime, reprise des 3 actes a l'identique, quatre
+contraintes refusees par PostgreSQL.
+**La nomenclature passe sous `TARIFS:*`** : elle demandait `CONSULTATIONS:READ`
+et `CONSULTATIONS:CREATE`, donc creer une consultation suffisait a fixer le prix
+des actes. URL inchangees, droit change, reponses typees (elles etaient en
+`dict`). Praticiens, assistants, secretaires et comptables gardent la lecture.
+**Phase 2** : ecrans `/tarification` et `/prise-en-charge`, onglet de la fiche
+patient, filtres dans l'URL, `Pagination` partagee, aucun DELETE sur un acte.
+`Backoffice/openapi.json` et ses types regenres : ils dataient d'avant les dix
+routes de la phase 1, donc son « contrat a jour » pouvait passer a cote.
+
+**Preuve** : 22 tests backend dont le tarif fige (mutation : `15000.00 au lieu de
+7500.00`), HTTP reel 14/14. Cote client 40 nouveaux tests, **deux mutations
+rouges** (un `tarif_base` au PATCH, une garde de bouton retiree), **56 tests
+verts**, `tsc` 0, lint 0 erreur, build vert, `verifier` du backoffice vert.
+Une limite mesuree : le schema OpenAPI ne porte **pas** la borne 0-100 du taux
+sur la forme chaine - le motif verifie la forme, pas la valeur. Pydantic
+l'applique. Test qui le fixe.
+Detail et matrice : `docs/TARIFICATION.md`.
 ## Reste à faire
 1. **Propriétaire : valider le plan de migration `b3d7f1a9c2e4`, puis le diff.**
-2. **Propriétaire : valider la phase 1 par écrit**, avant toute phase 2.
-3. Ventilation assurance / patient d'une facture : hors périmètre, non codée. La
-   prise en charge est **enregistrée, pas appliquée** au calcul d'un montant.
+2. **Propriétaire : trancher l'ecart de matrice signale.** Le serveur accorde
+   `ASSURANCE:WRITE` au secretariat sur les organismes ; l'ecran utilise
+   `TARIFS:WRITE` (admin seul). Le client est plus strict que le backend.
+3. **Tache suivante : la ventilation assurance / patient d'une facture.**
+   Hors perimetre des deux phases, non codee. La prise en charge est
+   **enregistree, pas appliquee** au calcul d'un montant. Demande une
+   permission propre : corriger une facture emise apres l'avoir ventilee n'est
+   pas le meme geste que declarer un droit.
 4. Faire consommer `tarifs_actes` par la facturation ; `tarif_base` reste lu en
    attendant. Transition, pas dual permanent.
-5. Phase 2 (menu Tarification, menu Prise en charge) après validation.
-6. Rechargement forcé du client, test d'une modification de face,
+5. Rechargement force du client, test d'une modification de face,
    `npm run design:parite`, liste des cabinets, puis la cause du
-   ralentissement de la suite et le verdict réel.
+   ralentissement de la suite et le verdict reel.
