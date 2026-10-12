@@ -31,43 +31,42 @@ Instance `sysdent_test_pg`, port **55436**, **tmpfs**, base-témoin
 exécution. Après correction : **5 bases avant et après trois exécutions, 0
 erreur.** Les tests de supervision **fabricent leurs propres cas** : l'un
 passait à vide, donc vert pour la mauvaise raison.
-## Tarification et prise en charge — phases 1 et 2 livrees
-Migration `b3d7f1a9c2e4` (chaine tenant), **verifiee sur base jetable, appliquee
-nulle part**. `c4e7a2b6d9f1` aligne le catalogue : elle **n'est pas non plus
-appliquee**. Quatre tables : `categories_patient` (`standard` creee par la
-migration), `tarifs_actes` (unique sur `(acte_id, categorie_code)`, categorie
-referencee par son **code**), `organismes_assurance`, `droits_prise_en_charge`.
-`CHECK` taux 0-100 et montant non negatif, `RESTRICT` sur un organisme porte par
-un droit. La migration reprend `tarif_base` dans `tarifs_actes` sous
-`standard` : rien de deplace. Aller-retour `upgrade`/`downgrade`/`upgrade` et
-rejeu sans doublon verifies sur base jetable.
-**La nomenclature passe sous `TARIFS:*`** : creer une consultation ne donne plus
-le droit de fixer le prix des actes. URL inchangees, reponses typees.
-
-**Matrice assurance, validee et appliquee.** Un droit unique `ASSURANCE:WRITE`
-couvrait deux gestes sans rapport. Il est remplace :
-`TARIFS:WRITE` pour ecrire un **organisme** (referentiel, admin seul),
-`ASSURANCE:WRITE_PATIENT` pour ecrire un **droit de patient** (secretariat et
-admin), `ASSURANCE:READ` pour tous. `ASSURANCE:WRITE` a quitte le catalogue :
-une session delivree avant ce changement transporte encore ce droit, et elle
-n'ecrit plus rien.
-
-**Phase 2** : ecrans `/tarification` et `/prise-en-charge`, onglet de la fiche
-patient, filtres dans l'URL, `Pagination` partagee, aucun DELETE sur un acte.
-
-**Preuve** : 32 tests backend dont le tarif fige (mutation : `15000.00 au lieu de
-7500.00`), 10 tests de matrice avec **deux mutations rouges**, HTTP reel 14/14.
-Cote client **62 tests verts**, `tsc` 0, lint 0 erreur, build vert ; `verifier`
-du backoffice vert. Un test lit la source du routeur pour exiger que client et
-serveur demandent le meme droit ; il vire au rouge des que l'un change.
-**Le schema OpenAPI ne porte pas la borne 0-100 du taux** sur la forme chaine :
-`docs/OPERATIONS.md` et le test qui fixe cette limite.
-Detail et matrice : `docs/TARIFICATION.md`.
+## Tarification et prise en charge — chaines livrees, rien d applique
+Migration `b3d7f1a9c2e4` (tables de tarification et de prise en charge) et
+`c4e7a2b6d9f1` (catalogue : `ASSURANCE:WRITE` devient
+`ASSURANCE:WRITE_PATIENT`). Les deux sont ecrites, relues et verifiees sur base
+jetable. **Aucune n'est appliquee a une base reelle.**
+**Chaine tenant, relue fichier par fichier le 12/10.** Vingt fichiers,
+**une seule tete** (`c4e7a2b6d9f1`), **aucune branche**. Chemin sans accroche,
+de `f4fb61aa2d24` racine a `c4e7a2b6d9f1`. `b3d7f1a9c2e4.down_revision` vaut
+bien `e8b2c4a7d1e5`, et **rien ne s intercale** entre les deux.
+**`c4e7a2b6d9f1` enchaine directement apres** : `upgrade head` l'appliquerait
+aussi. Pour n'appliquer que `b3d7f1a9c2e4`, nommer la cible.
+**Instance de developpement.** Registre : **122 cabinets `ACTIVE`, 19 bases, 5
+cabinets dont la base existe, 117 sans base.** Aucune base de cabinet n'est
+joignable : identifiants de la ligne `tenants_db`, valeurs par defaut du depot et
+ceux du master sont tous refuses sur le meme serveur - meme role, meme mot de
+passe, succes vers `sysdent_master` et echec vers une base de cabinet. Regle
+d'acces par base, pas secret errone. Cabinet
+`sysdent_tenant_clinique_cabinet_sn_5bd215` a `e8b2c4a7d1e5`, 49 tables,
+`tarifs_actes` absente : origine des 500, `b3d7f1a9c2e4` lui manque.
+**Blocage d'execution.** `alembic.exe` est bloque par une politique de controle
+d'application sur la machine du proprietaire. Contournement exclu : ni copie
+d'executable, ni modification de politique.
+**Preuves** : 32 tests backend dont le tarif fige (mutation : `15000.00 au lieu
+de 7500.00`), 10 tests de matrice a deux mutations rouges, 62 tests client verts,
+HTTP reel 14/14. Detail : `docs/TARIFICATION.md`.
 ## Reste à faire
-1. **Propriétaire : valider et appliquer `b3d7f1a9c2e4`, puis `c4e7a2b6d9f1`.**
-   Les deux sont ecrites et verifiees, aucune n'a ete appliquee. La seconde
-   retire `ASSURANCE:WRITE` du catalogue : un cabinet qui ne l'applique pas
-   garde un droit qui ne protege plus rien.
+1. **Propriétaire : decider la methode d execution**, `alembic.exe` etant
+   bloque par une politique de controle d'application. Aucune commande Alembic
+   n'a ete tentee, aucun contournement n'a ete cherche.
+2. **Cible explicite obligatoire.** `upgrade head` appliquerait aussi
+   `c4e7a2b6d9f1`, qui est hors perimetre de la premiere application. Nommer
+   `b3d7f1a9c2e4` comme cible.
+3. **Perimetre reel avant toute migration** : 5 cabinets ont une base sur 122
+   declares. La liste des 117 sans base doit etre arretee, pas migree.
+4. **Acces aux bases de cabinet a retablir** avant tout comptage avant / apres :
+   il conditionne la sauvegarde, le controle et l'arret sur ecart.
 2. **Tache suivante : la ventilation assurance / patient d'une facture.** Hors
    perimetre des deux phases, non codee. La prise en charge est
    **enregistree, pas appliquee** au calcul d'un montant. Demande une
