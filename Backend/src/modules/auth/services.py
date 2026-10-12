@@ -14,6 +14,11 @@ from src.core.exceptions import (
     InvalidTokenException,
     TenantConnectionException,
 )
+from src.core.schema_perime import (
+    SCHEMA_PERIME as _SCHEMA_PERIME,
+    SQLSTATE_SCHEMA_PERIME as _SQLSTATE_SCHEMA_PERIME,
+    est_divergence_de_schema,
+)
 from src.core.security import create_access_token, create_refresh_token, decrypt_secret, verify_password
 from src.modules.master.models import Societe, TenantDB, UtilisateurIndex
 from src.modules.tenants.models import Permission, PermissionRole, Role, SessionUser, Utilisateur
@@ -49,78 +54,14 @@ BASE_TENANT_INJOIGNABLE = (
     OSError,
 )
 
-#: Erreurs qui signifient « la base répond, mais plus comme le code l'attend ».
-#:
-#: Le schéma du cabinet est en retard de migrations : la connexion réussit, puis
-#: la première requête échoue. Le 10/10, un cabinet restauré deux migrations en
-#: retard renvoyait `UndefinedColumnError: column utilisateurs.cabinet_id does
-#: not exist` — un 500 qui exposait au client le schéma interne du cabinet.
-#:
-#: SQLAlchemy encapsule ces erreurs-là dans `ProgrammingError`, d'où le tri fait
-#: dans le `except` dédié : `ProgrammingError` couvre aussi une faute de frappe
-#: dans une requête, qui n'a rien à voir et doit remonter telle quelle.
-SCHEMA_PERIME = (
-    asyncpg.exceptions.UndefinedColumnError,
-    asyncpg.exceptions.UndefinedTableError,
-    asyncpg.exceptions.UndefinedFunctionError,
-)
-
-#: Les memes divergences, dites par leur code PostgreSQL.
-#:
-#: Un `sqlstate` est plus fiable qu'un nom de classe : il est porte par le
-#: serveur, il traverse les couches sans se transformer, et il ne depend ni de
-#: la version de SQLAlchemy ni de celle du pilote. On reconnait donc les deux.
-#: 42703 colonne absente, 42P01 table absente, 42883 fonction absente.
-SQLSTATE_SCHEMA_PERIME = frozenset({"42703", "42P01", "42883"})
-
-#: Combien de niveaux d'encapsulation on descend. Mesure le 11/10 : l'erreur
-#: asyncpg est deux niveaux sous le `ProgrammingError` attrape, pas un. Une
-#: profondeur bornee evite une boucle sur une chaine circulaire.
-PROFONDEUR_CHAINE = 6
-
-
-def _est_divergence_de_schema(exc: BaseException) -> bool:
-    """
-    L'erreur vient-elle d'un schéma périmé, ou d'une requête de code cassée ?
-
-    **Il faut descendre la chaîne entière.** Mesuré le 11/10 sur une base
-    réelle dont on avait supprimé une colonne, SQLAlchemy empile :
-
-        niveau 0  sqlalchemy.exc.ProgrammingError
-          .orig -> niveau 1  ...postgresql.asyncpg.ProgrammingError  sqlstate=42703
-                  .orig -> niveau 2  asyncpg.exceptions.UndefinedColumnError
-
-    Le tri d'origine s'arrêtait au niveau 1, où il ne trouve qu'un
-    `ProgrammingError` : il concluait « pas une divergence » et laissait
-    remonter un 500. C'est exactement la panne qu'il devait empêcher.
-
-    SQLAlchemy conserve l'erreur du pilote dans `.orig` : c'est là qu'il faut
-    regarder. S'arrêter à la surface confondrait les deux, et une faute de
-    frappe deviendrait « service indisponible » — donc invisible.
-    """
-    vues: set[int] = set()
-    courant: BaseException | None = exc
-    for _ in range(PROFONDEUR_CHAINE):
-        if courant is None or id(courant) in vues:
-            return False
-        vues.add(id(courant))
-
-        if isinstance(courant, SCHEMA_PERIME):
-            return True
-        if getattr(courant, "sqlstate", None) in SQLSTATE_SCHEMA_PERIME:
-            return True
-
-        origine = getattr(courant, "orig", None)
-        suivant = origine if isinstance(origine, BaseException) else courant.__cause__
-        if suivant is None or suivant is courant:
-            # On tente aussi `__context__` : une exception levee pendant le
-            # traitement d'une autre peut porter la divergence.
-            if courant.__context__ is not None and courant.__context__ is not courant:
-                courant = courant.__context__
-                continue
-            return False
-        courant = suivant
-    return False
+#: Le triage d'ecart de schema est partage : voir `src.core.schema_perime`.
+#: Il vit la, et non ici, parce que les routes de tarification interrogeaient
+#: la base de la meme facon et renvoyaient 500 : meme panne, deux traitements,
+#: et le second n'existait pas. Une seule definition, une seule possibilite de
+#: diverger.
+SCHEMA_PERIME = _SCHEMA_PERIME
+SQLSTATE_SCHEMA_PERIME = _SQLSTATE_SCHEMA_PERIME
+_est_divergence_de_schema = est_divergence_de_schema
 
 
 def _base_tenant_indisponible(

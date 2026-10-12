@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
-import { Pencil, Plus, RefreshCw, Search, WifiOff } from 'lucide-react'
+import { Pencil, Plus, Search, WifiOff } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -19,6 +19,7 @@ import { useToastStore } from '@/stores/toast-store'
 import { tarificationApi } from '../services/tarification-api'
 import { PERM_TARIFS_READ, PERM_TARIFS_WRITE, formaterMontant, type ActeNomenclature } from '../types'
 import { ActeModal } from '../components/acte-modal'
+import { EtatErreurModule } from '../components/etat-erreur'
 import { TarifsEditor } from '../components/tarifs-editor'
 
 const TAILLE_PAGE = 20
@@ -212,16 +213,13 @@ export function TarificationPage() {
               </div>
             ) : actes.isError ? (
               /* Un echec n'est pas une liste vide : afficher « aucun acte » ferait
-                 croire que le cabinet n'a pas de nomenclature. */
-              <EmptyState
-                icon={WifiOff}
-                titre="Nomenclature indisponible"
-                description="La liste des actes n'a pas pu etre chargee. Verifiez que le backend repond puis reessayez."
-              >
-                <Button variant="outline" onClick={recharger}>
-                  <RefreshCw className="h-4 w-4" /> Reessayer
-                </Button>
-              </EmptyState>
+                 croire que le cabinet n'a pas de nomenclature. Un cabinet dont le
+                 schema est en retard a son propre message. */
+              <EtatErreurModule
+                error={actes.error}
+                libelle="Nomenclature"
+                onReessayer={recharger}
+              />
             ) : lignes.length === 0 ? (
               <EmptyState
                 icon={Search}

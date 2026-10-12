@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
-import { Pencil, Plus, RefreshCw, Search, WifiOff } from 'lucide-react'
+import { Pencil, Plus, Search, WifiOff } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,6 +23,7 @@ import {
   type OrganismeAssurance,
 } from '../types'
 import { OrganismeModal } from '../components/organisme-modal'
+import { EtatErreurModule } from '../components/etat-erreur'
 
 const TAILLE_PAGE = 20
 
@@ -202,15 +203,11 @@ export function OrganismesPage() {
               ))}
             </div>
           ) : organismes.isError ? (
-            <EmptyState
-              icon={WifiOff}
-              titre="Organismes indisponibles"
-              description="La liste n'a pas pu etre chargee. Verifiez que le backend repond puis reessayez."
-            >
-              <Button variant="outline" onClick={() => void organismes.refetch()}>
-                <RefreshCw className="h-4 w-4" /> Reessayer
-              </Button>
-            </EmptyState>
+            <EtatErreurModule
+              error={organismes.error}
+              libelle="Organismes"
+              onReessayer={() => void organismes.refetch()}
+            />
           ) : lignes.length === 0 ? (
             <EmptyState
               icon={Search}

@@ -10,6 +10,7 @@ from src.core.config import settings
 from src.core.database import get_master_db, tenant_db_manager
 from src.core.exceptions import AuthenticationException, PermissionDeniedException, TenantNotFoundException
 from src.core.security import decode_token, decode_token_scoped, decrypt_secret
+from src.core.schema_perime import marquer_tenant
 from src.modules.master.models import TenantDB
 from src.modules.tenants.models import PermissionRole, Role, Utilisateur
 
@@ -155,6 +156,11 @@ async def get_tenant_db(
 
     if tenant_db_config is None:
         raise TenantNotFoundException(tenant_id)
+
+    # Retenu ici, et non demande plus tard : c'est le seul endroit ou
+    # l'identifiant du cabinet est resolu. Le journal d'un ecart de schema en a
+    # besoin, et une requete qui echoue n'a plus de dependance rejouable.
+    marquer_tenant(str(tenant_db_config.societe_id))
 
     await tenant_db_manager.get_or_create_engine(
         tenant_id=str(tenant_db_config.societe_id),

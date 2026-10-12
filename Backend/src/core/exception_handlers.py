@@ -2,10 +2,18 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError as PydanticValidationError
+from sqlalchemy.exc import DBAPIError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import structlog
 from .config import settings
 from .exceptions import AppException
+from .schema_perime import (
+    CODE_SCHEMA_EN_RETARD,
+    MESSAGE_SCHEMA_EN_RETARD,
+    element_manquant,
+    est_divergence_de_schema,
+    tenant_courant,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -128,6 +136,60 @@ def register_exception_handlers(app: FastAPI) -> None:
                 "error": {
                     "code": f"HTTP_{exc.status_code}",
                     "message": str(exc.detail),
+                    "details": {},
+                    "request_id": request_id,
+                },
+            },
+        )
+
+    @app.exception_handler(DBAPIError)
+    async def dbapi_error_handler(request: Request, exc: DBAPIError) -> JSONResponse:
+        """
+        Erreur renvoyée par le pilote de base : 503 si le cabinet est en retard
+        de migrations, 500 sinon.
+
+        **Pourquoi un gestionnaire dédié.** Le login traitait deja ce cas, mais
+        seul : les routes de tarification lisaient la base de la meme facon et
+        renvoyaient 500. Le client voyait alors une panne de l'application, et
+        l'interface ne pouvait rien dire de plus. Un triage qui ne s'applique
+        qu'a une route est un triage incomplet.
+
+        **Le 503 ne doit rien laisser fuir.** Ni nom de table, ni identifiant de
+        cabinet : le nom de la table manquante dit au client que la base est
+        presente mais en retard, et le nom lui revele son schema. Ces deux
+        elements vont au journal du serveur, avec le cabinet, la ou un
+        administrateur peut agir.
+
+        **Le reste n'est pas masqué.** Seules les divergences de schema
+        recognisedes deviennent un 503. Toute autre erreur du pilote garde le
+        500 d'avant, journalise avec sa trace : une faute de frappe dans une
+        requete ne doit pas devenir invisible sous un libelle de maintenance.
+        """
+        request_id = getattr(request.state, "request_id", "unknown")
+
+        if not est_divergence_de_schema(exc):
+            return await unhandled_exception_handler(request, exc)
+
+        manquant = element_manquant(exc)
+        logger.error(
+            "schema_tenant_en_retard",
+            tenant_id=tenant_courant(),
+            element_manquant=manquant,
+            erreur=type(exc).__name__,
+            sqlstate=getattr(exc, "sqlstate", None) or getattr(
+                getattr(exc, "orig", None), "sqlstate", None
+            ),
+            request_id=request_id,
+            path=request.url.path,
+        )
+
+        return JSONResponse(
+            status_code=503,
+            content={
+                "success": False,
+                "error": {
+                    "code": CODE_SCHEMA_EN_RETARD,
+                    "message": MESSAGE_SCHEMA_EN_RETARD,
                     "details": {},
                     "request_id": request_id,
                 },
