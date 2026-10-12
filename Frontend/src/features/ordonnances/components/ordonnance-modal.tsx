@@ -36,7 +36,7 @@ export function OrdonnanceModal({
   // Patient
   const [patientId, setPatientId] = useState(initialPatientId || '')
   const [patients, setPatients] = useState<Patient[]>([])
-  const [consultationId, setConsultationId] = useState(initialConsultationId || '')
+  const consultationId = initialConsultationId ?? ''
 
   // Référentiel
   const [medicaments, setMedicaments] = useState<Medicament[]>([])
@@ -238,14 +238,37 @@ export function OrdonnanceModal({
             )}
           </div>
 
-          <Input
-            label="ID Consultation associée *"
-            placeholder="UUID de la consultation"
-            value={consultationId}
-            onChange={(e) => setConsultationId(e.target.value)}
-            required
-            helperText="Une ordonnance doit être rattachée à une consultation médicale."
-          />
+          {/*
+            **L'identifiant de consultation n'est plus saisi.**
+
+            Il venait d'un champ libre où l'on recopiait un UUID. Deux
+            conséquences : la saisie était fausse la plupart du temps, et une
+            ordonnance pouvait partir rattachée à une consultation qui n'était
+            pas celle du patient affiché.
+
+            La fiche de consultation passe déjà `?consultation_id=` ; le point
+            d'entrée fait donc la liaison. Ouverte sans, la modale n'affiche
+            qu'un message et ne construit rien : une ordonnance partielle,
+            sans consultation, n'a pas de sens.
+          */}
+          {consultationId ? (
+            <Input
+              label="ID Consultation associée"
+              value={consultationId}
+              readOnly
+              disabled
+              helperText="Reprise de la consultation depuis laquelle vous avez lancé l'ordonnance."
+            />
+          ) : (
+            <div className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm">
+              <p className="font-semibold">Cette ordonnance n'est rattachée à aucune consultation.</p>
+              <p className="mt-1 text-muted-foreground">
+                Ouvrez la fiche d'une consultation, puis lancez l'ordonnance depuis
+                celle-ci. La consultation est alors reprise automatiquement, et le
+                patient comme les actes restent cohérents.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Section Médicament & Contrôle */}
@@ -318,9 +341,9 @@ export function OrdonnanceModal({
             <div className="p-2.5 rounded-lg bg-primary/15 border border-primary/40 text-xs text-primary flex items-center justify-between">
               <div>
                 <span className="font-bold text-white">{selectedMedicament.nom_commercial}</span>
-                <span className="mx-1.5">•</span>
+                <span className="mx-1.5">-</span>
                 <span>{selectedMedicament.dci}</span>
-                <span className="mx-1.5">•</span>
+                <span className="mx-1.5">-</span>
                 <span className="uppercase text-primary">{selectedMedicament.forme}</span>
                 {selectedMedicament.dosage && <span> - {selectedMedicament.dosage}</span>}
               </div>
@@ -345,7 +368,7 @@ export function OrdonnanceModal({
                   </div>
                   {controleResult.alertes.map((a, i) => (
                     <div key={i} className="pl-6 text-danger">
-                      • {a.message} {a.condition && `[${a.condition}]`}
+                      - {a.message} {a.condition && `[${a.condition}]`}
                     </div>
                   ))}
                 </div>
@@ -357,7 +380,7 @@ export function OrdonnanceModal({
                   </div>
                   {controleResult.alertes.map((a, i) => (
                     <div key={i} className="pl-6 text-warning">
-                      • {a.message} {a.condition && `[${a.condition}]`}
+                      - {a.message} {a.condition && `[${a.condition}]`}
                     </div>
                   ))}
                   <div>
