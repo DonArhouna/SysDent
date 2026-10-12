@@ -11,7 +11,7 @@
  * Sans conserver le refresh token côté client, le renouvellement était
  * impossible : l'application expirait au bout de 15 minutes.
  *
- * ⚠️ **Correctif recommandé côté backend** : déposer aussi un cookie
+ * Attention : **Correctif recommandé côté backend** : déposer aussi un cookie
  * `refresh_token` HttpOnly à la connexion, et rendre le champ du corps
  * facultatif avec repli sur le cookie. Le refresh token est un secret de
  * 7 jours ; le garder dans le localStorage le rend lisible par un XSS, alors
@@ -109,7 +109,7 @@ export const useAuthStore = create<AuthState>()(
             .post('/auth/logout', { refresh_token: refreshToken }, { silencieux: true })
             .catch(() => undefined)
         }
-        purgerSession()
+        purgerSession(true, true)
       },
     }),
     {
@@ -181,7 +181,31 @@ export function sessionDejaVidee(): boolean {
  * `diffuse` évite la boucle entre onglets : celui qui reçoit le message purge,
  * mais ne le repart pas.
  */
-function purgerSession(diffuse = true): void {
+/**
+ * La fermeture vient-elle d'une **décision** de l'utilisateur ?
+ *
+ * Une session qui expire et une déconnexion clicked aboutissent toutes deux à
+ * `/login`. Mais elles ne doivent pas se comporter pareil : après une
+ * déconnexion, on veut retrouver l'application à sa page d'accueil ; après une
+ * expiration, on veut retrouver la page qu'on consultationnait.
+ *
+ * Sans cette distinction, `AppShell` transmettait `depuis` dans les deux cas, et
+ * se reconnecter ramenait à l'ancienne route au lieu du tableau de bord.
+ */
+let sessionFermeeVolontairement = false
+
+/** La session a-t-elle été fermée par l'utilisateur, et non par expiration ? */
+export function sessionFermeeVolontairementVraiment(): boolean {
+  return sessionFermeeVolontairement
+}
+
+/** Oublie la fermeture volontaire : une nouvelle session ne l'est pas. */
+export function oublierFermetureVolontaire(): void {
+  sessionFermeeVolontairement = false
+}
+
+function purgerSession(diffuse = true, volontaire = false): void {
+  if (volontaire) sessionFermeeVolontairement = true
   if (sessionVidee) return
   sessionVidee = true
 

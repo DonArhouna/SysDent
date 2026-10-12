@@ -3,7 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom'
 import { AppSidebar } from '@/components/layout/sidebar'
 import { Topbar } from '@/components/layout/topbar'
 import { ToastContainer } from '@/components/ui/toast'
-import { useAuthStore } from '@/stores/auth-store'
+import { useAuthStore, sessionFermeeVolontairementVraiment } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
 
 /**
@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils'
  * que le profil n'est pas encore chargé : on le charge avant rendu, pour que
  * le RBAC d'affichage (sidebar) démarre avec de bonnes données.
  *
- * Responsive : ≥ lg la sidebar est ancrée à gauche (rétractable en rail) ;
+ * Responsive : >= lg la sidebar est ancrée à gauche (rétractable en rail) ;
  * < lg elle devient un drawer avec overlay (bouton de la navbar).
  */
 export function AppShell({ children }: { children: ReactNode }) {
@@ -54,7 +54,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [pathname])
 
   if (!token) {
-    return <Navigate to="/login" replace state={{ depuis: pathname }} />
+    // Une déconnexion **volontaire** ne restitue pas la route : on veut
+    // revenir au tableau de bord, pas retomber sur la page quittée. Une session
+    // expirée, elle, restitue : on reprend là où l'on était.
+    const volontaire = sessionFermeeVolontairementVraiment()
+    return (
+      <Navigate to="/login" replace state={volontaire ? null : { depuis: pathname }} />
+    )
   }
 
   if (!profil) {
@@ -69,7 +75,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="relative flex h-screen overflow-hidden bg-background p-3 md:p-4">
-      {/* Sidebar ancrée (≥ lg) */}
+      {/* Sidebar ancrée (>= lg) */}
       {/* La largeur est portée par CE wrapper, pas par le panneau : sans cela le
           rail restait sur 268 px et laissa derrière lui une bande vide que ni la
           navbar ni le contenu ne réquisitionnaient. La colonne principale est

@@ -2,7 +2,11 @@ import { useState, type FormEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, LockKeyhole, Sparkles, Mail } from 'lucide-react'
 import { ApiError } from '@/lib/api'
-import { useAuthStore } from '@/stores/auth-store'
+import {
+  oublierFermetureVolontaire,
+  sessionFermeeVolontairementVraiment,
+  useAuthStore,
+} from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { ToastContainer } from '@/components/ui/toast'
@@ -32,8 +36,14 @@ export function LoginPage() {
     setEnCours(true)
     try {
       await connexion(email.trim(), password)
-      const destination = (location.state as { depuis?: string } | null)?.depuis ?? '/dashboard'
-      navigate(destination, { replace: true })
+      // Après une déconnexion volontaire, la cible est le tableau de bord. La
+      // route quittée n'a pas à être restaurée : c'est le comportement que le
+      // propriétaire attend, et ce que la garde de session ne peut pas savoir.
+      const depuis = sessionFermeeVolontairementVraiment()
+        ? null
+        : ((location.state as { depuis?: string } | null)?.depuis ?? null)
+      oublierFermetureVolontaire()
+      navigate(depuis ?? '/dashboard', { replace: true })
     } catch (e) {
       setErreur(
         e instanceof ApiError
@@ -90,7 +100,7 @@ export function LoginPage() {
                 type={motDePasseVisible ? 'text' : 'password'}
                 required
                 autoComplete="current-password"
-                placeholder="••••••••"
+                placeholder="--------"
                 className="pl-9 pr-9"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
