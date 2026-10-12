@@ -9,6 +9,7 @@ import {
   Receipt,
   ShieldCheck,
   Stethoscope,
+  Tag,
   Truck,
   UserRound,
   Users,
@@ -64,6 +65,15 @@ export const NAVIGATION: SectionNavigation[] = [
       { label: 'Factures', href: '/factures', icon: FileText, permission: 'FACTURATION:READ' },
       { label: 'Caisse', href: '/caisse', icon: Wallet, permission: 'FACTURATION:READ' },
       { label: 'Devis', href: '/devis', icon: Receipt, permission: 'FACTURATION:READ' },
+      // `TARIFS:READ` et non `TARIFS:WRITE` : le praticien doit voir le prix d'un
+      // acte pour le facturer et l'expliquer au patient, sans pouvoir le fixer.
+      { label: 'Tarification', href: '/tarification', icon: Tag, permission: 'TARIFS:READ' },
+      {
+        label: 'Prise en charge',
+        href: '/prise-en-charge',
+        icon: ShieldCheck,
+        permission: 'ASSURANCE:READ',
+      },
     ],
   },
   {

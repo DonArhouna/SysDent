@@ -34,14 +34,16 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Can } from '@/components/auth/can'
 import { formatDateFr, formatDateTimeFr, calculerAge } from '@/lib/format'
 import { toast } from '@/stores/toast-store'
+import { possedePermission, useAuthStore } from '@/stores/auth-store'
 import { patientsApi } from '../services/patients-api'
 import { AlertesBanner } from '../components/alertes-banner'
 import { PatientFormModal } from '../components/patient-form-modal'
 import { AntecedentModal } from '../components/antecedent-modal'
+import { DroitsPatientPanel } from '@/features/tarification/components/droits-patient-panel'
 import type { AntecedentMedical, EtatGeneral } from '../types'
 
 /**
- * Groupes sanguins du système ABO × Rhésus.
+ * Groupes sanguins du système ABO x Rhésus.
  *
  * Référentiel de nomenclature sanguine, pas une donnée d'un tenant : il ne
  * dépend pas du cabinet et ne se paramètre pas. Une liste déroulante évite
@@ -59,6 +61,11 @@ export function PatientDetailPage() {
 
   const [activeTab, setActiveTab] = useState('synthese')
   const [modalEditOpen, setModalEditOpen] = useState(false)
+  // Les droits de prise en charge sont un information financière : le praticien
+  // les lit avant de soin, l'accueil les declare. Le garde est sur `READ`, pas
+  // sur `WRITE` - c'est la lecture qui conditionne l'onglet.
+  const profil = useAuthStore((e) => e.profil)
+  const peutLireAssurance = possedePermission(profil, 'ASSURANCE:READ')
   const [antecedentModalOpen, setAntecedentModalOpen] = useState(false)
   const [antecedentToEdit, setAntecedentToEdit] = useState<AntecedentMedical | null>(null)
 
@@ -188,9 +195,9 @@ export function PatientDetailPage() {
             <span className="font-mono font-semibold text-primary">
               {patient.numero_dossier}
             </span>{' '}
-            • {calculerAge(patient.date_naissance)} ans (
-            {patient.sexe === 'F' ? 'Femme' : 'Homme'}) • Né(e) le{' '}
-            {formatDateFr(patient.date_naissance)} •{' '}
+            - {calculerAge(patient.date_naissance)} ans (
+            {patient.sexe === 'F' ? 'Femme' : 'Homme'}) - Né(e) le{' '}
+            {formatDateFr(patient.date_naissance)} -{' '}
             {patient.nb_consultations} consultation
             {patient.nb_consultations > 1 ? 's' : ''}
           </>
@@ -238,7 +245,7 @@ export function PatientDetailPage() {
               </p>
               <p className="text-sm text-muted-foreground">
                 {patient.ville ?? 'Dakar'}
-                {patient.profession ? ` • ${patient.profession}` : ''}
+                {patient.profession ? ` - ${patient.profession}` : ''}
               </p>
             </div>
           </div>
@@ -291,6 +298,12 @@ export function PatientDetailPage() {
           </TabsTrigger>
           <TabsTrigger value="ordonnances">Ordonnances</TabsTrigger>
           <TabsTrigger value="facturation">Factures & Devis</TabsTrigger>
+          {/* Onglet de prise en charge : visible seulement si le profil peut lire
+              les droits. Un onglet qui ne s'ouvre pas est preferable a un onglet
+              qui affiche « acces refuse » a chaque ouverture. */}
+          {peutLireAssurance && (
+            <TabsTrigger value="prise-en-charge">Prise en charge</TabsTrigger>
+          )}
         </TabsList>
 
         {/* ================= ONGLET 1 : SYNTHÈSE & IDENTITÉ ================= */}
@@ -594,7 +607,7 @@ export function PatientDetailPage() {
                               ? { ...etatForm, diabete: true }
                               : // Décocher « Diabète » efface ce qui n'a de sens
                                 // que pour un diabétique : un dossier indiquant
-                                // « non diabétique · type 2 · Metformine » est
+                                // « non diabétique , type 2 , Metformine » est
                                 // contradictoire, et le praticien le relirait
                                 // sans y voir d'erreur.
                                 {
@@ -1042,6 +1055,13 @@ export function PatientDetailPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ================= ONGLET 8 : PRISE EN CHARGE ================= */}
+        {peutLireAssurance && (
+          <TabsContent value="prise-en-charge">
+            <DroitsPatientPanel patientId={patient.id} />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Modale d'édition administrative */}

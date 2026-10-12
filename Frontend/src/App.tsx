@@ -24,6 +24,8 @@ import { RolesPage } from '@/features/rbac/pages/roles-page'
 import { MonComptePage } from '@/features/compte/pages/mon-compte-page'
 import { ParametresPage } from '@/features/compte/pages/parametres-page'
 import { UtilisateursPage } from '@/features/utilisateurs/pages/utilisateurs-page'
+import { TarificationPage } from '@/features/tarification/pages/tarification-page'
+import { OrganismesPage } from '@/features/tarification/pages/organismes-page'
 
 export default function App() {
   return (
@@ -212,6 +214,30 @@ export default function App() {
           <AppShell>
             <ProtectedRoute permission="STOCK:READ">
               <StockPage ongletInitial="COMMANDES" />
+            </ProtectedRoute>
+          </AppShell>
+        }
+      />
+      <Route
+        path="/tarification"
+        element={
+          <AppShell>
+            <ProtectedRoute permission="TARIFS:READ">
+              <ErrorBoundary zone="Tarification">
+                <TarificationPage />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          </AppShell>
+        }
+      />
+      <Route
+        path="/prise-en-charge"
+        element={
+          <AppShell>
+            <ProtectedRoute permission="ASSURANCE:READ">
+              <ErrorBoundary zone="Prise en charge">
+                <OrganismesPage />
+              </ErrorBoundary>
             </ProtectedRoute>
           </AppShell>
         }
