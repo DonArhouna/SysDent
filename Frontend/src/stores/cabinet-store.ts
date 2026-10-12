@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { api, type ApiReponse } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth-store'
 
 export interface CabinetItem {
   id: string
@@ -44,6 +45,22 @@ export const useCabinetStore = create<CabinetState>()(
       vider: () => set({ cabinetActifId: null, cabinets: [], chargement: false }),
 
       chargerCabinets: async () => {
+        // **Permission vérifiée avant l'appel, pas après.** `/cabinets` exige
+        // `CABINETS:READ`. Un profil sans cette permission - un praticien restreint,
+        // par exemple - ne peut pas y accéder, et l'appel échoue en 403. Comme
+        // le tiroir odontogramme ne montre aucun site, il n'a rien a en faire :
+        // l'appel était inutile, et répétait un 403 dans l'onglet Réseau à
+        // chaque ouverture de page.
+        //
+        // La permission vient du profil réellement livré par `/auth/me`, pas
+        // d'une liste de rôles écrite ici : la seule constante est celle de
+        // l'API, celle que l'endpoint déclare.
+        const permissions = useAuthStore.getState().profil?.permissions ?? []
+        if (!permissions.includes('CABINETS:READ')) {
+          set({ cabinets: [], chargement: false })
+          return
+        }
+
         try {
           set({ chargement: true })
           const res = await api.get<ApiReponse<CabinetItem[]>>('/cabinets')
