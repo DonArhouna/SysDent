@@ -61,12 +61,13 @@ mutation rouge, plus preuve HTTP 503 sur base jetable de l'instance de test. **A
 navigateur vérifié.** Antérieurement : 32 tests backend, 62 client, HTTP réel 14/14. Voir
 `docs/TARIFICATION.md`.
 ## Reste à faire
-1. **Catalogue des permissions incomplet, confirmé sur le cabinet.** L'écran Rôles et
-   Permissions n'invente rien : il rend `GET /rbac/permissions`, qui lit la table `permissions`.
-   Sur le cabinet, **45 permissions, zéro `TARIFS:*` ni `ASSURANCE:*`** : aucune migration ne les
-   insère. Seul `ASSURANCE:WRITE_PATIENT` le fait, par `c4e7a2b6d9f1`, non appliquée. Un
-   administrateur ne peut donc pas attribuer ces droits. Correctif : une révision qui les sème,
-   sur le modèle de `c4e7a2b6d9f1`. Elle rejoint la chaîne, donc la liste des applications.
+1. **Catalogue des permissions, correctif écrit, non appliqué.** L'écran Rôles et
+   Permissions rend `GET /rbac/permissions`, qui lit la table `permissions` : sur le cabinet,
+   **45 permissions, zéro `TARIFS:*` ni `ASSURANCE:*`**, aucune migration ne les inscrivait.
+   La révision **`f1a7c3d90b28`** les sème, idempotente, `downgrade` inclus. Elle enchaine
+   après `c4e7a2b6d9f1` : posée sur `b3d7f1a9c2e4`, elle aurait créé une branche et deux têtes.
+   Chaîne relue : 21 révisions, une seule tête. **Ordre d'application : `b3d7f1a9c2e4`, puis
+   `c4e7a2b6d9f1`, puis `f1a7c3d90b28`.** Fixture de test désormais semée par `RbacService.semer_permissions`, test de parité vert.
 2. **Propriétaire : trancher l'exécution** de `b3d7f1a9c2e4`, bloquée par la politique du poste.
 2. **Cible explicite obligatoire** : `upgrade head` emporterait aussi `c4e7a2b6d9f1`, hors périmètre
    de la première application.
