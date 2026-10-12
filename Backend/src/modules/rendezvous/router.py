@@ -97,6 +97,9 @@ async def get_referentiel(
 # CRÉNEAUX LIBRES
 # ==============================================================================
 
+    # Liste bornee par la journee et par le fauteuil : les creneaux d une
+    # journée sont au plus quelques dizaines.
+    #   # garde-liste: creneaux libres d une journee, au plus 48 par fauteuil
 @router.get("/creneaux-libres", response_model=APIResponse[List[CreneauLibre]])
 async def lister_creneaux_libres(
     praticien_id: uuid.UUID,
@@ -116,7 +119,7 @@ async def lister_creneaux_libres(
     Créneaux réellement disponibles : heures déclarées **moins** ce qui est déjà
     pris (rendez-vous du praticien, fauteuils immobilisés).
 
-    ⚠️ Complète `GET /praticiens/{id}/creneaux` du module D2A, qui ne connaît que
+    ATTENTION : Complète `GET /praticiens/{id}/creneaux` du module D2A, qui ne connaît que
     les heures déclarées. C'est cette route qu'un écran de prise de rendez-vous
     doit appeler.
     """
@@ -374,7 +377,7 @@ async def bloquer_fauteuil(
     """
     Immobilise un fauteuil sans rendez-vous (panne, entretien).
 
-    ⚠️ `422 CRENEAU_DEJA_OCCUPE` si un rendez-vous occupe déjà le fauteuil sur
+    ATTENTION : `422 CRENEAU_DEJA_OCCUPE` si un rendez-vous occupe déjà le fauteuil sur
     cette plage : il faut d'abord déplacer ou annuler ce rendez-vous, pas
     supprimer son occupation.
     """

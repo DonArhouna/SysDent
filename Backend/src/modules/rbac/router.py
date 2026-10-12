@@ -25,6 +25,9 @@ from src.modules.tenants.models import Permission, Role, Utilisateur
 router = APIRouter(prefix="/rbac", tags=["RBAC & Rôles"])
 
 
+    # Catalogue borne par construction : 6 roles metier. Pager une liste de
+    # 6 elements n ajouterait qu une page a naviguer.
+    #   # garde-liste: 6 roles metier, borne fixe a 6
 @router.get("/roles", response_model=APIResponse[List[RoleResponse]])
 async def list_roles(
     db: AsyncSession = Depends(get_tenant_db),
@@ -135,6 +138,9 @@ async def revoke_permission(
     )
 
 
+    # Catalogue borne par construction : une iniciative par droit declare,
+    # 45 environ. Pager un catalogue qu on affiche en un ecran n a pas de sens.
+    #   # garde-liste: environ 45 permissions, borne fixe du catalogue
 @router.get("/permissions", response_model=APIResponse[List[dict]])
 async def list_permissions(
     db: AsyncSession = Depends(get_tenant_db),

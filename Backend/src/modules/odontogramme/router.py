@@ -265,6 +265,8 @@ async def get_historique_dent(
     )
 
 
+    # Liste bornee par le patient : quelques changements d etat, au plus 50.
+    #   # garde-liste: historique d etats d un patient, au plus 50 par patient
 @router.get(
     "/patients/{patient_id}/historique",
     response_model=APIResponse[List[EtatHistoriqueResponse]],
@@ -326,6 +328,8 @@ async def create_charting(
     )
 
 
+    # Liste bornee par le patient : un enregistrement par site et par dent.
+    #   # garde-liste: chartings parodontaux d un patient, au plus 40 par patient
 @router.get(
     "/patients/{patient_id}/charting",
     response_model=APIResponse[List[ChartingParodontalResponse]],

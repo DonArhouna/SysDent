@@ -136,6 +136,8 @@ async def update_cabinet(
 # SALLES
 # ==============================================================================
 
+    # Liste bornee par le cabinet : quelques salles, au plus 20.
+    #   # garde-liste: salles d un cabinet, au plus 20 par cabinet
 @router.get("/cabinets/{cabinet_id}/salles", response_model=APIResponse[List[SalleResponse]])
 async def lister_salles(
     cabinet_id: uuid.UUID,
@@ -241,6 +243,8 @@ async def supprimer_salle(
 # FAUTEUILS
 # ==============================================================================
 
+    # Liste bornee par le cabinet : quelques fauteuils, au plus 50.
+    #   # garde-liste: fauteuils d un cabinet, au plus 50 par cabinet
 @router.get("/cabinets/{cabinet_id}/fauteuils", response_model=APIResponse[List[FauteuilResponse]])
 async def lister_fauteuils(
     cabinet_id: uuid.UUID,

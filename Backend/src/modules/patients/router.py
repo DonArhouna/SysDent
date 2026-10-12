@@ -1,5 +1,5 @@
 """
-Routes API du module Patients & Dossier Médical (§4.2 du rapport).
+Routes API du module Patients & Dossier Médical (section4.2 du rapport).
 
 Toutes les routes sont :
   - authentifiées (JWT bearer ou cookie HttpOnly) via `get_current_user`,
@@ -253,6 +253,8 @@ async def patch_etat_general(
 # ANTÉCÉDENTS MÉDICAUX (UC7, Étape 3 du CDC)
 # ==============================================================================
 
+    # Liste bornee par le patient : quelques antecedents, au plus 20.
+    #   # garde-liste: antecedents d un patient, au plus 20 par patient
 @router.get("/{patient_id}/antecedents", response_model=APIResponse[List[AntecedentMedicalResponse]])
 async def list_antecedents(
     patient_id: uuid.UUID,

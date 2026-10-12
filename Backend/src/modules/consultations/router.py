@@ -254,6 +254,10 @@ async def annuler_consultation(
 # ACTES RÉALISÉS (UC6)
 # ==============================================================================
 
+    # Liste bornee par la consultation : une consultation porte quelques
+    # actes, jamais plus de 20. La borne est le nombre d actes realises
+    # sur la consultation demandee, pas une taille de cabinet.
+    #   # garde-liste: actes d une consultation, borne par la consultation
 @router.get("/{consultation_id}/actes", response_model=APIResponse[List[ActeRealiseResponse]])
 async def list_actes(
     consultation_id: uuid.UUID,
