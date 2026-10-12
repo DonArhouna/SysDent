@@ -1,124 +1,103 @@
 # SysDent Pro — état de reprise
 
-> Une page, ce qui est **prouvé**. Historique dans `git log -p -- docs/PROGRESS.md`.
+> Ce qui est **prouvé**, et sa preuve. Le détail des sessions est dans
+> `docs/journal/` et dans `git log -p -- docs/PROGRESS.md`.
 
 ## ACCÈS
-
-Le 500 du login avait **deux causes**. La première était l'environnement :
-`sysdent_s0b` (port 55435) s'était arrêté le 11/10 à 12:01:43, sans politique
-de redémarrage, et le backend l'avait rejoint à 12:16:57. Relancé par le
-propriétaire. La seconde était le code, corrigée : un échec d'ouverture de
-connexion n'est pas encapsulé par SQLAlchemy et remontait nu ; et l'erreur de
-schéma périmé se trouve **deux niveaux** sous le `ProgrammingError`, que le tri
-n'examinait pas. Vérifié en HTTP : 500 devenu 503, détails vides.
 
 Le cabinet `sysdent_tenant_clinique_cabinet_sn_5bd215` est restauré, migré à la
 tête `e8b2c4a7d1e5`, login **200**. Aucun compte réel n'a jamais été utilisé.
 
-## Tests : instance dédiée et preuves
+Le 500 du login avait **deux causes** : le conteneur de développement arrêté
+(politique de redémarrage absente), et deux défauts de code — un échec
+d'ouverture de connexion n'est pas encapsulé par SQLAlchemy et remontait nu ;
+l'erreur de schéma périmé se trouve **deux niveaux** sous le `ProgrammingError`,
+que le tri n'examinait pas. Vérifié en HTTP : 500 devenu 503, détails vides.
+
+## Tests : instance dédiée
 
 Instance `sysdent_test_pg`, port **55436**, volume **tmpfs**, base-témoin
 `sysdent_instance_test_marker`. `settings` réorienté **avant tout import de
 `src`**, et la garde **vérifie que la redirection a pris** ; quatre refus
-cumulatifs. Les tests de supervision **fabricent leurs propres cas** et les
-suppriment en `finally` : trois affirmaient des faits sur le développement,
-l'un passant **à vide**, donc vert pour la mauvaise raison.
+cumulatifs.
 
-Chaque base créée est enregistrée ; en fin de session les bases hors liste de
-protection font **échouer la session**. `--nettoyer-instance-test` les
-supprime, après contrôle du port **et** du marqueur.
+Les tests de supervision **fabricent leurs propres cas** et les suppriment en
+`finally` : trois affirmaient des faits sur le développement, l'un passant
+**à vide**, donc vert pour la mauvaise raison.
 
-Preuves : trois exécutions de suite, **5 bases avant et après** ; une base
-laissée volontairement fait échouer la session ; développement inchangé
-(17 bases, registre 137/137).
+**Fuite de bases, cause trouvée.** `BASES_CREEES_PAR_LA_SESSION` était déclaré
+**deux fois** (un `set`, puis une `list`). Le second écrasait le premier :
+`_enregistrer` faisait `.add` sur une liste, levait, **après** avoir créé la
+base et **avant** d'atteindre le `finally`. Mesure : 16 bases par exécution et
+17 erreurs de setup — la même cause. Après correction : **5 bases avant et
+après trois exécutions, 44 tests verts, 0 erreur.**
+
+Preuves : trois exécutions de suite sans variation ; une base laissée
+volontairement fait échouer la session ; développement inchangé (17 bases,
+registre 137/137).
 
 ## Suite complète : **NON VÉRIFIÉE**
+
 64 % puis **90 minutes** sans finir (objectif : moins de 15). Cause du
-ralentissement **non établie**. Un facteur corrigé depuis : la base plateforme
-de tests n'était jamais migrée, ce qui levait 4 erreurs au chargement.
-Mesures qui **écartent** deux hypothèses : `tmpfs` à 8 %, 6 connexions ouvertes
-pour un maximum de 100. Ni saturation, ni pression de connexions. Fuite de bases
-**corrigée et prouvée**. Le clonage de modèle, le coût Argon2 et les migrations
-rejouées par test n'ont **pas** été mesurés.
+ralentissement **non établie**. `tmpfs` à 8 %, 6 connexions sur 100 : ni
+saturation, ni pression. Clonage de modèle, coût Argon2 et migrations rejouées
+par test **non mesurés**.
 
-## Écart de schéma des cabinets (lecture seule)
+## Backoffice : tableau de bord écrit et testé
 
-12 bases existent. **5 à la tête**, aucun cabinet réel en retard. **5 bases sans
-table `alembic_version`** : des démonstrations (`clinique_demo_*`,
-`clinique_trace_3_*`, `clinique_diagnostic_dakar_*`, `clinique_d_mo_dakar_*`).
-Une seule en retard : `sysdent_tenant_ref` (`c4f8a2d91e05`), le **tenant de
-référence des tests**. Sur accord : `pg_dump` puis `alembic -c
-alembic_tenant.ini upgrade head`. Aucune base migrée.
+`/dashboard` rend le tableau de bord **dans `AppShell`** — la page livrée
+précédemment s'en oubliait, et rien ne le voyait. Deux tests exigent désormais
+un `aside` et un `header` ; **preuve par mutation** : sans enveloppe, le test
+échoue. Le harnais ne simulait pas `window.matchMedia`, ce qui faisait échouer
+**toute** page rendue dans le layout.
 
-## Registre : 129 lignes sans base, toutes conservées
+Un seul appel ; total et part « base absente » sur **deux lignes distinctes** ;
+erreur avec « Réessayer », **jamais un zéro** ; vide sans « Réessayer » ;
+bannière des codes de secours conditionnée par le profil.
 
-Décision du propriétaire : **aucune suppression**. Ventilation : 91
-manifestement de test, 2 provisionnements échoués, 33 douteux
-(`clinique_provisionnement_*`), 3 possiblement réels (`clinique_cabinet_sn_*`).
-Aucun dump pour ces 36 dernières.
-
-## Backoffice : tableau de bord écrit, layout réparé
-
-`/dashboard` rend le tableau de bord **dans `AppShell`**. La page livrée
-précédemment s'en oubliait : `AppShell` (sidebar, navbar, thème) n'était
-utilisé que par l'écran provisoire qu'elle remplaçait. Le type ne le voyait pas,
-les tests passaient. Deux tests exigent désormais un `aside` et un `header`, avec
-un témoin sur `AppShell` seul ; **preuve par mutation** : sans enveloppe, le
-test échoue.
-
-Le harnais ne simulait pas `window.matchMedia`, que la bascule de thème appelle :
-**toute** page rendue dans le layout échouait. C'est là que se expliquaient les
-2 tests de bannière en échec depuis le début — ils rendent l'écran provisoire,
-qui utilise `AppShell`. **7 fichiers, 42 tests, tous verts.**
-
-Un seul appel, total et part sans base sur deux lignes distinctes, erreur avec
-« Réessayer » et jamais un zéro, vide sans « Réessayer », bannière conditionnée.
-Pas d'i18n : ni le backoffice ni le client n'en ont — à trancher.
+**47 tests fronts verts sur 8 fichiers**, `npm run verifier` vert.
 
 ## Le 500 du tableau de bord : **cause nommée, reproduite, corrigée**
 
-Sur le HEAD, instance de test, jeton plateforme valide :
-
-| | avant | après |
+| requête | avant | après |
 |---|---|---|
 | sans jeton | 401 | 401 |
 | jeton invalide | 401 | 401 |
 | login + 2FA | 200 | 200 |
 | **tableau de bord** | **500** | **200** |
 
-Traceback : `stats.py:354`, `_cabinets_essai_proches_expiration` —
+`stats.py:354`, `_cabinets_essai_proches_expiration` :
 `TenantPlateforme.date_fin_essai.is_(None).invert()`. `is_(None)` renvoie déjà
 un `BinaryExpression`, qu'on ne peut pas inverser. L'appel lève à la
-**construction** du `select`, avant tout accès à la base : le 500 ne dépendait
-d'aucune donnée. La condition était de plus sans effet — en SQL, comparer
-`NULL` donne `NULL`, et les deux conditions de date voisines excluaient déjà
-les essais sans date.
+**construction** du `select`, donc avant tout accès à la base : le 500 ne
+dépendait d'aucune donnée. La condition était de plus sans effet. Code
+**antérieur** aux travaux sur le tableau de bord.
 
-Code **antérieur** aux travaux sur le tableau de bord : ce n'est pas une
-régression. Le test échouait pour la même raison, au même endroit.
+**Couple 401/500 : hypothèse écartée par test.** `api.ts` renouvelle une fois
+et rejoue une fois ; si le renouvellement échoue, la session est purgée et la
+requête **n'est pas rejouée**. `/platform/auth/*` n'est jamais rejoué. Preuve
+par mutation : le garde retiré, son test échoue.
 
-**Fuite trouvée au passage** : la fixture plateforme paramétrée de `conftest`
-laisse une base `sysdent_platform_test_<hex>` par paramètre — 6 bases
-accumulées. Non corrigée, signalée.
+## Registre et bases
 
-## Couple 401 / 500 : hypothèse écartée par les tests
+**129 lignes sans base, toutes conservées** (décision du propriétaire) : 91 de
+test, 2 provisionnements échoués, 33 douteux, 3 possiblement réels. Aucun dump
+pour ces 36 dernières.
 
-L'hypothèse du propriétaire — 401 puis 500, donc un rejeu sans jeton frais —
-est **écartée**. `api.ts` renouvelle **une** fois puis rejoue **une** fois ; si
-le renouvellement échoue, la session est purgée et la requête **n'est pas
-rejouée** — c'est ce qui évite le couple décrit. Une route `/platform/auth/*`
-n'est jamais rejouée (son 401 veut dire « mauvais mot de passe »), et un 403 ne
-déclenche rien. Preuve par mutation : le garde `/auth` retiré, son test échoue.
+Écart de schéma : aucun cabinet réel en retard. Cinq bases de démonstration
+n'ont pas de table `alembic_version`. `sysdent_tenant_ref` est le tenant de
+référence des tests. Aucune base migrée.
 
-5 tests qui **comptent les appels** : 47 tests fronts verts sur 8 fichiers.
+## Non vérifié
 
-**Non fait** : `design:parite`, liste des cabinets. **Aucun rendu déclaré
-vérifié** : pas de navigateur.
+- **Rendu navigateur** : jamais contrôlé. Checklist dans
+  `docs/backoffice/VERIFICATION_NAVIGATEUR.md`.
+- **Pas d'i18n** : ni le backoffice ni le client n'en ont. **À trancher.**
+- Cause du ralentissement de la suite.
 
 ## Reste à faire
 
-1. Condenser `PROGRESS.md` sous 80 lignes.
-2. Corriger la fuite des bases `sysdent_platform_test_<hex>` (fixture
-   paramétrée de `conftest` : une base par paramètre, 6 accumulées).
-3. `npm run design:parite`, puis la liste des cabinets.
-4. Rapprochement du registre : arbitrage sur les 36 lignes non jetables.
+1. Vérification navigateur, checklist en main.
+2. `npm run design:parite`, puis la liste des cabinets.
+3. Cause du ralentissement de la suite, puis verdict réel.
+4. Registre : arbitrage sur les 36 lignes non jetables.
