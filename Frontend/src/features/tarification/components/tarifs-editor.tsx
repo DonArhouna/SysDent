@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { EyeOff, Save, Trash2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { EtatErreurModule } from './etat-erreur'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Input } from '@/components/ui/input'
@@ -112,6 +113,15 @@ export function TarifsEditor({ acte }: { acte: ActeNomenclature | null }) {
       <CardContent>
         {categories.isPending ? (
           <Skeleton className="h-24 w-full" />
+        ) : categories.isError ? (
+          /* L'editeur a sa propre requete : sans ce branche, un cabinet en
+             retard de migrations y affichait « Aucune categorie de patient »,
+             un message faux qui accuse le cabinet d'etre vide. */
+          <EtatErreurModule
+            error={categories.error}
+            libelle="Categories de patient"
+            onReessayer={() => void categories.refetch()}
+          />
         ) : toutesCategories.length === 0 ? (
           <EmptyState
             titre="Aucune categorie de patient"

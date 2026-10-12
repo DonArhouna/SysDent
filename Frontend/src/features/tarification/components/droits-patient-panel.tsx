@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, RefreshCw, ShieldCheck, Trash2, WifiOff } from 'lucide-react'
+import { Plus, ShieldCheck, Trash2, WifiOff } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { EtatErreurModule } from './etat-erreur'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Input } from '@/components/ui/input'
@@ -98,15 +99,15 @@ export function DroitsPatientPanel({ patientId }: { patientId: string }) {
         ) : droits.isPending ? (
           <Skeleton className="h-24 w-full" />
         ) : droits.isError ? (
-          <EmptyState
-            icon={WifiOff}
-            titre="Prise en charge indisponible"
-            description="Les droits n'ont pas pu etre charges."
-          >
-            <Button variant="outline" onClick={() => void droits.refetch()}>
-              <RefreshCw className="h-4 w-4" /> Reessayer
-            </Button>
-          </EmptyState>
+          /* Le message de mise a jour du schema prime ici sur tout le reste :
+             le bouton « Ajouter un droit » doit disparaitre avec la liste. Un
+             module absent propose sinon une saisie qui echouerait, ou pire qui
+             disparaitrait sans bruit. */
+          <EtatErreurModule
+            error={droits.error}
+            libelle="Prise en charge"
+            onReessayer={() => void droits.refetch()}
+          />
         ) : lignes.length === 0 ? (
           <EmptyState
             icon={ShieldCheck}
