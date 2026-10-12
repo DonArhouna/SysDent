@@ -166,3 +166,39 @@ def etat_par_defaut() -> str:
     )
     assert trouve, "l'etat par defaut est introuvable dans dent-drawer.tsx"
     return trouve.group(1)
+
+
+#: Les codes que le serveur refuse, et qui ont longtemps circule dans le client.
+#: Ils ne sont pas « obsoletes » : ils sont **faux**, et le serveur les rejette.
+CODES_REFUSES = ("OCCLUSALE", "LINGUALE", "MESIALE", "DISTALE", "INCISIVE")
+
+FONCTION = "src/features/odontogramme"
+
+
+def test_aucun_code_de_face_refuse_dans_la_fonction_entiere() -> None:
+    """
+    Le garde Previous ne regardait que `dent-drawer.tsx`.
+
+    Or le code faux avait repris ailleurs : `odontogramme-svg.tsx` le nomme
+    quatre fois pour ses couleurs, et `types.ts` le documente comme si c'etait
+    la nomenclature. Un jour, un de ces endroits aurait envoye. Le test porte
+    donc sur **toute** la fonction odontogramme, pas sur un fichier.
+    """
+    dossier = RACINE / "Frontend" / FONCTION
+    coupables: list[str] = []
+
+    for chemin in sorted(dossier.rglob("*")):
+        if chemin.suffix not in {".ts", ".tsx"}:
+            continue
+        contenu = chemin.read_text(encoding="utf-8")
+        for code in CODES_REFUSES:
+            for numero, ligne in enumerate(contenu.splitlines(), 1):
+                if re.search(rf"\b{code}\b", ligne):
+                    coupables.append(f"{chemin.name}:{numero} -> {code}")
+
+    assert coupables == [], (
+        "le client contient des codes de face que le serveur refuse :\n"
+        + "\n".join(f"    {c}" for c in coupables)
+        + "\n  Un jour, l'un d'eux partira dans une requete et l'enregistrement "
+        "renverra 422."
+    )

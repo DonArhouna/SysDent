@@ -1,9 +1,28 @@
 export type TypeOdontogramme = 'ADULTE' | 'ENFANT' | 'MIXTE'
 
+/**
+ * Les cinq faces d'une dent, **telles que le serveur les nomme**.
+ *
+ * Ce n'est pas une documentation : c'est un type. Une union fait de tout code
+ * hors nomenclature une **erreur de compilation**, la ou un commentaire ne
+ * fait rien. Le tiroir envoyait des adjectifs francais la ou le serveur attend
+ * des codes techniques, et chaque enregistrement se faisait refuser en 422.
+ *
+ * Les anciens noms ne sont pas ecrits ici, meme en commentaire : le controle
+ * de contrat refuse leur presence dans toute la fonction, et il ne distingue
+ * pas une prose d'un code envoye. Les citer pour expliquer le defaut
+ * suffirait a le faire echouer.
+ *
+ * La source de verite reste `Backend/src/common/dentaire.py` ; le test
+ * `Backend/tests/test_contrat_faces_odontogramme.py` compare les deux.
+ */
+export type CodeFace = 'MESIAL' | 'DISTAL' | 'VESTIBULAIRE' | 'LINGUAL_PALATIN' | 'OCCLUSAL_INCISAL'
+
 export interface FaceDent {
-  face: string // VESTIBULAIRE, LINGUALE, MESIALE, DISTALE, OCCLUSALE, INCISIVE
-  face_courte: string // V, L, M, D, O, I
-  etat: string // SAINE, CARIE_DEBUTANTE, SOIGNEE, OBTURATION, COURONNE...
+  face: CodeFace
+  /** Abréviation d'affichage : M, D, V, L, O. */
+  face_courte: string
+  etat: string
   notes?: string | null
 }
 

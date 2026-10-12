@@ -58,11 +58,16 @@ function DentItem({
     return couleurGlobale
   }
 
-  const cCentre = getCouleurFace('OCCLUSALE')
+  // **Nomenclature du serveur**, comme dans le tiroir. Ces cinq noms n'etaient
+  // que la comparaison par abrege qui les faisait fonctionner : le code long
+  // ne correspondait jamais, et c'est le repli sur `face_courte` qui sauvait
+  // l'affichage. Une correspondance de secours masque une divergence au lieu de
+  // la corriger - et le jour ou le repli manque, la couleur disparait.
+  const cCentre = getCouleurFace('OCCLUSAL_INCISAL')
   const cHaut = getCouleurFace('VESTIBULAIRE')
-  const cBas = getCouleurFace('LINGUALE')
-  const cGauche = getCouleurFace('MESIALE')
-  const cDroite = getCouleurFace('DISTALE')
+  const cBas = getCouleurFace('LINGUAL_PALATIN')
+  const cGauche = getCouleurFace('MESIAL')
+  const cDroite = getCouleurFace('DISTAL')
 
   const estAbsent = dent.etat_actuel.includes('ABSENTE')
 
@@ -201,7 +206,7 @@ export function OdontogrammeSvg({
           <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
             Arcade Maxillaire (Supérieure)
           </span>
-          <span className="text-[11px] text-muted-foreground">Quadrant 1 (Droit) • Quadrant 2 (Gauche)</span>
+          <span className="text-[11px] text-muted-foreground">Quadrant 1 (Droit) - Quadrant 2 (Gauche)</span>
         </div>
 
         <div className="flex items-center justify-center gap-1 sm:gap-2 overflow-x-auto py-2">
@@ -245,7 +250,7 @@ export function OdontogrammeSvg({
           <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
             Arcade Mandibulaire (Inférieure)
           </span>
-          <span className="text-[11px] text-muted-foreground">Quadrant 4 (Droit) • Quadrant 3 (Gauche)</span>
+          <span className="text-[11px] text-muted-foreground">Quadrant 4 (Droit) - Quadrant 3 (Gauche)</span>
         </div>
 
         <div className="flex items-center justify-center gap-1 sm:gap-2 overflow-x-auto py-2">

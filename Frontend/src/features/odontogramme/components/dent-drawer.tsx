@@ -21,16 +21,19 @@ interface DentDrawerProps {
 /**
  * Les cinq faces d'une dent.
  *
- * **Le `code` est la nomenclature du serveur**, pas un adjectif français : le
- * 12/10, ce tiroir envoyait `OCCLUSALE`, `LINGUALE`, `MESIALE` et `DISTALE`
- * là où le serveur n'accepte que `OCCLUSAL_INCISAL`, `LINGUAL_PALATIN`,
- * `MESIAL` et `DISTAL`. Comme les cinq faces partent a chaque enregistrement,
- * une seule invalide faisait echouer toute la sauvegarde en 422 — pour un
- * praticien dont la dent etait parfaitement valide.
+ * **Le `code` est la nomenclature du serveur**, pas un adjectif français. Le
+ * 12/10, ce tiroir envoyait quatre adjectifs la ou le serveur attend ses codes
+ * techniques ; comme les cinq faces partent a chaque enregistrement, cela
+ * faisait echouer toute la sauvegarde en 422 — pour un praticien dont la dent
+ * etait parfaitement valide.
  *
  * Le serveur fait autorite : c'est lui qui enregistre, et c'est lui qui renvoie
  * ces codes dans `/odontogramme/referentiel/etats`. Le libelle et l'abrege
  * restent des donnees d'affichage.
+ *
+ * Les anciens noms ne sont pas ecrits ici, meme en commentaire : le controle
+ * de contrat refuse leur presence dans toute la fonction, et il ne distingue
+ * pas une prose d'un code reellement envoye.
  *
  * `Backend/tests/test_contrat_faces_odontogramme.py` lit ce tableau et le
  * compare a la nomenclature du serveur : changer un code d'un seul cote fait
