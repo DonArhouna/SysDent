@@ -1,85 +1,80 @@
 # SysDent Pro — état de reprise
-> Ce qui est **prouvé**, et sa preuve. Le détail est dans `docs/journal/` et
-> dans `git log -p -- docs/PROGRESS.md`.
+> Ce qui est **prouvé**, et sa preuve. Détail : `docs/journal/`, et
+> `git log -p -- docs/PROGRESS.md`.
 ## ACCÈS
 Le cabinet `sysdent_tenant_clinique_cabinet_sn_5bd215` est restauré, migré à la
 tête `e8b2c4a7d1e5`, login **200**. Aucun compte réel n'a jamais été utilisé.
 Le 500 du login avait **deux causes** : le conteneur de développement arrêté
-(sans politique de redémarrage), et deux défauts de code — un échec
-d'ouverture de connexion n'est pas encapsulé par SQLAlchemy et remontait nu ;
-l'erreur de schéma périmé est **deux niveaux** sous le `ProgrammingError`, que
-le tri n'examinait pas. Vérifié en HTTP : 500 devenu 503, détails vides.
-## 422 de l'odontogramme : **cause nommée**
-Le tiroir n'utilisait pas le référentiel pour les faces : cinq options écrites
-en dur, dont une que le serveur refuse.
-| option | validateur |
-|---|---|
-| `SAINE`, `CARIE_DEBUTANTE`, `CARIE_AVANCEE`, `COURONNE` | acceptés |
-| `SOIGNEE` (« Obturation / Composite ») | **refusé** |
-`ETATS_DENT` n'a aucun état de ce nom : les restaurations sont
-`OBTURATION_*`, `INLAY`, `ONLAY`, `COURONNE*`. Choisir « Obturation /
-Composite » suffisait à déclencher le 422. **L'état par défaut étant accepté, il
-fallait changer une lésion pour tomber dessus** — exactement le geste du
-praticien.
-Corrigé à la racine : les états viennent de `referentielEtats`, comme ceux de
-l'état global. Plus aucune liste écrite en dur ; le test l'interdit.
-Également corrigés : quatre codes de face hors nomenclature (`MESIALE`,
-`DISTALE`, `LINGUALE`, `OCCLUSALE`), et `face` devient le type `CodeFace`,
-une union des codes serveur — une faute devient une erreur de compilation.
-## 403 sur `/cabinets`
-Les logs du navigateur nommaient l'appelant : `dashboard.tsx:244`, pas
-l'odontogramme. `litCabinets` y était calculé ligne 205 et utilisé ailleurs,
-mais la requête n'avait **pas** de `enabled` — elle partait inconditionnellement.
-Garde branché.
+(action du propriétaire), et deux défauts de code — un échec de connexion pas
+encapsulé par SQLAlchemy, et une erreur de schéma **deux niveaux** sous le
+`ProgrammingError`, que le tri n'examinait pas. 500 -> 503.
+## Défauts d'interface, tous només
+Cinq 422 et un 403, une famille : **le garde existait ailleurs dans le fichier
+et n'était pas branché**. Prouvé par lecture, vérifié par test.
+- Odontogramme : cinq états écrits en dur, dont `SOIGNEE` que `ETATS_DENT`
+  refuse. **L'état par défaut étant accepté, il fallait *changer* une lésion**
+  pour tomber dessus — le geste du praticien. Les états viennent de
+  `referentielEtats`. Également quatre faces hors nomenclature, et `face`
+  devient le type `CodeFace` : une faute devient une erreur de compilation.
+- Consultation : `cabinet_id: ''` quand aucun site n'est résolu — impossible
+  sans `CABINETS:READ` ; motif vide, refusé par `min_length=2`.
+- Dashboard : `litCabinets` calculé mais jamais câblé sur le `enabled`
+  (`dashboard.tsx:244`). Agenda : praticiens listés sans `PRATICIENS:READ`.
+- Après déconnexion volontaire la connexion va au tableau de bord, après
+  expiration elle restitue la route. **Aucun rendu navigateur déclaré.**
 ## Tests : instance dédiée
 Instance `sysdent_test_pg`, port **55436**, **tmpfs**, base-témoin
 `sysdent_instance_test_marker`. `settings` réorienté **avant tout import de
 `src`**, garde vérifiant que la redirection a pris ; quatre refus cumulatifs.
-**Fuite de bases, cause trouvée** : `BASES_CREEES_PAR_LA_SESSION` était
-déclaré **deux fois** (un `set`, puis une `list`). Le second écrasait le premier :
-`.add` sur une liste lève, **après** la création et **avant** le `finally`.
-Mesure : 16 bases par exécution. Après correction : **5 bases avant et après
-trois exécutions, 44 tests verts, 0 erreur.**
-Les tests de supervision **fabricent leurs propres cas** : trois affirmaient
-des faits sur le développement, l'un passant **à vide**, donc vert pour la
-mauvaise raison.
-## Backoffice
-`/dashboard` rend dans `AppShell` ; la page livree precedemment s'en
-oubliait, et rien ne le voyait. Deux tests exigent un `aside` et un `header`,
-preuve par mutation. Un seul appel, total et part « base absente » sur deux
-lignes, « Reessayer » jamais un zero. **47 tests verts**, `verifier` vert.
-Le 500 du tableau de bord : `stats.py:354`, `is_(None).invert()` — corrige,
-**200 verifie en HTTP** (avant : 500). Couple 401/500 **ecarte par test**.
-## Suite complète : **NON VÉRIFIÉE**
-64 % puis 90 minutes sans finir. Cause du ralentissement **non établie**.
-`tmpfs` à 8 %, 6 connexions sur 100 : ni saturation, ni pression.
-## Registre et bases
-**129 lignes sans base, toutes conservées** (décision du propriétaire) : 91 de
-test, 2 échecs de provisionnement, 33 douteux, 3 possiblement réels. Aucun
-cabinet réel en retard de schéma ; 5 bases de démonstration sans
-`alembic_version`. Aucune base migrée.
+**Fuite de bases** : `BASES_CREEES_PAR_LA_SESSION` était déclaré deux fois (un
+`set`, puis une `list`) ; le second écrasait le premier, d'où 16 bases par
+exécution. Après correction : **5 bases avant et après trois exécutions, 0
+erreur.** Les tests de supervision **fabricent leurs propres cas** : l'un
+passait à vide, donc vert pour la mauvaise raison.
+## Tarification — phase 1 **livrée, non appliquée**
+Migration `b3d7f1a9c2e4` (chaîne tenant). **Vérifiée sur base jetable,
+appliquée nulle part** : le propriétaire valide le plan et le diff avant.
+Quatre tables : `categories_patient` (`standard` créée par la migration),
+`tarifs_actes` (unique sur `(acte_id, categorie_code)`, catégorie référencée
+par son **code**), `organismes_assurance` (assurance et mutuelle ont les mêmes
+données ; `type_organisme` porte la différence), `droits_prise_en_charge`.
+`CHECK` taux 0-100 et montant non négatif, `RESTRICT` sur un organisme porté par
+un droit. La migration reprend `tarif_base` dans `tarifs_actes` sous
+`standard` au moment où elle est appliquée : rien n'est déplacé ni supprimé.
+Aller-retour `upgrade`/`downgrade`/`upgrade` : 53 tables, aucune résiduelle
+après downgrade, actes conservés, type enum supprimé, reprise des 3 actes à
+l'identique, quatre contraintes refusées par PostgreSQL.
+`TARIFS:READ`/`TARIFS:WRITE` et `ASSURANCE:READ`/`ASSURANCE:WRITE` au
+catalogue. `TARIFS:WRITE` : `ADMIN_CABINET` seul. `ASSURANCE:WRITE` aussi
+`SECRETAIRE`, qui saisit la carte de mutuelle à la création de fiche — pas les
+organismes, pas les taux. **La nomenclature passe sous `TARIFS:*`** : elle
+demandait `CONSULTATIONS:READ` et `CONSULTATIONS:CREATE`, donc créer une
+consultation suffisait à fixer le prix des actes. URL inchangées, droit changé,
+réponses typées (elles étaient en `dict`). Praticiens, assistants, secrétaires
+et comptables gardent la lecture : le dentiste doit voir le prix pour le
+facturer au patient.
+**Preuve** : 22 tests verts, dont le tarif figé (par mutation : `15000.00 au
+lieu de 7500.00`). HTTP réel sur l'instance de test : **14 appels, 14 résultats
+attendus, 0 écart**, dont les 403 de `PRATICIEN`. 130 tests verts au total.
+Routes et matrice : `docs/TARIFICATION.md`.
 ## Non vérifié
-- **Rendu navigateur** : jamais contrôlé. Checklist :
-  `docs/backoffice/VERIFICATION_NAVIGATEUR.md`.
-- **Pas d'i18n** : ni le client ni le backoffice n'en ont. **À trancher.**
-- Ralentissement de la suite.
-## Défauts d'interface du 12/10 (client)
-Cinq symptomes, une meme famille : **le garde existait ailleurs dans le
-fichier et n'etait pas branche**. Prouve par lecture, verifie par test.
-| symptome | cause |
-|---|---|
-| 422 odontogramme | etat ecrit en dur absent de la nomenclature ; le defaut passait, il fallait *changer* une lesion |
-| 422 odontogramme | quatre codes de face hors nomenclature |
-| 422 consultation | `cabinet_id: ''` quand aucun site n'est resolu : impossible pour un profil sans `CABINETS:READ` |
-| 422 consultation | motif vide, refuse par `min_length=2` |
-| 403 agenda | liste des praticiens demandee sans `PRATICIENS:READ` |
-Corrige a la racine : etats venus du referentiel, `face` typee en union,
-`cabinet_id` absent plutot que vide, liste des praticiens seulement si le
-droit existe. Apres deconnexion volontaire, la connexion va au tableau de
-bord ; apres expiration, elle restitue la route. L'identifiant de consultation
-n'est plus saisi.
+**Backoffice** : `/dashboard` rend dans `AppShell`, la page livrée s'en
+oubliait ; deux tests l'exigent, preuve par mutation. **47 tests verts**, le
+500 du tableau de bord (`stats.py:354`) est **200 en HTTP**, couple 401/500
+écarté par test.
+**Rendu navigateur** : jamais contrôlé, checklist
+`docs/backoffice/VERIFICATION_NAVIGATEUR.md`. **Pas d'i18n** : ni le client ni
+le backoffice n'en ont, **à trancher**. **Suite complète jamais jouée** : 64 %
+puis 90 minutes sans finir, cause non établie. **Registre** : 129 lignes sans
+base, conservées (décision du propriétaire) ; aucune base migrée.
 ## Reste à faire
-1. Rechargement forcé du client, puis test d'une modification de face.
-2. `npm run design:parite`, puis la liste des cabinets.
-3. Cause du ralentissement, puis verdict réel de la suite.
-4. Registre : arbitrage sur les 36 lignes non jetables.
+1. **Propriétaire : valider le plan de migration `b3d7f1a9c2e4`, puis le diff.**
+2. **Propriétaire : valider la phase 1 par écrit**, avant toute phase 2.
+3. Ventilation assurance / patient d'une facture : hors périmètre, non codée. La
+   prise en charge est **enregistrée, pas appliquée** au calcul d'un montant.
+4. Faire consommer `tarifs_actes` par la facturation ; `tarif_base` reste lu en
+   attendant. Transition, pas dual permanent.
+5. Phase 2 (menu Tarification, menu Prise en charge) après validation.
+6. Rechargement forcé du client, test d'une modification de face,
+   `npm run design:parite`, liste des cabinets, puis la cause du
+   ralentissement de la suite et le verdict réel.
