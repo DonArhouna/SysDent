@@ -1324,6 +1324,15 @@ async def cabinet(tenant_db: AsyncSession) -> dict:
     # réglementaire facultative. On le crée quand même parce que la plupart des
     # tests l'exercent, et parce que l'ordonnance l'exige toujours.
     from src.modules.tenants.models import Praticien
+    from src.modules.rbac.services import RbacService
+
+    # Le semis passe par le service du provisionnement, jamais par une liste
+    # recopiée : une liste ici finirait par diverger du catalogue, et les tests
+    # passeraient sur un catalogue que le produit ne produit pas. C'est
+    # exactement le défaut que le test de parité cherche à voir.
+    await RbacService.semer_permissions(tenant_db)
+    await RbacService.semer_roles(tenant_db)
+    await tenant_db.flush()
 
     praticien = Praticien(
         utilisateur_id=user.id,
