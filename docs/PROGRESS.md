@@ -88,27 +88,32 @@ pour ces 36 dernières.
 n'ont pas de table `alembic_version`. `sysdent_tenant_ref` est le tenant de
 référence des tests. Aucune base migrée.
 
-## Odontogramme et 403 `/cabinets` (12/10)
+## Odontogramme et 403 `/cabinets` (12/10, réactualisé)
 
-**422, cause nommée.** Le tiroir de dent envoie **toujours les cinq faces**,
-donc un seul code hors nomenclature fait échouer toute la sauvegarde. Quatre
-des cinq divergeaient : `OCCLUSALE`, `LINGUALE`, `MESIALE`, `DISTALE` côté
-client, contre `OCCLUSAL_INCISAL`, `LINGUAL_PALATIN`, `MESIAL`, `DISTAL` côté
-serveur. Le serveur fait autorité. Test de contrat qui lit le `.tsx` **et** le
-`.py` : un code changé d'un seul côté fait échouer. Preuve : `MESIALE` rétabli,
-le test échoue.
+**403 — corrigé au bon endroit.** Les logs du navigateur nomment l'appelant :
+`api.ts:249` puis `dashboard.tsx:244`. C'était le **tableau de bord**, pas
+l'odontogramme ; le correctif de la veille visait un autre appel, sur une autre
+page. La cause y était visible : `litCabinets = possedePermission(profil,
+'CABINETS:READ')` était calculé ligne 205 et utilisé ailleurs, mais la requête
+`/cabinets` n'avait **pas** de `enabled` — elle partait inconditionnellement.
+Garde branché.
 
-**403, cause nommée.** `GET /cabinets` exige `CABINETS:READ` ; l'odontogramme
-n'affiche aucun site, l'appel ne lui servait à rien, et `chargerCabinets`
-avalait l'erreur en silence. Permission désormais lue dans le profil livré par
-`/auth/me`, sans liste de rôles codée. Un 403 n'est pas rejoué et ne se traduit
-pas par une liste vide trompeuse.
+**422 — le contrat n'est plus en cause.** Le corps exact produit par le tiroir
+passe la validation serveur (`FacesMiseAJour`, 5 faces acceptées). Un 422 naît
+de la validation d'entrée, avant tout accès à la base : ce corps ne peut donc
+pas le produire. Les états proposés par l'interface et ceux acceptés par le
+validateur sont **37 de chaque côté, écart nul** — deux tables séparées que le
+test verrouille désormais.
+
+Le test de contrat lit le `.tsx` **et** le `.py`, vérifie que le corps du client
+passe, et que tous les états de l'interface sont valides.
+
+**Non vérifié, et c'est important** : le 422 du propriétaire **n'est pas
+reproduit**. Il vient d'un autre corps — bundle antérieur, ou valeur différente.
+Il faut son corps de réponse exact, pas une devination.
 
 16 tests clients verts, lint et build verts. Le client n'a **pas** de script
 `verifier` : l'équivalent est `lint` + `test` + `build`.
-
-**Non vérifié** : aucun appel HTTP n'a été rejoué pour ces deux routes, donc le
-200 du praticien autorisé n'est pas confirmé par une preuve de bout en bout.
 
 ## Non vérifié
 
