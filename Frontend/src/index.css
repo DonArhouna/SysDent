@@ -57,6 +57,11 @@
 
     /* Teinte des ring de focus (AA sur les deux fonds). */
     --ring: 220 85% 55%;
+
+    /* Défilement : piste invisible, poignée discrète. Token d'accent pour le
+       survol. Aucune couleur en dur ici comme ailleurs. */
+    --scrollbar-thumb: 220 20% 82%;
+    --scrollbar-thumb-hover: 220 18% 66%;
   }
 
   .dark {
@@ -94,6 +99,69 @@
     --kpi-orange: 36 95% 58%;
 
     --ring: 213 94% 62%;
+
+    /* Nuit : poignée plus claire qu'en clair, sinon elle disparaît sur le navy.
+       Le survol garde le même écart de luminosité, la transition fait le reste. */
+    --scrollbar-thumb: 220 16% 34%;
+    --scrollbar-thumb-hover: 220 18% 52%;
+  }
+
+  /*
+   * Scrollbar fine, sur toute l'application.
+   *
+   * Deux implémentations sont nécessaires : Firefox n'expose pas
+   * `::-webkit-scrollbar` et lit `scrollbar-width` / `scrollbar-color` ;
+   * Chromium et Safari n'ignorent que le pseudo-élément. Écrire les deux n'est
+   * pas redondant, c'est ce qui rend la même barre dans les deux.
+   *
+   * `scrollbar-width: thin` est ignore cote WebKit, sans consequence : la
+   * valeur y est ignoree, la largeur vient du pseudo-element.
+   *
+   * **Pourquoi ces tokens.** La poignée doit suivre le thème : une valeur
+   * écrite en dur passerait claire sur le navy et sombre sur le blanc, et
+   * aucun test de rendu ne le rattraperait. Les couleurs vivent donc à côté
+   * des autres, dans `:root` et dans `.dark`.
+   */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--scrollbar-thumb)) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--scrollbar-thumb));
+    border-radius: 9999px;
+    /* `background-clip: padding-box` + bordure transparente : la poignée garde
+       un anneau vide qui la détache de la piste même quand elle est courte. */
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--scrollbar-thumb-hover));
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /*
+   * Le survol ne fait bouger que la couleur. Une transition de couleur est sans
+   * risque pour la sensibilite vestibulaire, mais la preference reste respectee
+   * par construction : rien ne se declenche si l'utilisateur l'a demandee.
+   */
+  @media (prefers-reduced-motion: no-preference) {
+    *::-webkit-scrollbar-thumb {
+      transition: background-color 150ms ease;
+    }
   }
 
   * {
