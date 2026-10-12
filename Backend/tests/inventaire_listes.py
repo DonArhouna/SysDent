@@ -47,6 +47,12 @@ LISTES_VOLUMINEUSES = {
     "/api/v1/stock/fournisseurs",
     "/api/v1/utilisateurs",
     "/api/v1/audit",
+    # CDC 5.6 / 5.7 : la nomenclature et les organismes d'un cabinet croissent
+    # avec son activite, et un cabinet peut porter plusieurs milliers d'actes
+    # tarifes. Sans pagination, l'ecran de tarification chiffre l'integralite a
+    # chaque ouverture.
+    "/api/v1/tarification/actes",
+    "/api/v1/tarification/organismes",
 }
 
 #: Chemins explicitement des **vues bornees** ou des **referentiels**. Les
