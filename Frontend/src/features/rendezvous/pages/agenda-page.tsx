@@ -26,6 +26,7 @@ import { Can } from '@/components/auth/can'
 import { formatDateFr } from '@/lib/format'
 import { toast } from '@/stores/toast-store'
 import { useCabinetStore } from '@/stores/cabinet-store'
+import { possedePermission, useAuthStore } from '@/stores/auth-store'
 import { praticiensApi } from '@/features/praticiens/services/praticiens-api'
 import { nomComplet } from '@/features/praticiens/types'
 import { rendezvousApi } from '../services/rendezvous-api'
@@ -61,11 +62,26 @@ export function AgendaPage() {
   const [modalBlocageOpen, setModalBlocageOpen] = useState(false)
 
   // Praticiens
+  //
+  const profil = useAuthStore((e) => e.profil)
+  //
+  // **La liste des praticiens demande `PRATICIENS:READ`.** Un praticien qui n'a
+  // pas ce droit - profil restreint - ne peut pas la lire : l'appel repondait
+  // 403 a chaque ouverture de l'agenda, alors que l'agenda lui-meme est
+  // parfaitement autorise. Le 403 etait donc inutile et visible.
+  //
+  // Sans cette permission, on n'appelle rien et le filtre porte sur soi : pas
+  // de `praticien_id` dans la requete, et le serveur restreint l'agenda au
+  // compte connecte. C'est le comportement attendu d'un profil restreint, pas
+  // une degradation.
+  const litPraticiens = possedePermission(profil, 'PRATICIENS:READ')
+
   const { data: resPraticiens } = useQuery({
     queryKey: ['praticiens-agenda', cabinetActifId],
     queryFn: () => praticiensApi.lister(cabinetActifId),
+    enabled: litPraticiens,
   })
-  const praticiens = resPraticiens?.data ?? []
+  const praticiens = litPraticiens ? (resPraticiens?.data ?? []) : []
 
   // Données de l'agenda
   const { data: resAgenda, isLoading, isError, refetch } = useQuery({
@@ -189,19 +205,30 @@ export function AgendaPage() {
             className="rounded-lg border border-input bg-card px-3 py-1.5 text-xs text-foreground"
           />
 
-          <Select
-            value={praticienFiltreId}
-            onChange={(e) => setPraticienFiltreId(e.target.value)}
-            className="h-9 text-xs min-w-[180px]"
-          >
-            <option value="">Tous les praticiens</option>
-            {praticiens.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.titre ? `${p.titre} ` : 'Dr '}
-                {nomComplet(p)}
-              </option>
-            ))}
-          </Select>
+          {litPraticiens ? (
+            <Select
+              value={praticienFiltreId}
+              onChange={(e) => setPraticienFiltreId(e.target.value)}
+              className="h-9 text-xs min-w-[180px]"
+            >
+              <option value="">Tous les praticiens</option>
+              {praticiens.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.titre ? `${p.titre} ` : 'Dr '}
+                  {nomComplet(p)}
+                </option>
+              ))}
+            </Select>
+          ) : (
+            // Un profil restreint voit son agenda, et **seulement** le sien.
+            // Afficher « Tous les praticiens » sur une liste vide laisserait
+            // croire qu'il peut tout voir : il ne le peut pas, et l'appel
+            // serait refuse.
+            <span className="rounded-lg border border-border bg-muted px-3 py-1.5 text-xs text-muted-foreground">
+              Mon agenda
+              {profil ? ` - Dr ${profil.prenom} ${profil.nom}` : ''}
+            </span>
+          )}
         </div>
       </div>
 
@@ -232,7 +259,7 @@ export function AgendaPage() {
                         {indispo.fauteuil_numero ?? 'Fauteuil'}
                       </span>
                       <span className="text-muted-foreground block font-mono text-[11px]">
-                        {indispo.debut.slice(11, 16)} - {indispo.fin.slice(11, 16)} • {indispo.motif}
+                        {indispo.debut.slice(11, 16)} - {indispo.fin.slice(11, 16)} - {indispo.motif}
                       </span>
                     </div>
                     <Can permission="AGENDA:UPDATE">
@@ -335,7 +362,7 @@ export function AgendaPage() {
                               </span>
                             )}
                             {rdv.notes && (
-                              <span className="italic truncate max-w-xs">• {rdv.notes}</span>
+                              <span className="italic truncate max-w-xs">- {rdv.notes}</span>
                             )}
                           </div>
                         </div>
