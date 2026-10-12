@@ -582,9 +582,17 @@ BASES_PROTEGEES_INSTANCE_DE_TESTS = frozenset(
 #: `TEST_DATABASE_URL` pourrait etre redirige entre le demarrage et la fin.
 PORT_INSTANCE_DE_TESTS = 55436
 
-#: Chaque base creee par une fixture passe par ici. Le registre sert d'abord a
-#: etre Preuve : une base creee puis oubliee se voit.
-BASES_CREEES_PAR_LA_SESSION: list[str] = []
+#: Chaque base creee par une fixture passe par le registre defini plus haut
+#: (`BASES_CREEES_PAR_LA_SESSION`, un `set`).
+#:
+#: **Ne pas redeclarer ce nom ici.** Une seconde declaration l'ecrase : c'est
+#: exactement ce qui est arrive. `_creer_base` appelait alors `_enregistrer`,
+#: qui fait `.add` - sur une `list`. L'appel levait
+#: `AttributeError: 'list' object has no attribute 'add'` **apres** avoir cree
+#: la base et **avant** d'atteindre le `try` du `finally` : la base existait,
+#: n'etait pas enregistree, et personne ne la supprimait. Mesure : 16 bases
+#: par execution de tests plateforme, et 17 erreurs de setup qui etaient la
+#: meme cause. Le nom est unique, et son type aussi.
 
 
 async def creer_base_jetable(nom: str, *, migrer: bool = True) -> str:
@@ -618,7 +626,7 @@ async def creer_base_jetable(nom: str, *, migrer: bool = True) -> str:
     finally:
         await administration.dispose()
 
-    BASES_CREEES_PAR_LA_SESSION.append(nom)
+    BASES_CREEES_PAR_LA_SESSION.add(nom)
 
     if migrer:
         from src.core.migrations import upgrade_tenant_to_head
@@ -644,7 +652,7 @@ async def supprimer_base_jetable(nom: str) -> None:
     finally:
         await administration.dispose()
     if nom in BASES_CREEES_PAR_LA_SESSION:
-        BASES_CREEES_PAR_LA_SESSION.remove(nom)
+        BASES_CREEES_PAR_LA_SESSION.discard(nom)
 
 
 async def bases_presentes_sur_instance_de_tests() -> list[str]:
@@ -725,19 +733,42 @@ def _garde_fin_de_session():
     if not residuelles:
         return
 
+    # **Ce que CETTE session a cree, on le supprime.** Ce n'est pas un
+    # nettoyage a l'aveugle : le registre fait foi. On distingue donc deux
+    # cas, et c'est la distinction qui rend la garde acceptable :
+    #
+    # - une base **dans le registre** a ete creee par cette session. Quand son
+    #   `finally` n'a pas joue - fixture dont la dependante echoue au setup,
+    #   execution interrompue - elle reste. Elle est notre, on la supprime ;
+    # - une base **hors registre** est inconnue : elle peut venir d'un debug
+    #   ouvert a la main. On ne la touche pas, on la signale.
+    #
+    # Sans cette separation, la seule alternative etait de laisser 16 bases
+    # s'accumuler par execution de tests plateforme - mesure, 5 bases devenues
+    # 53 en trois executions.
+    connues = [nom for nom in residuelles if nom in BASES_CREEES_PAR_LA_SESSION]
+    inconnues = [nom for nom in residuelles if nom not in BASES_CREEES_PAR_LA_SESSION]
+
+    for nom in connues:
+        asyncio.run(supprimer_base_jetable(nom))
+
+    if not inconnues:
+        return
+
     nettoyer, refus = _cibles_de_nettoyage()
     if nettoyer:
-        for nom in residuelles:
+        for nom in inconnues:
             asyncio.run(supprimer_base_jetable(nom))
         return
     if refus:
         pytest.fail(f"\n  [garde] fin de session : {refus}\n", pytrace=False)
 
     pytest.fail(
-        "\n  [garde] fin de session : bases residuelles sur l'instance de tests\n"
-        + "".join(f"    - {nom}\n" for nom in residuelles)
-        + "\n  Elles n'ont pas ete supprimees : une base non reconnue peut etre\n"
-        "  un debug ouvert a la main. Pour les supprimer explicitement :\n\n"
+        "\n  [garde] fin de session : bases inconnues sur l'instance de tests\n"
+        + "".join(f"    - {nom}\n" for nom in inconnues)
+        + "\n  Elles ne sont pas dans le registre de cette session : elles peuvent\n"
+        "  venir d'un debug ouvert a la main, donc elles ne sont pas supprimees.\n"
+        "  Pour les supprimer explicitement :\n\n"
         "      pytest --nettoyer-instance-test\n",
         pytrace=False,
     )
