@@ -421,7 +421,7 @@ async def creer_organisme(
     request: Request,
     db: AsyncSession = Depends(get_tenant_db),
     current_user: Utilisateur = Depends(get_current_user),
-    _: bool = Depends(require_permissions("ASSURANCE:WRITE")),
+    _: bool = Depends(require_permissions("TARIFS:WRITE")),
 ):
     ip, ua = _ctx(request)
     organisme = await OrganismeService.creer(
@@ -454,7 +454,7 @@ async def modifier_organisme(
     request: Request,
     db: AsyncSession = Depends(get_tenant_db),
     current_user: Utilisateur = Depends(get_current_user),
-    _: bool = Depends(require_permissions("ASSURANCE:WRITE")),
+    _: bool = Depends(require_permissions("TARIFS:WRITE")),
 ):
     ip, ua = _ctx(request)
     organisme = await OrganismeService.obtenir(db, organisme_id)
@@ -476,7 +476,7 @@ async def supprimer_organisme(
     organisme_id: uuid.UUID,
     db: AsyncSession = Depends(get_tenant_db),
     current_user: Utilisateur = Depends(get_current_user),
-    _: bool = Depends(require_permissions("ASSURANCE:WRITE")),
+    _: bool = Depends(require_permissions("TARIFS:WRITE")),
 ):
     """Refuse si des droits de patients y sont rattaches."""
     organisme = await OrganismeService.obtenir(db, organisme_id)
@@ -532,7 +532,7 @@ async def creer_droit_patient(
     request: Request,
     db: AsyncSession = Depends(get_tenant_db),
     current_user: Utilisateur = Depends(get_current_user),
-    _: bool = Depends(require_permissions("ASSURANCE:WRITE")),
+    _: bool = Depends(require_permissions("ASSURANCE:WRITE_PATIENT")),
 ):
     ip, ua = _ctx(request)
     droit = await DroitPriseEnChargeService.creer(
@@ -571,7 +571,7 @@ async def modifier_droit_patient(
     request: Request,
     db: AsyncSession = Depends(get_tenant_db),
     current_user: Utilisateur = Depends(get_current_user),
-    _: bool = Depends(require_permissions("ASSURANCE:WRITE")),
+    _: bool = Depends(require_permissions("ASSURANCE:WRITE_PATIENT")),
 ):
     ip, ua = _ctx(request)
     droit = await DroitPriseEnChargeService.obtenir(db, droit_id)
@@ -609,7 +609,7 @@ async def supprimer_droit_patient(
     droit_id: uuid.UUID,
     db: AsyncSession = Depends(get_tenant_db),
     current_user: Utilisateur = Depends(get_current_user),
-    _: bool = Depends(require_permissions("ASSURANCE:WRITE")),
+    _: bool = Depends(require_permissions("ASSURANCE:WRITE_PATIENT")),
 ):
     droit = await DroitPriseEnChargeService.obtenir(db, droit_id)
     await DroitPriseEnChargeService.supprimer(db, droit)

@@ -50,6 +50,18 @@ ACTION_SIGN = "SIGN"
 # point de vue de qui peut le faire : les separer ne produirait que des
 # permissions que personne n'accorde isolement.
 ACTION_WRITE = "WRITE"
+# `WRITE_PATIENT` est la seule action dont le nom porte son **portee**, et c'est
+# deliberé. Un `ASSURANCE:WRITE` unique couvrait deux gestes sans rapport :
+# créer un organisme payeur - un referentiel du cabinet, dont une erreur se
+# propage a tous les patients - et declarer le droit d'un patient, qui ne
+# concerne qu'une fiche. Separer les deux retire au secretariat la possibilite
+# de creer un organisme sans lui retirer la saisie de la carte de mutuelle a
+# l'accueil.
+#
+# Nommage : `WRITE_PATIENT` et non `PATIENT:WRITE`, parce que la resource
+# reste `ASSURANCE` et que c'est la **portee** qui change. Le format du reste du
+# catalogue est "MODULE:ACTION".
+ACTION_WRITE_PATIENT = "WRITE_PATIENT"
 
 
 def p(module: str, action: str) -> Permission:
@@ -128,8 +140,19 @@ CATALOGUE_PERMISSIONS: List[Permission] = [
     p(MODULE_TARIFS, ACTION_READ),
     p(MODULE_TARIFS, ACTION_WRITE),
     # -- CDC 5.7 : prise en charge --------------------------------------------
+    # `READ` : tout le monde du cabinet, y compris le praticien qui doit savoir
+    # qui couvre quoi **avant** de soin.
+    #
+    # `WRITE_PATIENT` : declarer le droit d'un patient. Secrétariat et admin.
+    # C'est la seule écriture d'un droit.
+    #
+    # `WRITE` n'existe plus ici. Créer ou renommer un organisme est un geste de
+    # **référentiel**, et il est couvert par `TARIFS:WRITE` avec la nomenclature
+    # et ses tarifs : administrateur du cabinet seul. Garder `ASSURANCE:WRITE`
+    # aurait laissé le secariat créer des organismes alors que sa mission est de
+    # saisir une carte de mutuelle.
     p(MODULE_ASSURANCE, ACTION_READ),
-    p(MODULE_ASSURANCE, ACTION_WRITE),
+    p(MODULE_ASSURANCE, ACTION_WRITE_PATIENT),
 ]
 
 # Rôles qui n'ont aucun contrôle de permission (accès complet par conception).
@@ -235,13 +258,15 @@ MATRICE_ROLES: Dict[str, List[Permission]] = {
         p(MODULE_FACTURATION, ACTION_READ),
         p(MODULE_FACTURATION, ACTION_CREATE),
         p(MODULE_STOCK, ACTION_READ),
-        # L'accueil enregistre la carte de mutuelle du patient au moment ou il
-        # cree sa fiche. Il ne declare donc QUE la prise en charge : le droit
-        # d'ecrire sur les organismes et sur les taux reste au cabinet, parce
-        # qu'un taux errone se reproduit sur toutes les factures du jour.
+        # L'accueil enregistre la carte de mutuelle du patient au moment où il
+        # cree sa fiche. Il ne declare QUE le droit d'un patient
+        # (`ASSURANCE:WRITE_PATIENT`) : pas le taux de reference d'un
+        # organisme, pas la creation d'un organisme. Un taux errone se reproduit
+        # sur toutes les factures du jour ; une organisms faux, sur tous les
+        # patients qui la designent.
         p(MODULE_TARIFS, ACTION_READ),
         p(MODULE_ASSURANCE, ACTION_READ),
-        p(MODULE_ASSURANCE, ACTION_WRITE),
+        p(MODULE_ASSURANCE, ACTION_WRITE_PATIENT),
     ],
     # Comptable : lit et corrige la facturation, aucun accès au dossier médical.
     "COMPTABLE": [
