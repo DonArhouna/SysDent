@@ -4,23 +4,19 @@
 ## ACCÈS
 Le cabinet `sysdent_tenant_clinique_cabinet_sn_5bd215` est restauré, migré à la tête `e8b2c4a7d1e5`,
 login **200**. Aucun compte réel n'a jamais été utilisé. Le 500 du login avait **deux causes** : le
-conteneur arrêté, action du propriétaire, et deux défauts de code, une connexion pas encapsulée par
-SQLAlchemy et une erreur de schéma **deux niveaux** sous `ProgrammingError` : 500 -> 503.
+conteneur arrêté, et deux défauts de code, une connexion pas encapsulée par SQLAlchemy et une erreur de
+schéma **deux niveaux** sous `ProgrammingError` : 500 -> 503.
 ## Défauts d'interface, tous nommés
-Cinq 422 et un 403, une famille : **le garde existait ailleurs dans le fichier et n'était pas
-branché**. Prouvé par lecture, vérifié par test.
-- Odontogramme : cinq états écrits en dur, dont `SOIGNEE` que `ETATS_DENT` refuse. **L'état par
-  défaut étant accepté, il fallait *changer* une lésion** pour y tomber ; les états viennent de
-  `referentielEtats`. Quatre faces hors nomenclature, `face` devient `CodeFace` : une faute devient
-  une erreur.
-- Consultation : `cabinet_id: ''` quand aucun site n'est résolu, impossible sans `CABINETS:READ` ;
-  motif vide, refusé par `min_length=2`.
+Cinq 422 et un 403, une famille : **le garde existait ailleurs dans le fichier et n'était pas branché**.
+Odontogramme : cinq états écrits en dur, dont `SOIGNEE` que `ETATS_DENT` refuse, et l'état par défaut
+étant accepté, il fallait *changer* une lésion pour y tomber ; `face` devient `CodeFace`. Consultation :
+`cabinet_id: ''` quand aucun site n'est résolu, motif vide refusé par `min_length=2`.
 ## Tests : instance dédiée
 Instance `sysdent_test_pg`, port **55436**, **tmpfs**, base-témoin `sysdent_instance_test_marker`.
-`settings` réorienté **avant tout import de `src`**, garde vérifiant que la redirection a pris ;
-quatre refus cumulatifs. **Fuite de bases** : `BASES_CREEES_PAR_LA_SESSION` était déclaré deux fois, un
-`set` puis une `list` ; le second écrasait le premier, d'où 16 bases par exécution, ramenées à **5 avant et
-après trois exécutions, 0 erreur.** Les tests de supervision **fabricent leurs propres cas**.
+`settings` réorienté **avant tout import de `src`**, garde vérifiant que la redirection a pris.
+**Fuite de bases** : `BASES_CREEES_PAR_LA_SESSION` était déclaré deux fois, un `set` puis une `list` ;
+le second écrasait le premier, d'où 16 bases par exécution, ramenées à **5 avant et après trois
+exécutions, 0 erreur.** Les tests de supervision **fabricent leurs propres cas**.
 ## Tarification et prise en charge : chaînes livrées, rien d'appliqué
 `b3d7f1a9c2e4` (4 tables de tarification et de prise en charge) et `c4e7a2b6d9f1` (catalogue :
 `ASSURANCE:WRITE` devient `ASSURANCE:WRITE_PATIENT`) sont écrits, relus et vérifiés sur base
@@ -31,11 +27,10 @@ jetable. **Aucune n'est appliquée à une base réelle.**
 `b3d7f1a9c2e4.down_revision` vaut bien `e8b2c4a7d1e5`, **rien ne s'intercale**, et `c4e7a2b6d9f1`
 **enchaine directement après** : `upgrade head` l'appliquerait, il faut nommer la cible. 
 ## Sauvegarde, mesures et dossier de décision, le 12/10
-Sauvegarde fraîche **hors dépôt et hors synchronisation**, volume local `C:` :
-`C:\sauvegardes_sysdent\cabinet_5bd215_2026-10-12_1844\`. Archive `cabinet_5bd215.dump`, 262.6 Ko,
-code de sortie 0, **`pg_restore -l` lisible, 399 entrées**, SHA-256
-`1818375ceabe64141bbfeb2a78aaf095848af02385d1b49dd6903a77ab97f6b3`. Les 4 tables de tarification y
-sont absentes : l'archive confirme l'état. Dumps antérieurs intouchés.
+**Sauvegarde, mesures et dossier de décision, le 12/10.** Sauvegarde fraîche **hors dépôt et hors
+synchronisation**, volume local `C:` : `C:\sauvegardes_sysdent\cabinet_5bd215_2026-10-12_1844\`.
+Archive `cabinet_5bd215.dump`, 262.6 Ko, code de sortie 0, **`pg_restore -l` lisible, 399 entrées**,
+SHA-256 `1818375ceabe64141bbfeb2a78aaf095848af02385d1b49dd6903a77ab97f6b3`. Dumps antérieurs intouchés.
 
 **Référence avant écriture**
 : `e8b2c4a7d1e5`, 49 tables, **patients 33, utilisateurs 11, consultations 31, factures 43**, 53
@@ -60,6 +55,11 @@ Réessayer » et sans bouton d'écriture. Prouvé : 8 tests backend et 6 tests c
 mutation rouge, plus preuve HTTP 503 sur base jetable de l'instance de test. **Aucun rendu
 navigateur vérifié.** Antérieurement : 32 tests backend, 62 client, HTTP réel 14/14. Voir
 `docs/TARIFICATION.md`.
+**Route Stock hors de la coquille, corrigée.** `/stock/fournisseurs` était déclarée sans `AppShell` :
+la page prenait tout l'écran, sans sidebar ni navbar. Une seule route sur trois, `/stock` et
+`/stock/commandes` étant correctes, et il n'y en a pas d'autres : produits, mouvements et alertes sont
+des onglets de `StockPage`. Corrigé sans toucher au contenu. Test structurel sur `App.tsx`, rouge avant,
+et rouge de nouveau dès qu'on retire l'enveloppe de `/stock/commandes`. **Rendu non vérifié.**
 ## Reste à faire
 1. **Catalogue des permissions, correctif écrit, non appliqué.** L'écran Rôles et
    Permissions rend `GET /rbac/permissions`, qui lit la table `permissions` : sur le cabinet,
