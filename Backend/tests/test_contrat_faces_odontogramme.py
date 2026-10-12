@@ -158,7 +158,54 @@ def test_les_etats_proposes_par_l_interface_sont_tous_valides() -> None:
         assert valider_etat_dent(code) == code
 
 
+def test_le_referentiel_couvre_tous_les_etats_du_serveur() -> None:
+    """
+    Le tiroir puise ses états dans le référentiel. Ce test vérifie donc que le
+    référentiel lui-même ne peut pas proposer une valeur refusée.
+
+    C'est l'invariant qui remplace la liste écrite en dur : tant que les deux
+    tables sont identiques, aucun état proposé ne peut être refusé.
+    """
+    from src.common.dentaire import ETATS_DENT, valider_etat_dent
+    from src.modules.odontogramme.services import LIBELLES_ETATS
+
+    ecart = sorted(set(LIBELLES_ETATS) ^ set(ETATS_DENT))
+    assert ecart == [], (
+        f"le referentiel et la table de validation divergent sur : {ecart}. "
+        f"Un praticien pourrait choisir un etat que l'enregistrement refuse."
+    )
+
+    for code in LIBELLES_ETATS:
+        assert valider_etat_dent(code) == code
+
+
 def etat_par_defaut() -> str:
+    """L'état d'une face non modifiee, tel que le tiroir l'initialise."""
+    source = TIROIR.read_text(encoding="utf-8")
+    trouve = re.search(
+        r"initialFaces\[f\.code\]\s*=\s*found\s*\?\s*found\.etat\s*:\s*'([^']+)'", source
+    )
+    assert trouve, "l'etat par defaut est introuvable dans dent-drawer.tsx"
+    return trouve.group(1)
+
+
+def test_le_tiroir_utilise_le_referentiel_pour_les_faces() -> None:
+    """
+    Le remede de fond : une seule source de verite.
+
+    Le composant recoit deja `referentielEtats` - c'est lui qui alimente la liste
+    de l'etat global. Les faces doivent lire la meme source, sinon la liste
+    codee en dur peut diverger a nouveau, silencieusement.
+    """
+    source = TIROIR.read_text(encoding="utf-8")
+
+    assert "referentielEtats.map" in source, (
+        "les etats doivent venir du referentiel serveur, comme ceux de l'etat global"
+    )
+    # La liste codee en dur disparait : plus aucune option ecrite a la main.
+    assert not re.search(r'<option value="[A-Z_]+">', source), (
+        "il reste une liste d'etats codee en dur ; elle peut diverger du serveur"
+    )
     """L'état d'une face non modifiee, tel que le tiroir l'initialise."""
     source = TIROIR.read_text(encoding="utf-8")
     trouve = re.search(

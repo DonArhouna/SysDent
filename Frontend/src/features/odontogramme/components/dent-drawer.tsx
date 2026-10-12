@@ -178,11 +178,22 @@ export function DentDrawer({
                   onChange={(e) => setFaces({ ...faces, [f.code]: e.target.value })}
                   className="w-1/2 rounded-lg border border-input bg-card px-2.5 py-1 text-xs text-foreground"
                 >
-                  <option value="SAINE">Saine</option>
-                  <option value="CARIE_DEBUTANTE">Carie débutante</option>
-                  <option value="CARIE_AVANCEE">Carie avancée</option>
-                  <option value="SOIGNEE">Obturation / Composite</option>
-                  <option value="COURONNE">Couronne</option>
+                  {/*
+                    **Les etats viennent du referentiel serveur**, comme ceux
+                    de l'etat global. Cette liste etait ecrite en dur, et
+                    contenait une valeur que le serveur refuse : le
+                    praticien choisissait « Obturation / Composite », et
+                    l'enregistrement repondait 422. Le defaut passant, rien
+                    ne laissait deviner que le defaut etait une seule option.
+
+                    Une liste codee en dur diverge : le referentiel est deja
+                    la, et c'est lui qui fait autorite.
+                  */}
+                  {referentielEtats.map((etat) => (
+                    <option key={etat.code} value={etat.code}>
+                      {etat.libelle}
+                    </option>
+                  ))}
                 </select>
               </div>
             ))}
