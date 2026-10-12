@@ -36,10 +36,9 @@ relus et vérifiés sur base jetable. **Aucune n'est appliquée à une base rée
 seule tête** (`c4e7a2b6d9f1`), **aucune branche**. `b3d7f1a9c2e4.down_revision`
 vaut bien `e8b2c4a7d1e5`, **rien ne s'intercale**, et `c4e7a2b6d9f1` **enchaine
 directement après** : `upgrade head` l'appliquerait, il faut nommer la cible.
-**Instance de développement.** Registre : **122 cabinets `ACTIVE`, 19 bases,
-5 dont la base existe, 117 sans base.** Aucune base de cabinet n'est
-joignable, avec le même rôle et le même mot de passe que le master :
-règle d'accès par base, pas secret erroné.
+**Instance de développement.** Registre : **122 cabinets `ACTIVE`, 19 bases, 5
+dont la base existe, 117 sans base.** Aucune base de cabinet n'est joignable,
+même avec le rôle et le mot de passe du master : règle d'accès par base.
 ## Sauvegarde, mesures et dossier de décision, le 12/10
 Sauvegarde fraîche **hors dépôt et hors synchronisation**, volume local `C:` :
 `C:\sauvegardes_sysdent\cabinet_5bd215_2026-10-12_1844\`. Archive
@@ -57,15 +56,16 @@ ici. Mesures complètes, sans donnée personnelle : `MESURES_ETAT_ACTUEL.txt`.
 dossier. Motif, chemin de l'exécutable bloqué, commande nommant la cible,
 garanties, exclusions. Aucun mot de passe ni identifiant : accès par le
 socket local du conteneur `sysdent_s0b`.
-**Blocage d'exécution** : `alembic.exe` bloqué par une politique de contrôle
-d'application chez le propriétaire ; contournement exclu, ni copie d'exécutable
-ni modification de politique. **Aucune commande Alembic tentée.**
+**Tentative refusée.** Autorisation écrite reçue le 12/10, puis `alembic.exe`
+bloqué par la stratégie de contrôle d'application du poste, sans contournement.
+**Base intacte** : `e8b2c4a7d1e5`, 49 tables, **11 utilisateurs, 33 patients, 31
+consultations, 43 factures**, `tarifs_actes` absente. HTTP non fait.
 **Preuves** : 32 tests backend dont le tarif figé (mutation : `15000.00` au
 lieu de `7500.00`), 10 de matrice à deux mutations rouges, 62 client verts,
 HTTP réel 14/14. Détail : `docs/TARIFICATION.md`.
 ## Reste à faire
-1. **Propriétaire : décider la méthode d'exécution.** Dossier prêt, rien
-   d'appliqué, en attente d'une décision écrite.
+1. **Propriétaire : trancher l'exécution.** Autorisation écrite reçue, mais la
+   politique bloque l'exécutable : exécution manuelle, ou politique levée.
 2. **Cible explicite obligatoire** : `upgrade head` emporterait aussi
    `c4e7a2b6d9f1`, hors périmètre de la première application.
 3. **Périmètre réel avant toute migration** : 5 cabinets ont une base sur 122
