@@ -95,16 +95,30 @@ export function ConsultationsListPage() {
       return
     }
 
+    // **Le motif est obligatoire et fait au moins deux caractères.** Le
+    // laisser vide partait en 422 : le serveur répond « String should have at
+    // least 2 characters », sans dire que c'est le champ motif qu'il a
+    // trouvé vide. On le dit ici, à l'écran, là où la saisie se fait.
+    if (motif.trim().length < 2) {
+      toast.error('Veuillez saisir un motif (2 caractères minimum).')
+      return
+    }
+
     try {
       setLoadingDemarrage(true)
-      const cabCible = cabinetId || cabinetActifId || (cabinets[0]?.id ?? '')
+      const cabCible = cabinetId || cabinetActifId || cabinets[0]?.id || ''
       const res = await consultationsApi.demarrer({
         patient_id: patientId,
         // Chaîne vide = aucun profil attribué. L'envoyer telle quelle ferait
         // échouer la validation UUID côté serveur.
+        //
+        // **Le même piège que praticien_id, laissé ouvert sur cabinet_id** :
+        // sans site résolu, `?? ''` produisait une chaîne vide, et la
+        // validation UUID la refusait en 422. Le propriétaire ne pouvait pas
+        // démarrer une consultation alors que le champ n'était pas le sien.
+        cabinet_id: cabCible || undefined,
         praticien_id: praticienId || undefined,
-        cabinet_id: cabCible,
-        motif,
+        motif: motif.trim(),
       })
       toast.success('Consultation démarrée avec succès.')
       setModalDemarrerOpen(false)
