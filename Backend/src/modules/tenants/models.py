@@ -4,6 +4,7 @@ import enum
 import uuid
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Enum,
@@ -559,7 +560,7 @@ class ChartingParodontal(TenantBase, UUIDMixin, TimestampMixin):
     Charting parodontal d'une dent : sondage en 6 points et indices associés.
 
     `sondages` est un JSONB : [{"site": "MV", "profondeur": 3}, ...] selon le
-    dictionnaire §5.2. On conserve l'ensemble des mesures d'un même relevé
+    dictionnaire section 5.2. On conserve l'ensemble des mesures d'un même relevé
     comme une seule ligne, ce qui garantit qu'elles sont contemporaries.
     """
 
@@ -690,6 +691,180 @@ class ActeRealise(TenantBase, UUIDMixin, TimestampMixin):
 
 
 # ==============================================================================
+# TARIFICATION PAR CABINET (CDC 5.6)
+#
+# `actes_nomenclature.tarif_base` ne porte qu'**un** montant par acte. Le cahier
+# des charges demande des tarifs parametrables : deux patients peuvent payer
+# differemment le meme acte selon leur situation. Le detail est donc porte par
+# deux tables, et non par une colonne de plus sur l'acte.
+#
+# Decoupage retenu :
+#   - `categories_patient` : les situations tarifaires du cabinet. `standard`
+#     existe toujours, pour tout cabinet, et porte le tarif de reference ;
+#   - `tarifs_actes` : le montant d'un acte pour une categorie.
+#
+# `tarif_base` n'est pas supprime : il reste la colonne lue par la facturation
+# existante et par la reprise de donnees. Une revision de tarif ecrit dans
+# `tarifs_actes` et laisse `tarif_base` intact tant que la facturation n'a pas
+# ete migratee - c'est une transition, pas un dual permanent. Voir
+# `docs/PROGRESS.md`.
+# ==============================================================================
+
+
+class CategoriePatient(TenantBase, UUIDMixin, TimestampMixin):
+    """
+    Categorie tarifaire d'un patient (cabinet dependant).
+
+    Le cabinet decide de ses categories : `standard`, `conventionne`, `tarif
+    ameli`... Le code `standard` est cree automatiquement pour tout cabinet, parce
+    que tout acte doit avoir un tarif de reference meme si personne n'a configure
+    de variante.
+
+    Le code est la clef fonctionnelle et non l'identifiant : un patient porte une
+    categorie, et les tarifs s'y rattachent. Un `id` UUID serait inutilisable
+    dans une interface ou dans une facture.
+    """
+
+    __tablename__ = "categories_patient"
+
+    code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    libelle: Mapped[str] = mapped_column(String(200), nullable=False)
+    #: Ordre d'affichage. Un `0` place la categorie en tete.
+    ordre: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
+    #: La categorie de reference. Exactement une par cabinet : c'est ce qui
+    #: permet de creer un acte sans avoir configure quoi que ce soit.
+    par_defaut: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_categories_patient_code"),
+        CheckConstraint("ordre >= 0", name="ck_categories_patient_ordre"),
+    )
+
+
+class TarifActe(TenantBase, UUIDMixin, TimestampMixin):
+    """
+    Montant d'un acte pour une categorie de patient.
+
+    Un acte a toujours au moins un tarif - celui de `standard`. Sans ligne
+    correspondante, la facturation lit `actes_nomenclature.tarif_base`.
+
+    L'unicite `(acte_id, categorie_code)` est portee par la base : deux
+    secretaires qui tarifent le meme acte au meme instant passent par deux
+    chemins differents, et le second doit echouer, pas ecraser le premier.
+    """
+
+    __tablename__ = "tarifs_actes"
+
+    acte_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("actes_nomenclature.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    # Reference au **code** et non a l'id : un tarif se lit et se saisit par code
+    # de categorie, et c'est ce code qui apparaitra sur une facture. `RESTRICT` :
+    # une categorie utilisee ne peut pas disparaitre, sinon ses tarifs
+    # pointeraient dans le vide sans que rien ne le signale.
+    categorie_code: Mapped[str] = mapped_column(
+        String(50),
+        ForeignKey("categories_patient.code", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    montant: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+
+    acte: Mapped[ActeNomenclature] = relationship("ActeNomenclature")
+
+    __table_args__ = (
+        UniqueConstraint("acte_id", "categorie_code", name="uq_tarifs_actes_acte_categorie"),
+        CheckConstraint("montant >= 0", name="ck_tarifs_actes_montant_positif"),
+    )
+
+
+# ==============================================================================
+# PRISE EN CHARGE (CDC 5.7)
+#
+# Assurance et mutuelle sont deux sources, pas deux modules : les
+# donnees stockees sont identiques - un organisme, un numero de police, un taux.
+# Les separer en deux tables obligerait a dupliquer le schema et les regles pour
+# une difference qui n'est qu'un libelle. `type_organisme` porte la difference.
+# ==============================================================================
+
+
+class TypeOrganismeEnum(str, enum.Enum):
+    """Nature de l'organisme : regime obligatoire ou mutuelle complementaire."""
+
+    ASSURANCE = "ASSURANCE"
+    MUTUELLE = "MUTUELLE"
+
+
+class OrganismeAssurance(TenantBase, UUIDMixin, TimestampMixin):
+    """
+    Organisme payeur connu du cabinet (assurance, mutuelle, PSP...).
+
+    Le referentiel est **par cabinet**, pas national : un cabinet qui ne traite
+    pas la Songu ne doit pas avoir a la saisir.
+    """
+
+    __tablename__ = "organismes_assurance"
+
+    code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    nom: Mapped[str] = mapped_column(String(200), nullable=False)
+    type_organisme: Mapped[TypeOrganismeEnum] = mapped_column(
+        Enum(TypeOrganismeEnum, name="typeorganismeenum", values_callable=lambda e: [x.value for x in e]),
+        nullable=False,
+        default=TypeOrganismeEnum.ASSURANCE,
+    )
+    actif: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    __table_args__ = (UniqueConstraint("code", name="uq_organismes_assurance_code"),)
+
+
+class DroitPriseEnCharge(TenantBase, UUIDMixin, TimestampMixin):
+    """
+    Droit ouvert par un patient sur un organisme.
+
+    Un patient peut avoir plusieurs droits - une assurance obligatoire et une
+    mutuelle complementaire. `priorite` dit lequel s'applique en premier quand
+    les deux se recouvrent ; c'est une decision du cabinet, pas une deduction
+    du serveur.
+
+    `taux_prise_en_charge` est un pourcentage de 0 a 100, porte par un `CHECK`
+    en base : une valeur hors bornes doit etre refusee par PostgreSQL, pas par
+    le seul validateur du formulaire.
+    """
+
+    __tablename__ = "droits_prise_en_charge"
+
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("patients.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    organisme_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("organismes_assurance.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    numero_police: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    taux_prise_en_charge: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
+    #: 1 = principal. Deux droits de meme priorite sur le meme patient sont
+    #: acceptes : c'est l'appelant qui tranche, et aucun code ne peut le deviner.
+    priorite: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    actif: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    organisme: Mapped[OrganismeAssurance] = relationship("OrganismeAssurance")
+
+    __table_args__ = (
+        CheckConstraint(
+            "taux_prise_en_charge >= 0 AND taux_prise_en_charge <= 100",
+            name="ck_droits_prise_en_charge_taux_dans_0_100",
+        ),
+        CheckConstraint("priorite >= 1", name="ck_droits_prise_en_charge_priorite"),
+    )
+
+
+# ==============================================================================
 # RENDEZ-VOUS & AGENDA (RG09)
 # ==============================================================================
 
@@ -803,7 +978,7 @@ class CreneauFauteuil(TenantBase, UUIDMixin, TimestampMixin):
     """
     Occupation d'un fauteuil sur une plage horaire — toutes causes confondues.
 
-    ⚠️ Table unique pour l'occupation, et c'est délibéré. Un rendez-vous pose
+    ATTENTION : Table unique pour l'occupation, et c'est délibéré. Un rendez-vous pose
     une ligne `motif = RENDEZ_VOUS` avec `rendez_vous_id` renseigné ; un fauteuil
     hors service en pose une avec `rendez_vous_id = NULL` et un motif de
     maintenance. La contrainte d'exclusion porte donc sur CETTE table, et couvre
@@ -967,7 +1142,7 @@ class Facture(TenantBase, UUIDMixin, TimestampMixin):
     statut: Mapped[StatutFactureEnum] = mapped_column(Enum(StatutFactureEnum), default=StatutFactureEnum.EMISE, nullable=False, index=True)
     date_emission: Mapped[date] = mapped_column(Date, default=date.today, nullable=False)
     date_echeance: Mapped[date | None] = mapped_column(Date, nullable=True)
-    # Traçabilité (MLD §4.8) : le praticien du soin à l'origine de la facture
+    # Traçabilité (MLD section 4.8) : le praticien du soin à l'origine de la facture
     # (null sur une vente libre) et l'agent qui a émis le document.
     praticien_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("praticiens.id"), nullable=True)
     emis_par_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("utilisateurs.id"), nullable=True)
@@ -1002,7 +1177,7 @@ class Paiement(TenantBase, UUIDMixin, TimestampMixin):
     reference: Mapped[str | None] = mapped_column(String(100), nullable=True) # Ref transaction Wave/OM/Chèque
     recu_numero: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     date_paiement: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
-    # Agent de caisse qui a encaissé (MLD §4.8 : #enregistre_par).
+    # Agent de caisse qui a encaissé (MLD section 4.8 : #enregistre_par).
     enregistre_par_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("utilisateurs.id"), nullable=True)
     # Email fige au moment de l'encaissement : un compte supprime doit pas
     # emporter la preuve de qui a pris l'argent (meme raison que sur
