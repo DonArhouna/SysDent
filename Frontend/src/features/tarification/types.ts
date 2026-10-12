@@ -20,26 +20,33 @@ export const CODE_CATEGORIE_STANDARD = 'standard'
 export const PERM_TARIFS_WRITE = 'TARIFS:WRITE'
 export const PERM_TARIFS_READ = 'TARIFS:READ'
 export const PERM_ASSURANCE_READ = 'ASSURANCE:READ'
-export const PERM_ASSURANCE_WRITE = 'ASSURANCE:WRITE'
+/**
+ * Ecriture d'un **droit de prise en charge**, pour un patient donne.
+ *
+ * Ce n'est pas la meme chose qu'ecrire un organisme, et la confusion a
+ * reellement existe cote serveur : un `ASSURANCE:WRITE` unique couvrait les
+ * deux. Le secretariat pouvait donc creer un organisme payeur - un referentiel
+ * dont une erreur se propage a tous les patients - alors que sa mission est de
+ * saisir une carte de mutuelle.
+ *
+ * Le droit a ete separe : `ASSURANCE:WRITE_PATIENT` couvre le droit d'un
+ * patient, un organisme exige `TARIFS:WRITE` comme la nomenclature.
+ */
+export const PERM_ASSURANCE_WRITE = 'ASSURANCE:WRITE_PATIENT'
 
 /**
  * Ecriture d'un **organisme payeur**, et non d'un droit de patient.
  *
- * Ce n'est pas `ASSURANCE:WRITE`. Un organisme est un referentiel du cabinet,
- * comme la nomenclature : le creer ou le renommer change ce que tous les
- * patients pourront designer, et une erreur se propage a chaque facture. Un
+ * Ce n'est pas `ASSURANCE:WRITE_PATIENT`. Un organisme est un referentiel du
+ * cabinet, comme la nomenclature : le creer ou le renommer change ce que tous
+ * les patients pourront designer, et une erreur se propage a chaque facture. Un
  * droit de prise en charge, lui, ne concerne qu'une fiche.
  *
  * Le separateur utilise ici est donc `TARIFS:WRITE`, accorde a `ADMIN_CABINET`
- * seul. Le secretariat saisit la carte de mutuelle d'un patient a l'accueil, il
- * ne touche pas au referentiel des organismes.
- *
- * **Ecart assume, et a arbitrer.** Le backend accorde aujourd'hui
- * `ASSURANCE:WRITE` au secretariat sur **toutes** les routes d'assurance,
- * organismes compris. Ce module est donc plus strict que le serveur : il
- * n'affiche pas un bouton que le serveur accepterait. C'est deliberé - le
- * proprietaire a tranche que le secretariat n'ecrit pas sur les organismes - et
- * l'ecart est signale pour arbitrage, pas masque.
+ * seul, et c'est **le separateur que le serveur verifie** sur ces routes depuis
+ * la matrice validee. Le client n'est plus en avant du serveur : les deux sont
+ * d'accord. `test_matrice-assurance-alignee.test.ts` echoue des que l'un des
+ * deux change.
  */
 export const PERM_ORGANISMES_WRITE = PERM_TARIFS_WRITE
 
