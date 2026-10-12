@@ -242,6 +242,12 @@ export function DashboardPage() {
   const cabinets = useQuery({
     queryKey: ['stats', 'cabinets'],
     queryFn: () => api.get<ApiReponse<Cabinet[]>>('/cabinets'),
+    // **Le garde existait, il n'etait pas branche.** `litCabinets` est calcule
+    // ligne 205 et sert ailleurs sur cette page ; cette requete, elle, partait
+    // inconditionnellement. Un profil sans `CABINETS:READ` - praticien
+    // restreint - recevait donc un 403 a chaque ouverture du tableau de bord,
+    // sans qu'aucune donnee du tableau ne soit concernee.
+    enabled: litCabinets,
   })
 
   const encaisseJour = useMemo(() => {
@@ -401,8 +407,8 @@ export function DashboardPage() {
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold">{cabinet.nom}</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {cabinet.ville ?? 'Localisation non renseignée'} · {cabinet.nb_salles}{' '}
-                      salle(s) · {cabinet.nb_fauteuils_actifs} fauteuil(s) ·{' '}
+                      {cabinet.ville ?? 'Localisation non renseignée'} - {cabinet.nb_salles}{' '}
+                      salle(s) - {cabinet.nb_fauteuils_actifs} fauteuil(s) -{' '}
                       {cabinet.nb_praticiens_actifs} praticien(s)
                     </p>
                   </div>

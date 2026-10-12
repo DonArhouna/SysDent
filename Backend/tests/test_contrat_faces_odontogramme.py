@@ -107,3 +107,62 @@ def test_le_serveur_accepte_la_face_du_client(face: str) -> None:
 
     assert valider_face(face) == face
     assert valider_face(face.lower()) == face, "la normalisation doit rester valable"
+
+
+def test_le_corps_du_client_passe_la_validation() -> None:
+    """
+    Le test qui répond à « le 422 est-il encore possible ? ».
+
+    Un 422 naît de la validation d'entrée, **avant** tout accès à la base. On
+    construit donc le modèle que la route utilise avec le corps exact produit
+    par le tiroir, sans base ni patient. Si ce corps passe, le 422 ne peut pas
+    venir de ce corps-là : il vient d'un autre.
+    """
+    from pydantic import ValidationError
+
+    from src.modules.odontogramme.schemas import FacesMiseAJour
+
+    corps = {
+        "faces": [{"face": code, "etat": etat_par_defaut()} for code in _codes_du_client()]
+    }
+
+    try:
+        model = FacesMiseAJour.model_validate(corps)
+    except ValidationError as exc:
+        details = "; ".join(
+            f"{'.'.join(str(p) for p in e['loc'])} : {e['msg']}" for e in exc.errors()
+        )
+        pytest.fail(f"le corps du client est refuse par le serveur : {details}")
+
+    assert len(model.faces) == len(FACES_DENT)
+
+
+def test_les_etats_proposes_par_l_interface_sont_tous_valides() -> None:
+    """
+    L'interface propose ses états depuis `LIBELLES_ETATS`, le serveur valide
+    contre `ETATS_DENT`. Ce sont deux tables **séparées** : si la première
+    contenait une valeur absente de la seconde, le praticien pourrait choisir
+    un état que l'enregistrement refuse — un 422 sur un simple clic.
+
+    Le contrat le garantit ; ce test le verrouille.
+    """
+    from src.common.dentaire import ETATS_DENT, valider_etat_dent
+    from src.modules.odontogramme.services import LIBELLES_ETATS
+
+    refuses = sorted(set(LIBELLES_ETATS) - set(ETATS_DENT))
+    assert refuses == [], (
+        f"l'interface propose des etats que le serveur refuse : {refuses}"
+    )
+
+    for code in LIBELLES_ETATS:
+        assert valider_etat_dent(code) == code
+
+
+def etat_par_defaut() -> str:
+    """L'état d'une face non modifiee, tel que le tiroir l'initialise."""
+    source = TIROIR.read_text(encoding="utf-8")
+    trouve = re.search(
+        r"initialFaces\[f\.code\]\s*=\s*found\s*\?\s*found\.etat\s*:\s*'([^']+)'", source
+    )
+    assert trouve, "l'etat par defaut est introuvable dans dent-drawer.tsx"
+    return trouve.group(1)
