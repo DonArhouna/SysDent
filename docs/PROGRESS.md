@@ -33,44 +33,48 @@ erreur.** Les tests de supervision **fabricent leurs propres cas** : l'un
 passait à vide, donc vert pour la mauvaise raison.
 ## Tarification et prise en charge — phases 1 et 2 livrees
 Migration `b3d7f1a9c2e4` (chaine tenant), **verifiee sur base jetable, appliquee
-nulle part** : le proprietaire valide le plan et le diff avant. Quatre tables :
-`categories_patient` (`standard` creee par la migration), `tarifs_actes` (unique
-sur `(acte_id, categorie_code)`, categorie referencee par son **code**),
-`organismes_assurance`, `droits_prise_en_charge`. `CHECK` taux 0-100 et montant
-non negatif, `RESTRICT` sur un organisme porte par un droit. La migration
-reprend `tarif_base` dans `tarifs_actes` sous `standard` : rien de deplace.
-Aller-retour `upgrade`/`downgrade`/`upgrade` : 53 tables, aucune residuelle, actes
-conserves, type enum supprime, reprise des 3 actes a l'identique, quatre
-contraintes refusees par PostgreSQL.
-**La nomenclature passe sous `TARIFS:*`** : elle demandait `CONSULTATIONS:READ`
-et `CONSULTATIONS:CREATE`, donc creer une consultation suffisait a fixer le prix
-des actes. URL inchangees, droit change, reponses typees (elles etaient en
-`dict`). Praticiens, assistants, secretaires et comptables gardent la lecture.
+nulle part**. `c4e7a2b6d9f1` aligne le catalogue : elle **n'est pas non plus
+appliquee**. Quatre tables : `categories_patient` (`standard` creee par la
+migration), `tarifs_actes` (unique sur `(acte_id, categorie_code)`, categorie
+referencee par son **code**), `organismes_assurance`, `droits_prise_en_charge`.
+`CHECK` taux 0-100 et montant non negatif, `RESTRICT` sur un organisme porte par
+un droit. La migration reprend `tarif_base` dans `tarifs_actes` sous
+`standard` : rien de deplace. Aller-retour `upgrade`/`downgrade`/`upgrade` et
+rejeu sans doublon verifies sur base jetable.
+**La nomenclature passe sous `TARIFS:*`** : creer une consultation ne donne plus
+le droit de fixer le prix des actes. URL inchangees, reponses typees.
+
+**Matrice assurance, validee et appliquee.** Un droit unique `ASSURANCE:WRITE`
+couvrait deux gestes sans rapport. Il est remplace :
+`TARIFS:WRITE` pour ecrire un **organisme** (referentiel, admin seul),
+`ASSURANCE:WRITE_PATIENT` pour ecrire un **droit de patient** (secretariat et
+admin), `ASSURANCE:READ` pour tous. `ASSURANCE:WRITE` a quitte le catalogue :
+une session delivree avant ce changement transporte encore ce droit, et elle
+n'ecrit plus rien.
+
 **Phase 2** : ecrans `/tarification` et `/prise-en-charge`, onglet de la fiche
 patient, filtres dans l'URL, `Pagination` partagee, aucun DELETE sur un acte.
-`Backoffice/openapi.json` et ses types regenres : ils dataient d'avant les dix
-routes de la phase 1, donc son « contrat a jour » pouvait passer a cote.
 
-**Preuve** : 22 tests backend dont le tarif fige (mutation : `15000.00 au lieu de
-7500.00`), HTTP reel 14/14. Cote client 40 nouveaux tests, **deux mutations
-rouges** (un `tarif_base` au PATCH, une garde de bouton retiree), **56 tests
-verts**, `tsc` 0, lint 0 erreur, build vert, `verifier` du backoffice vert.
-Une limite mesuree : le schema OpenAPI ne porte **pas** la borne 0-100 du taux
-sur la forme chaine - le motif verifie la forme, pas la valeur. Pydantic
-l'applique. Test qui le fixe.
+**Preuve** : 32 tests backend dont le tarif fige (mutation : `15000.00 au lieu de
+7500.00`), 10 tests de matrice avec **deux mutations rouges**, HTTP reel 14/14.
+Cote client **62 tests verts**, `tsc` 0, lint 0 erreur, build vert ; `verifier`
+du backoffice vert. Un test lit la source du routeur pour exiger que client et
+serveur demandent le meme droit ; il vire au rouge des que l'un change.
+**Le schema OpenAPI ne porte pas la borne 0-100 du taux** sur la forme chaine :
+`docs/OPERATIONS.md` et le test qui fixe cette limite.
 Detail et matrice : `docs/TARIFICATION.md`.
 ## Reste à faire
-1. **Propriétaire : valider le plan de migration `b3d7f1a9c2e4`, puis le diff.**
-2. **Propriétaire : trancher l'ecart de matrice signale.** Le serveur accorde
-   `ASSURANCE:WRITE` au secretariat sur les organismes ; l'ecran utilise
-   `TARIFS:WRITE` (admin seul). Le client est plus strict que le backend.
-3. **Tache suivante : la ventilation assurance / patient d'une facture.**
-   Hors perimetre des deux phases, non codee. La prise en charge est
+1. **Propriétaire : valider et appliquer `b3d7f1a9c2e4`, puis `c4e7a2b6d9f1`.**
+   Les deux sont ecrites et verifiees, aucune n'a ete appliquee. La seconde
+   retire `ASSURANCE:WRITE` du catalogue : un cabinet qui ne l'applique pas
+   garde un droit qui ne protege plus rien.
+2. **Tache suivante : la ventilation assurance / patient d'une facture.** Hors
+   perimetre des deux phases, non codee. La prise en charge est
    **enregistree, pas appliquee** au calcul d'un montant. Demande une
    permission propre : corriger une facture emise apres l'avoir ventilee n'est
    pas le meme geste que declarer un droit.
-4. Faire consommer `tarifs_actes` par la facturation ; `tarif_base` reste lu en
+3. Faire consommer `tarifs_actes` par la facturation ; `tarif_base` reste lu en
    attendant. Transition, pas dual permanent.
-5. Rechargement force du client, test d'une modification de face,
+4. Rechargement force du client, test d'une modification de face,
    `npm run design:parite`, liste des cabinets, puis la cause du
    ralentissement de la suite et le verdict reel.
