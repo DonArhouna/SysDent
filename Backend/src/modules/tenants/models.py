@@ -9,6 +9,7 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     SmallInteger,
@@ -1657,3 +1658,60 @@ class AuditLogTenant(TenantBase, UUIDMixin):
     changes: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+class Notification(TenantBase, UUIDMixin, TimestampMixin):
+    """
+    Notification adressee a un utilisateur d'un cabinet.
+
+    **Un destinataire, pas un role.** Une notification est un fait survenu pour
+    une personne : deux secretaires du meme cabinet ne recoivent pas la meme.
+    Un role aurait partage le texte et masque le destinataire reel.
+
+    **Le cabinet est porte, pas deduit.** `cabinet_id` est denormalise alors que
+    l'utilisateur y suffit. Une base par cabinet rend le filtre par cabinet
+    implicite, et une notification fuit vers un autre cabinet des que le
+    mecanisme change. Le porter rend ce cloisonnement explicite et testable.
+
+    **`lu` est un booleen et non un horodatage de lecture.** Une premiere tranche
+    n'a besoin que de l'etat. Trancher ici aurait fige une semantique : "quand a
+    ete lu" ou "quand a ete vu" ne se repondent pas de la meme facon.
+
+    **Aucun emetteur dans cette tranche.** Aucun evenement metier ne cree de
+    notification. Les tests les creent directement : le modele et son
+    cloisonnement se prouvent sans avoir invente les evenements, et les
+    emetteurs viendront apres decision sur leurs types et leurs destinataires.
+    """
+
+    __tablename__ = "notifications"
+
+    #: Type d evenement. Libre et non une enumeration : les emetteurs n existent
+    #: pas encore, et figer les valeurs les rendrait a renegocier.
+    type: Mapped[str] = mapped_column(String(50), nullable=False)
+    titre: Mapped[str] = mapped_column(String(200), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    #: Lu ou non, pour CE destinataire. Une notification n est pas partagee.
+    lu: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    #: Lu le... pas dans cette tranche. Voir la docstring.
+    cabinet_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("cabinets.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    utilisateur_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("utilisateurs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    __table_args__ = (
+        # Le compteur non lu et la liste se posent tous deux sur
+        # (utilisateur_id, lu). Sans cet index, chaque badge de la barre de
+        # navigation ferait un balayage de la table.
+        Index(
+            "ix_notifications_utilisateur_lu",
+            "utilisateur_id",
+            "lu",
+        ),
+    )
