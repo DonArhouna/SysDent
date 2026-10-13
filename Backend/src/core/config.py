@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     PLATFORM_DB_HOST: str = "localhost"
     PLATFORM_DB_PORT: int = 5432
     PLATFORM_DB_USER: str = "postgres"
-    PLATFORM_DB_PASSWORD: str = "postgres_password"
+    PLATFORM_DB_PASSWORD: str = "changer-moi"
     PLATFORM_DB_NAME: str = "sysdent_platform"
     PLATFORM_DB_ECHO: bool = False
     PLATFORM_DB_POOL_SIZE: int = 5
@@ -122,7 +122,7 @@ class Settings(BaseSettings):
     MASTER_DB_HOST: str = "localhost"
     MASTER_DB_PORT: int = 5432
     MASTER_DB_USER: str = "postgres"
-    MASTER_DB_PASSWORD: str = "postgres_password"
+    MASTER_DB_PASSWORD: str = "changer-moi"
     MASTER_DB_NAME: str = "sysdent_master"
     MASTER_DB_ECHO: bool = False
     MASTER_DB_POOL_SIZE: int = 10
@@ -132,7 +132,7 @@ class Settings(BaseSettings):
     TENANT_DB_HOST: str = "localhost"
     TENANT_DB_PORT: int = 5432
     TENANT_DB_USER: str = "postgres"
-    TENANT_DB_PASSWORD: str = "postgres_password"
+    TENANT_DB_PASSWORD: str = "changer-moi"
     TENANT_DB_POOL_SIZE: int = 5
     TENANT_DB_MAX_OVERFLOW: int = 10
 
