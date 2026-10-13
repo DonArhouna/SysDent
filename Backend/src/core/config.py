@@ -3,6 +3,12 @@ from typing import List, Literal, Union
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+#: Valeur de reserve interdite pour un mot de passe de connexion. Une variable
+#: presente mais egale a ce gabarit est le cas le plus trompeur : tout semble
+#: configure, et le poste demarre quand meme avec le secret du depot. Elle est
+#: refusee au meme titre que l absence.
+VALEUR_DE_RESERVE: str = "changer-moi"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -11,6 +17,30 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore",
     )
+
+    #: Les trois mots de passe de connexion ne sont pas des champs simples : ils
+    #: sont valides par le validateur ci-dessous, qui refuse le vide et le
+    #: gabarit.
+
+    @field_validator(
+        "PLATFORM_DB_PASSWORD", "MASTER_DB_PASSWORD", "TENANT_DB_PASSWORD"
+    )
+    @classmethod
+    def _mot_de_passe_refuse(cls, valeur: str, info) -> str:
+        """
+        Un mot de passe de connexion ne peut etre ni vide ni un gabarit.
+
+        Le message nomme la variable et ce qu il faut faire. Il ne reprend
+        jamais la valeur : un message de configuration qui la recopie la fait
+        finir dans un journal, une capture d ecran ou une conversation.
+        """
+        if not valeur.strip() or valeur.strip() == VALEUR_DE_RESERVE:
+            raise ValueError(
+                f"{info.field_name} est vide ou reste sur sa valeur de "
+                "development. Definissez cette variable d'environnement avec un "
+                "secret a vous avant de demarrer."
+            )
+        return valeur
 
     # Application
     APP_NAME: str = "SysDent Pro API"
@@ -40,7 +70,7 @@ class Settings(BaseSettings):
     PLATFORM_DB_HOST: str = "localhost"
     PLATFORM_DB_PORT: int = 5432
     PLATFORM_DB_USER: str = "postgres"
-    PLATFORM_DB_PASSWORD: str = "changer-moi"
+    PLATFORM_DB_PASSWORD: str = Field(...)
     PLATFORM_DB_NAME: str = "sysdent_platform"
     PLATFORM_DB_ECHO: bool = False
     PLATFORM_DB_POOL_SIZE: int = 5
@@ -122,7 +152,7 @@ class Settings(BaseSettings):
     MASTER_DB_HOST: str = "localhost"
     MASTER_DB_PORT: int = 5432
     MASTER_DB_USER: str = "postgres"
-    MASTER_DB_PASSWORD: str = "changer-moi"
+    MASTER_DB_PASSWORD: str = Field(...)
     MASTER_DB_NAME: str = "sysdent_master"
     MASTER_DB_ECHO: bool = False
     MASTER_DB_POOL_SIZE: int = 10
@@ -132,7 +162,7 @@ class Settings(BaseSettings):
     TENANT_DB_HOST: str = "localhost"
     TENANT_DB_PORT: int = 5432
     TENANT_DB_USER: str = "postgres"
-    TENANT_DB_PASSWORD: str = "changer-moi"
+    TENANT_DB_PASSWORD: str = Field(...)
     TENANT_DB_POOL_SIZE: int = 5
     TENANT_DB_MAX_OVERFLOW: int = 10
 
