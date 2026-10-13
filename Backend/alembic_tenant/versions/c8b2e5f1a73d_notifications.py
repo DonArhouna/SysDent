@@ -1,5 +1,11 @@
 """Notifications : table d'adressage par utilisateur, sans emetteur.
 
+**Placement.** Cette revision enchaine apres `d6a1f4c92b57`, le correctif qui
+rattache `ASSURANCE:WRITE_PATIENT` au secretariat. Elle enchainait
+auparavant sur `f1a7c3d90b28`, ce qui donnait deux enfants a cette revision, donc
+deux tetes et un `upgrade head` dont la cible n'etait plus deterministe. Elle
+n'est appliquee a aucune base, donc le deplacement est sans risque.
+
 **Pourquoi une table maintenant.** Aucun emetteur n'existe : aucun evenement
 metier ne cree de notification dans cette tranche. La table est nee quand
 meme, parce que le modele, le cloisonnement et le contrat de pagination se
@@ -27,7 +33,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "c8b2e5f1a73d"
-down_revision: Union[str, None] = "f1a7c3d90b28"
+down_revision: Union[str, None] = "d6a1f4c92b57"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
