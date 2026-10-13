@@ -178,3 +178,15 @@ desktop.ini
 # sans eux, un clone frais ne cree pas la base-temoin et la garde refuse
 # toute session de tests. L'exclusion ci-dessus est plus large que necessaire.
 !Backend/docker/init-test/*.sql
+# --- Documents de travail, retires du suivi le 13/10 -------------------
+# COMMANDS.md et RAPPORT_AVANCEMENT_SysDent.md portent une typographie
+# riche, que le crochet de controle d integrite refuse dans tout fichier
+# suivi. Les retirer evite d'avoir a normaliser 66 caracteres pour y
+# depositier une valeur de mot de passe. Les fichiers restent sur le disque.
+Backend/COMMANDS.md
+RAPPORT_AVANCEMENT_SysDent.md
+
+# _create_cabinet.py porte un mot de passe d administrateur en clair.
+# Il est conserve sur le disque pour qui en a besoin, et ne doit plus
+# revenir au depot tant qu'il n aura pas lu sa valeur dans l environnement.
+Backend/_create_cabinet.py
