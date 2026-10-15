@@ -127,11 +127,11 @@ async def main() -> int:
     return await peupler(email, mdp)
 
 
-async def peupler(email: str, mdp: str, fermer: bool = True) -> int:
+async def peupler(email: str, mdp: str | None, fermer: bool = True, jeton: str | None = None) -> int:
     """
     Peuple le cabinet de `email`. Appelable depuis une autre commande
     (`creer_cabinet_demo.py`), qui garde alors ses connexions ouvertes
-    (`fermer=False`).
+    (`fermer=False`). `jeton` : session déjà ouverte, le login est alors sauté.
     """
     client = AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
     ids_actes_existants: list[str] = []
@@ -162,11 +162,12 @@ async def peupler(email: str, mdp: str, fermer: bool = True) -> int:
         return corps.get("data", corps.get("items"))
 
     # ------------------------------------------------------------ session
-    r = await client.post(API + "/auth/login", json={"email": email, "password": mdp})
-    if r.status_code != 200:
-        print(f"Login impossible : HTTP {r.status_code}")
-        return 1
-    jeton = r.json()["data"].get("access_token")
+    if jeton is None:
+        r = await client.post(API + "/auth/login", json={"email": email, "password": mdp})
+        if r.status_code != 200:
+            print(f"Login impossible : HTTP {r.status_code}")
+            return 1
+        jeton = r.json()["data"].get("access_token")
     if not jeton:
         # Le mot de passe est correct mais une étape reste à franchir (2FA de
         # l'administrateur, mot de passe temporaire). Outil interne, qui a déjà

@@ -321,6 +321,7 @@ class TenantService:
             raise EntityNotFoundException("Cabinet", tenant_id)
 
         avant = _vers_ligne(dossier, societe, None)
+        ancien_nom = societe.nom
         champs_societe = {
             "nom": nom,
             "ninea": ninea,
@@ -343,6 +344,9 @@ class TenantService:
         await platform_db.flush()
         await master_db.flush()
 
+        if nom is not None:
+            await TenantService._renommer_site_principal(tenant_id, ancien_nom, nom)
+
         from src.modules.platform.services.journal import JournalService
 
         await JournalService.journaliser(
@@ -362,6 +366,34 @@ class TenantService:
             ip_address=client_ip,
         )
         return await TenantService.detail(platform_db, master_db, tenant_id)
+
+    @staticmethod
+    async def _renommer_site_principal(tenant_id: uuid.UUID, ancien_nom: Optional[str], nouveau_nom: str) -> None:
+        """
+        Fait suivre le nom de la société au site principal, en base du tenant.
+
+        Le provisionnement nomme le premier site comme la société ; sans ce
+        report, renommer le cabinet depuis la console laissait l'ancien nom
+        partout dans l'application (agenda, factures, sélecteur de site).
+
+        Un site unique prend toujours le nom de la société. Avec plusieurs
+        sites, seul celui qui portait l'ancien nom est renommé : les autres ont
+        été nommés par le cabinet, on n'y touche pas. Une base injoignable ne
+        fait pas échouer la modification : le nom en base master fait foi.
+        """
+        from src.modules.auth.securite import session_cabinet
+        from src.modules.tenants.models import Cabinet
+
+        try:
+            async with await session_cabinet(str(tenant_id)) as db:
+                sites = (await db.execute(select(Cabinet))).scalars().all()
+                cibles = sites if len(sites) == 1 else [s for s in sites if s.nom == ancien_nom]
+                for site in cibles:
+                    site.nom = nouveau_nom
+                if cibles:
+                    await db.commit()
+        except Exception as e:  # base absente, registre incomplet, réseau : jamais bloquant
+            logger.warning("renommage_site_impossible", tenant_id=str(tenant_id), erreur=str(e))
 
     # ─────────────────────────────────────────────────────────────────────────
     # Machine à états
