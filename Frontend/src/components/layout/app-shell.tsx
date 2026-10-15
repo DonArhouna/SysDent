@@ -21,6 +21,9 @@ import { cn } from '@/lib/utils'
  * Responsive : >= lg la sidebar est ancrée à gauche (rétractable en rail) ;
  * < lg elle devient un drawer avec overlay (bouton de la navbar).
  */
+/** Profil relu une fois par chargement de page (et non à chaque navigation). */
+let profilRafraichi = false
+
 export function AppShell({ children }: { children: ReactNode }) {
   const token = useAuthStore((etat) => etat.token)
   const profil = useAuthStore((etat) => etat.profil)
@@ -52,6 +55,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     setDrawerMobile(false)
   }, [pathname])
+
+  // Le profil persisté peut dater d'une version précédente (logo, nom du
+  // cabinet, droits changés depuis la console) : il est relu UNE fois par
+  // ouverture de l'application, en arrière-plan, sans bloquer l'affichage.
+  useEffect(() => {
+    if (!token || profilRafraichi) return
+    profilRafraichi = true
+    void chargerProfil().catch(() => undefined)
+  }, [token, chargerProfil])
 
   if (!token) {
     // Une déconnexion **volontaire** ne restitue pas la route : on veut

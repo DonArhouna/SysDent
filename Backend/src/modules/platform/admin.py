@@ -21,6 +21,8 @@ Usage :
     .venv\\Scripts\\python.exe -m src.modules.platform.admin lister
     .venv\\Scripts\\python.exe -m src.modules.platform.admin reinitialiser-mot-de-passe \\
         --email rhonekane@gmail.com --motif "Ouverture du backoffice"
+    .venv\\Scripts\\python.exe -m src.modules.platform.admin changer-email \\
+        --email ancien@exemple.com --nouvel-email nouveau@exemple.com --motif "Adresse perso"
 """
 
 from __future__ import annotations
@@ -391,6 +393,56 @@ async def cmd_reinitialiser_2fa(args) -> int:
     return 0
 
 
+async def cmd_changer_email(args) -> int:
+    email = _valider_email(args.email)
+    nouvel_email = _valider_email(args.nouvel_email)
+    if nouvel_email == email:
+        print("Le nouvel e-mail est identique à l'actuel : rien à faire.")
+        return 1
+    moteur, fabrique = await _session()
+    try:
+        async with fabrique() as db:
+            compte = (
+                await db.execute(
+                    select(UtilisateurPlateforme).where(UtilisateurPlateforme.email == email)
+                )
+            ).scalar_one_or_none()
+            if compte is None:
+                print(f"Compte introuvable : {email}")
+                return 1
+            deja_pris = (
+                await db.execute(
+                    select(UtilisateurPlateforme.id).where(
+                        UtilisateurPlateforme.email == nouvel_email
+                    )
+                )
+            ).scalar_one_or_none()
+            if deja_pris is not None:
+                print(f"Un compte utilise déjà {nouvel_email} : rien n'a été modifié.")
+                return 1
+
+            # Les sessions sont revoquees : l'identifiant de connexion change, une
+            # session ouverte sous l'ancien ne doit pas lui survivre.
+            nb = await _revoquer_sessions(db, compte.id)
+            compte.email = nouvel_email
+            await _journaliser(
+                db,
+                "PLATFORM_EMAIL_MODIFIE",
+                str(compte.id),
+                args.motif,
+                avant={"email": email},
+                apres={"email": nouvel_email, "sessions_revoquees": nb},
+            )
+            await db.commit()
+    finally:
+        await moteur.dispose()
+    print(
+        f"E-mail modifié : {email} -> {nouvel_email} — {nb} session(s) révoquée(s).\n"
+        "  Le mot de passe et la 2FA sont inchangés ; connectez-vous avec le nouvel e-mail."
+    )
+    return 0
+
+
 async def _revoquer_sessions(db, utilisateur_id) -> int:
     from sqlalchemy import text
 
@@ -438,6 +490,12 @@ def _construire_parser() -> argparse.ArgumentParser:
     fa.add_argument("--email", required=True)
     fa.add_argument("--motif", required=True)
     fa.set_defaults(fonction=cmd_reinitialiser_2fa)
+
+    mail = sous.add_parser("changer-email", help="Changer l'e-mail de connexion d'un compte")
+    mail.add_argument("--email", required=True, help="E-mail actuel du compte")
+    mail.add_argument("--nouvel-email", required=True)
+    mail.add_argument("--motif", required=True)
+    mail.set_defaults(fonction=cmd_changer_email)
     return parser
 
 

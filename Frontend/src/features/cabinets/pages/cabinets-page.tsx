@@ -29,8 +29,11 @@ import { Can } from '@/components/auth/can'
 import { toast } from '@/stores/toast-store'
 import { cabinetsApi } from '../services/cabinets-api'
 import type { Cabinet, Fauteuil, Salle } from '../types'
+import { CabinetLogo } from '@/components/cabinet-logo'
+import { useAuthStore } from '@/stores/auth-store'
 
 export function CabinetsPage() {
+  const profilCabinet = useAuthStore((e) => e.profil)
   const queryClient = useQueryClient()
   const [cabinetSelectionneId, setCabinetSelectionneId] = useState<string | null>(null)
 
@@ -196,6 +199,19 @@ export function CabinetsPage() {
         sousTitre="Configuration des sites, des salles de soins et du parc de fauteuils dentaires"
         onRefresh={() => void refetch()}
       />
+
+      {/* Identité du cabinet : le logo se définit depuis la console de l'éditeur. */}
+      <div className="flex items-center gap-4 rounded-card border border-border bg-card p-4">
+        <CabinetLogo url={profilCabinet?.cabinet_logo_url} nom={profilCabinet?.cabinet_nom} taille="lg" legende />
+        <div className="min-w-0">
+          <p className="truncate text-lg font-semibold">{profilCabinet?.cabinet_nom ?? 'Votre cabinet'}</p>
+          <p className="text-xs text-muted-foreground">
+            {profilCabinet?.cabinet_logo_url
+              ? 'Logo affiché dans la barre latérale et sur les pages d’activation de compte.'
+              : 'Aucun logo défini. Demandez à l’éditeur de l’ajouter depuis sa console.'}
+          </p>
+        </div>
+      </div>
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

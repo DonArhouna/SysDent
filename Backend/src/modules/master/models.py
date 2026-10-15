@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 import uuid
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, deferred, mapped_column, relationship
 from src.common.base_model import Base, TimestampMixin, UUIDMixin
 
 
@@ -16,6 +16,12 @@ class Societe(Base, UUIDMixin, TimestampMixin):
     nom: Mapped[str] = mapped_column(String(150), nullable=False, index=True)
     ninea: Mapped[str | None] = mapped_column(String(50), nullable=True, unique=True, index=True)
     logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Logo stocké EN BASE (et non sur le disque du serveur) : il suit les
+    # sauvegardes et le passage d'un serveur à l'autre. `deferred` : les octets
+    # ne sont chargés que lorsqu'on sert le logo, jamais dans une liste.
+    logo_contenu: Mapped[bytes | None] = deferred(mapped_column(LargeBinary, nullable=True))
+    logo_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    logo_maj: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     adresse_siege: Mapped[str | None] = mapped_column(Text, nullable=True)
     ville: Mapped[str | None] = mapped_column(String(100), nullable=True)
     pays: Mapped[str] = mapped_column(String(100), default="Sénégal", nullable=False)

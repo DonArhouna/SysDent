@@ -53,7 +53,12 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_utilisateur_index_id'), 'utilisateur_index', ['id'], unique=False)
     op.create_index(op.f('ix_utilisateur_index_societe_id'), 'utilisateur_index', ['societe_id'], unique=False)
-    op.add_column('super_admins', sa.Column('tentatives_echouees', sa.Integer(), nullable=False))
+    # `server_default` : sans lui, l'ajout d'une colonne NOT NULL echoue des
+    # qu'un Super Admin existe deja (cas de toute base creee par init_db.py).
+    op.add_column(
+        'super_admins',
+        sa.Column('tentatives_echouees', sa.Integer(), nullable=False, server_default='0'),
+    )
     op.add_column('super_admins', sa.Column('verrouille_jusqua', sa.DateTime(timezone=True), nullable=True))
     # ### end Alembic commands ###
 

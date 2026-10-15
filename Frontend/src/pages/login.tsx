@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, LockKeyhole, Sparkles, Mail } from 'lucide-react'
+import { Eye, EyeOff, LockKeyhole, ShieldCheck, Sparkles, Mail } from 'lucide-react'
 import { ApiError } from '@/lib/api'
 import {
   oublierFermetureVolontaire,
@@ -10,6 +10,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { ToastContainer } from '@/components/ui/toast'
+import { Cadre, EtapesConnexion } from '@/features/auth/etapes-connexion'
+import { CodesSecours } from '@/features/auth/securite-ui'
 
 /**
  * Connexion multi-tenant : le backend résout le cabinet rattaché à l'email
@@ -18,6 +20,9 @@ import { ToastContainer } from '@/components/ui/toast'
 export function LoginPage() {
   const token = useAuthStore((etat) => etat.token)
   const connexion = useAuthStore((etat) => etat.connexion)
+  const etapeConnexion = useAuthStore((etat) => etat.etapeConnexion)
+  const codesSecours = useAuthStore((etat) => etat.codesSecoursAAfficher)
+  const oublierCodesSecours = useAuthStore((etat) => etat.oublierCodesSecours)
   const navigate = useNavigate()
   const location = useLocation()
   const [email, setEmail] = useState('')
@@ -26,8 +31,50 @@ export function LoginPage() {
   const [enCours, setEnCours] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
 
+  const entrer = () => {
+    // Après une déconnexion volontaire, la cible est le tableau de bord. La
+    // route quittée n'a pas à être restaurée : c'est le comportement que le
+    // propriétaire attend, et ce que la garde de session ne peut pas savoir.
+    const depuis = sessionFermeeVolontairementVraiment()
+      ? null
+      : ((location.state as { depuis?: string } | null)?.depuis ?? null)
+    oublierFermetureVolontaire()
+    navigate(depuis ?? '/dashboard', { replace: true })
+  }
+
+  // Codes de secours AVANT la redirection : la session est déjà ouverte quand
+  // ils arrivent, et ils ne seront plus jamais affichés.
+  if (codesSecours) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="w-full max-w-md">
+          <Cadre titre="Vos codes de secours" icone={<ShieldCheck className="h-5 w-5 text-success" />}>
+            <CodesSecours
+              codes={codesSecours}
+              onTerminer={() => {
+                oublierCodesSecours()
+                entrer()
+              }}
+            />
+          </Cadre>
+        </div>
+      </div>
+    )
+  }
+
   if (token) {
     return <Navigate to="/dashboard" replace />
+  }
+
+  if (etapeConnexion) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="w-full max-w-md">
+          <EtapesConnexion email={email.trim()} onConnecte={entrer} />
+        </div>
+        <ToastContainer />
+      </div>
+    )
   }
 
   const soumettre = async (evenement: FormEvent) => {
@@ -35,15 +82,9 @@ export function LoginPage() {
     setErreur(null)
     setEnCours(true)
     try {
-      await connexion(email.trim(), password)
-      // Après une déconnexion volontaire, la cible est le tableau de bord. La
-      // route quittée n'a pas à être restaurée : c'est le comportement que le
-      // propriétaire attend, et ce que la garde de session ne peut pas savoir.
-      const depuis = sessionFermeeVolontairementVraiment()
-        ? null
-        : ((location.state as { depuis?: string } | null)?.depuis ?? null)
-      oublierFermetureVolontaire()
-      navigate(depuis ?? '/dashboard', { replace: true })
+      // Une étape reste peut-être à franchir (mot de passe temporaire, code,
+      // configuration de la 2FA) : l'écran bascule alors sur `EtapesConnexion`.
+      if ((await connexion(email.trim(), password)) === 'session') entrer()
     } catch (e) {
       setErreur(
         e instanceof ApiError

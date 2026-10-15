@@ -185,12 +185,46 @@ class Utilisateur(TenantBase, UUIDMixin, TimestampMixin):
         UUID(as_uuid=True), ForeignKey("cabinets.id"), nullable=True, index=True
     )
     deux_facteurs: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    secret_2fa: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # Secret TOTP ACTIF, chiffré (Fernet). Alimenté seulement à la confirmation,
+    # par promotion de `secret_2fa_en_attente`.
+    secret_2fa: Mapped[str | None] = mapped_column(Text, nullable=True)
+    secret_2fa_en_attente: Mapped[str | None] = mapped_column(Text, nullable=True)
+    deux_facteurs_confirme_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Codes de secours hachés, consommés une seule fois.
+    codes_secours_haches: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    # Compte créé par invitation : son titulaire n'a pas encore choisi son mot
+    # de passe. La connexion est refusée tant que c'est vrai.
+    activation_requise: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Mot de passe temporaire : la connexion passe d'abord par son changement.
+    doit_changer_mot_de_passe: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     dernier_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     role: Mapped[Role] = relationship("Role", back_populates="utilisateurs")
     praticien_profil: Mapped["Praticien | None"] = relationship("Praticien", back_populates="utilisateur", uselist=False)
     sessions: Mapped[list["SessionUser"]] = relationship("SessionUser", back_populates="utilisateur", cascade="all, delete-orphan")
+
+
+class JetonAuth(TenantBase, UUIDMixin):
+    """
+    Jeton à usage unique de l'authentification du cabinet, **haché** (SHA-256 ou
+    HMAC) : activation de compte, étape de connexion, code reçu par e-mail.
+    """
+
+    __tablename__ = "jetons_auth"
+
+    utilisateur_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("utilisateurs.id", ondelete="CASCADE"), nullable=False
+    )
+    # ACTIVATION, ETAPE_CONNEXION, CODE_EMAIL
+    usage: Mapped[str] = mapped_column(String(30), nullable=False)
+    hash_jeton: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    # Code e-mail : empreinte de l'étape qui l'a demandé (il ne vaut que pour elle).
+    contexte: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    expire_le: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    utilise: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
 
 class SessionUser(TenantBase, UUIDMixin, TimestampMixin):

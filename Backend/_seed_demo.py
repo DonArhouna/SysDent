@@ -91,6 +91,30 @@ COMPTE = {"crees": 0, "ignores": 0, "erreurs": 0}
 API = "/api/v1"
 
 
+async def _session_directe(email: str) -> str:
+    """Jeton de session pour `email`, ouvert en base (après un mot de passe vérifié par l'API)."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+
+    from src.core.database import MasterAsyncSessionFactory
+    from src.modules.auth.securite import session_cabinet
+    from src.modules.auth.services import AuthService
+    from src.modules.tenants.models import Utilisateur
+
+    async with MasterAsyncSessionFactory() as master:
+        config, _ = await AuthService._resoudre_tenant(master, email)
+    tenant_id = str(config.societe_id)
+    async with await session_cabinet(tenant_id) as db:
+        user = (
+            await db.execute(
+                select(Utilisateur).options(selectinload(Utilisateur.role)).where(Utilisateur.email == email)
+            )
+        ).scalar_one()
+        acces, _ = await AuthService.ouvrir_session(db, user, tenant_id, user_agent="seed-demo")
+        await db.commit()
+    return acces
+
+
 def jour(h: int, m: int = 0) -> str:
     return f"{LUNDI.isoformat()}T{h:02d}:{m:02d}:00+00:00"
 
@@ -100,7 +124,15 @@ async def main() -> int:
         print(__doc__)
         return 2
     email, mdp = sys.argv[1].strip().lower(), sys.argv[2]
+    return await peupler(email, mdp)
 
+
+async def peupler(email: str, mdp: str, fermer: bool = True) -> int:
+    """
+    Peuple le cabinet de `email`. Appelable depuis une autre commande
+    (`creer_cabinet_demo.py`), qui garde alors ses connexions ouvertes
+    (`fermer=False`).
+    """
     client = AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
     ids_actes_existants: list[str] = []
 
@@ -134,7 +166,14 @@ async def main() -> int:
     if r.status_code != 200:
         print(f"Login impossible : HTTP {r.status_code}")
         return 1
-    client.headers.update({"Authorization": f"Bearer {r.json()['data']['access_token']}"})
+    jeton = r.json()["data"].get("access_token")
+    if not jeton:
+        # Le mot de passe est correct mais une étape reste à franchir (2FA de
+        # l'administrateur, mot de passe temporaire). Outil interne, qui a déjà
+        # accès aux bases : il ouvre la session directement, sans activer de
+        # second facteur à la place du titulaire du compte.
+        jeton = await _session_directe(email)
+    client.headers.update({"Authorization": f"Bearer {jeton}"})
     print(f"Connecte : {email}")
 
     # ------------------------------------------------- deja peuple ?
@@ -290,7 +329,11 @@ async def main() -> int:
     # ------------------------------------------------------ rendez-vous
     print("\nRendez-vous (lundi)…")
     creneaux = [(9, 0), (9, 30), (10, 0), (11, 0), (14, 0), (15, 30), (16, 0)]
-    deja = await obtenir(f"/rendez-vous?date={LUNDI.isoformat()}&limit=100") or []
+    # Filtre par periode (`du` / `au`) : l'ancien parametre `date` n'existe plus.
+    deja = await obtenir(
+        f"/rendez-vous?du={LUNDI.isoformat()}T00:00:00%2B00:00"
+        f"&au={LUNDI.isoformat()}T23:59:59%2B00:00&limit=100"
+    ) or []
     if isinstance(deja, dict):
         deja = deja.get("items", [])
     pris = {
@@ -325,6 +368,12 @@ async def main() -> int:
 
     # -------------------------------------------------------- facturation
     print("\nFactures et paiements…")
+    # Un encaissement exige une session de caisse ouverte. Si une session est
+    # deja ouverte (relance), le refus est attendu et sans consequence.
+    r = await client.post(API + "/caisse/sessions", json={"cabinet_id": cabinet_id})
+    if r.status_code in (200, 201):
+        COMPTE["crees"] += 1
+        print("  caisse ouverte")
     lignes = [
         {"designation": "Consultation dentaire", "quantite": 1, "prix_unitaire": 15000},
         {"designation": "Détartrage", "quantite": 1, "prix_unitaire": 25000},
@@ -363,8 +412,9 @@ async def main() -> int:
         )
 
     await client.aclose()
-    await tenant_db_manager.close_all()
-    await master_engine.dispose()
+    if fermer:
+        await tenant_db_manager.close_all()
+        await master_engine.dispose()
 
     print()
     print(f"Cree : {COMPTE['crees']}   Erreurs : {COMPTE['erreurs']}")

@@ -5,7 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { useAuthStore } from '@/stores/auth-store'
+import { useAuthStore, type Methode2FA } from '@/stores/auth-store'
+
+import { EnvoiCodeEmailBouton } from './envoi-code-email'
 
 /**
  * Connexion plateforme — mot de passe puis code TOTP.
@@ -31,6 +33,7 @@ export function LoginPage() {
   const connexion = useAuthStore((etat) => etat.connexion)
   const valider2fa = useAuthStore((etat) => etat.valider2fa)
   const annuler2fa = useAuthStore((etat) => etat.annuler2fa)
+  const methodes2fa = useAuthStore((etat) => etat.methodes2fa)
 
   const location = useLocation()
   const depuis = (location.state as { depuis?: string } | null)?.depuis ?? '/'
@@ -40,6 +43,10 @@ export function LoginPage() {
   const [code, setCode] = useState('')
   const [erreur, setErreur] = useState('')
   const [soumission, setSoumission] = useState(false)
+  // Choix de l'utilisateur ; par defaut l'application si le compte en a une.
+  const [choix, setChoix] = useState<Methode2FA | null>(null)
+  const methode: Methode2FA = choix ?? (methodes2fa.includes('totp') ? 'totp' : 'email')
+  const deuxMethodes = methodes2fa.includes('totp') && methodes2fa.includes('email')
 
   if (token) return <Navigate to={depuis} replace />
 
@@ -84,9 +91,11 @@ export function LoginPage() {
               {challenge2fa ? 'Vérification en deux étapes' : 'Connexion'}
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              {challenge2fa
-                ? 'Saisissez le code à 6 chiffres de votre application d’authentification.'
-                : 'Accès réservé aux comptes de la plateforme.'}
+              {!challenge2fa
+                ? 'Accès réservé aux comptes de la plateforme.'
+                : methode === 'totp'
+                  ? 'Saisissez le code à 6 chiffres de votre application d’authentification.'
+                  : 'Recevez un code à 6 chiffres sur l’adresse e-mail du compte.'}
             </p>
           </CardHeader>
 
@@ -99,6 +108,31 @@ export function LoginPage() {
                   void enCours(() => valider2fa(code.trim()))
                 }}
               >
+                {deuxMethodes && (
+                  <div role="tablist" aria-label="Méthode de vérification" className="grid grid-cols-2 gap-1 rounded-xl bg-muted p-1">
+                    {(['totp', 'email'] as const).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        role="tab"
+                        aria-selected={methode === m}
+                        onClick={() => {
+                          setChoix(m)
+                          setErreur('')
+                        }}
+                        className={
+                          'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ' +
+                          (methode === m ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')
+                        }
+                      >
+                        {m === 'totp' ? 'Application' : 'E-mail'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {methode === 'email' && <EnvoiCodeEmailBouton onEnvoye={() => setErreur('')} />}
+
                 <div className="space-y-1.5">
                   <label htmlFor="code">Code de vérification</label>
                   <Input
@@ -120,7 +154,16 @@ export function LoginPage() {
                 )}
 
                 <div className="flex justify-between gap-2">
-                  <Button type="button" variant="outline" onClick={annuler2fa} disabled={soumission}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setChoix(null)
+                      setCode('')
+                      annuler2fa()
+                    }}
+                    disabled={soumission}
+                  >
                     Retour
                   </Button>
                   <Button type="submit" disabled={soumission || code.trim().length < 6}>

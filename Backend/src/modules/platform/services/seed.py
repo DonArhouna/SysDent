@@ -61,10 +61,10 @@ class TenantSeedService:
         from src.modules.rbac.services import RbacService
         from src.modules.platform.services.templates import TemplateService
 
-        await tenant_db_manager.get_or_create_engine(
-            tenant_id=str(societe_id),
-            db_name=db_name,
-        )
+        # Identifiants lus dans le registre master : le compte DÉDIÉ du cabinet.
+        # `get_or_create_engine(db_name=...)` sans identifiants retombait sur le
+        # compte d'administration, et ce moteur restait en cache pour toutes les
+        # requêtes suivantes du cabinet.
         session_factory = await tenant_db_manager.get_session_factory(str(societe_id))
 
         gabarit_formulaire = await TemplateService.obtenir_contenu(
@@ -232,7 +232,7 @@ class TenantSeedService:
         """
         from src.modules.tenants.models import Facture, Patient, Praticien, Salle
 
-        await tenant_db_manager.get_or_create_engine(tenant_id=str(tenant_id), db_name=db_name)
+        # Registre master, donc compte dédié : jamais l'administrateur en cache.
         session_factory = await tenant_db_manager.get_session_factory(str(tenant_id))
         async with session_factory() as session:
             async def _existe(modele, colonne=None) -> bool:

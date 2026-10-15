@@ -92,7 +92,9 @@ async def _migrer() -> None:
     from src.core.migrations import upgrade_platform_to_head
 
     print(f"Migrations plateforme -> {settings.PLATFORM_DB_NAME} …")
-    upgrade_platform_to_head()
+    # Alembic est synchrone et ouvre sa propre boucle asyncio : il doit tourner
+    # dans un thread, comme dans init_db.py.
+    await asyncio.to_thread(upgrade_platform_to_head)
     print("  ✓ base plateforme à jour")
 
 

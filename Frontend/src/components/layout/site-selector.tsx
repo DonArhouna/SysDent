@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Building2, Check, ChevronDown } from 'lucide-react'
+import { urlRessource } from '@/lib/api'
 import { useCabinetStore } from '@/stores/cabinet-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
@@ -21,6 +22,27 @@ import { cn } from '@/lib/utils'
  *   des sites réels. Jamais « tous », jamais « aucun » : « aucun » ferait
  *   afficher au cabinet la comptabilité d'un autre site.
  */
+/**
+ * Logo du cabinet connecté (défini depuis la console), ou l'icône d'immeuble
+ * à défaut et si l'image ne se charge pas.
+ */
+function IconeCabinet() {
+  const logo = urlRessource(useAuthStore((s) => s.profil?.cabinet_logo_url))
+  const nom = useAuthStore((s) => s.profil?.cabinet_nom)
+  const [casse, setCasse] = useState(false)
+  if (logo && !casse) {
+    return (
+      <img
+        src={logo}
+        alt={`Logo de ${nom ?? 'votre cabinet'}`}
+        onError={() => setCasse(true)}
+        className="h-6 w-6 shrink-0 rounded-md border border-border bg-white object-contain p-0.5"
+      />
+    )
+  }
+  return <Building2 className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
+}
+
 export function SiteSelector() {
   const { cabinetActifId, cabinets, chargement, setCabinetActifId, chargerCabinets } =
     useCabinetStore()
@@ -67,7 +89,7 @@ export function SiteSelector() {
         className="flex items-center gap-2 rounded-lg border border-border bg-card/80 px-2.5 py-1.5 text-xs shadow-sm"
         title="Votre cabinet"
       >
-        <Building2 className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
+        <IconeCabinet />
         <span className="max-w-[160px] truncate font-semibold">{nomCabinet}</span>
       </div>
     )
@@ -82,7 +104,7 @@ export function SiteSelector() {
         className="flex items-center gap-2 rounded-lg border border-border bg-card/80 px-2.5 py-1.5 text-xs shadow-sm"
         title="Votre cabinet"
       >
-        <Building2 className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
+        <IconeCabinet />
         <span className="flex flex-col text-left">
           <span className="max-w-[130px] truncate font-semibold sm:max-w-[190px]">
             {siteActif?.nom ?? cabinets[0].nom}
@@ -107,7 +129,7 @@ export function SiteSelector() {
         aria-expanded={ouvert}
         className="flex items-center gap-2 rounded-lg border border-border bg-card/80 px-2.5 py-1.5 text-xs text-foreground shadow-sm transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-primary/40"
       >
-        <Building2 className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
+        <IconeCabinet />
         <span className="flex flex-col text-left">
           <span className="text-[9px] uppercase leading-none tracking-wider text-muted-foreground">
             Site

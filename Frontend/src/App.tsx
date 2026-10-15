@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/layout/app-shell'
 import { ProtectedRoute } from '@/components/auth/can'
 import { LoginPage } from '@/pages/login'
+import { ActivationPage } from '@/pages/activation'
 import { DashboardPage } from '@/pages/dashboard'
 import { ForbiddenPage } from '@/pages/403'
 import { NotFoundPage } from '@/pages/404'
@@ -32,6 +33,8 @@ export default function App() {
     <ErrorBoundary zone="Application">
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      {/* Publique : le lien d'activation reçu par e-mail ouvre cette page. */}
+      <Route path="/activation" element={<ActivationPage />} />
       <Route
         path="/403"
         element={

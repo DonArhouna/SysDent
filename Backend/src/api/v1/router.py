@@ -15,6 +15,9 @@ from src.modules.platform.routers.onboarding import onboarding_router
 from src.modules.platform.routers.support import platform_support_router
 from src.modules.platform.routers.supervision import platform_supervision_router
 from src.modules.platform.routers.tenants import platform_tenants_router
+from src.modules.platform.routers.rbac_cabinet import platform_rbac_cabinet_router
+from src.modules.platform.routers.agenda import platform_agenda_router
+from src.modules.platform.routers.logos import platform_logos_router, public_logos_router
 from src.modules.platform.routers.users import platform_users_router
 from src.modules.rbac import rbac_router
 from src.modules.rendezvous import rendezvous_router
@@ -70,6 +73,10 @@ api_v1_router.include_router(utilisateurs_router)
 api_v1_router.include_router(platform_auth_router)
 api_v1_router.include_router(platform_users_router)
 api_v1_router.include_router(platform_tenants_router)
+api_v1_router.include_router(platform_rbac_cabinet_router)
+api_v1_router.include_router(platform_agenda_router)
+api_v1_router.include_router(platform_logos_router)
+api_v1_router.include_router(public_logos_router)
 api_v1_router.include_router(platform_commercial_router)
 api_v1_router.include_router(platform_support_router)
 api_v1_router.include_router(platform_supervision_router)

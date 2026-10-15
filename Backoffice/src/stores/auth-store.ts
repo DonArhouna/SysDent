@@ -37,7 +37,10 @@ export interface ProfilPlateforme {
   email: string
   prenom: string
   nom: string
-  role: string
+  /** Codes des rôles, tels que `/platform/auth/me` les renvoie. */
+  roles?: string[]
+  /** Ancien champ unique, conservé pour compatibilité ; préférer `roles`. */
+  role?: string
   permissions: string[]
   /** `true` tant que le compte n'a pas confirmé son secret TOTP. */
   deux_facteurs_actif?: boolean
@@ -50,6 +53,12 @@ export interface ProfilPlateforme {
    * sans codes ne laisse aucune voie de recours.
    */
   codes_secours_a_regenerer?: boolean
+  /** Méthodes du second facteur utilisables : `totp` (application), `email`. */
+  methodes_2fa?: string[]
+  telephone?: string | null
+  statut?: string
+  dernier_login?: string | null
+  cree_le?: string
 }
 
 /**
@@ -101,6 +110,14 @@ interface EnrolementTermine extends NonNullable<Activation['data']> {
   codes_secours: string[]
 }
 
+/** Reponse d'un envoi de code par e-mail : adresse masquee et duree de validite. */
+export type EnvoiCodeEmail = NonNullable<
+  ReponseDe<'/api/v1/platform/auth/2fa/email', 'post'>['data']
+>
+
+/** Methode de second facteur proposee par le serveur. */
+export type Methode2FA = 'totp' | 'email'
+
 /** Reponse de `/platform/auth/2fa/codes-secours/regenerer`, tiree du schema. */
 type CodesRegeneres = NonNullable<
   ReponseDe<'/api/v1/platform/auth/2fa/codes-secours/regenerer', 'post'>['data']
@@ -131,6 +148,19 @@ interface AuthState {
    * elle, a fermee.
    */
   jetonEnrolement: string | null
+  /**
+   * Methodes proposees par le serveur pour l'etape en cours (memoire seule).
+   * Un compte enrole par e-mail n'a pas d'application : `totp` n'y figure pas.
+   */
+  methodes2fa: Methode2FA[]
+  /**
+   * Envoie un code a 6 chiffres a l'adresse du compte. Pendant un defi, le code
+   * se saisit ensuite dans `valider2fa` ; pendant un enrolement, dans
+   * `activerEnrolementEmail`.
+   */
+  envoyerCodeEmail: () => Promise<EnvoiCodeEmail>
+  /** Enrolement par e-mail : active la 2FA, ouvre la session, rend les codes de secours. */
+  activerEnrolementEmail: (code: string) => Promise<string[]>
   connexion: (email: string, password: string) => Promise<'challenge' | 'enrolement' | 'ok'>
   valider2fa: (code: string) => Promise<void>
   annuler2fa: () => void
@@ -151,6 +181,32 @@ interface AuthState {
   deconnexion: () => void
 }
 
+/**
+ * Fin commune des deux enrolements (QR ou e-mail) : la session s'ouvre et les
+ * codes de secours reviennent a l'appelant, jamais dans le store.
+ */
+async function terminerEnrolement(donnees: EnrolementTermine): Promise<string[]> {
+  const { codes_secours, ...jetons } = donnees
+  if (!jetons.access_token || !jetons.refresh_token) {
+    // L'activation a reussi cote serveur : impossible d'ecrire un etat
+    // « connecte » sans jeton. Le dire, plutot que laisser l'ecran pretendre.
+    throw new Error("Activation effectuee, mais le serveur n a renvoye aucune session.")
+  }
+  sessionVivante()
+  useAuthStore.setState({
+    token: jetons.access_token,
+    refreshToken: jetons.refresh_token,
+    // Le jeton d'enrolement a ete consomme par le serveur : le garder
+    // permettrait de rejouer une activation, et de trailer un secret dans l'etat.
+    jetonEnrolement: null,
+    preparation2fa: null,
+    challenge2fa: null,
+    methodes2fa: [],
+  })
+  await useAuthStore.getState().chargerProfil()
+  return codes_secours
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -158,8 +214,9 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       profil: null,
       challenge2fa: null,
-        jetonEnrolement: null,
-        preparation2fa: null,
+      jetonEnrolement: null,
+      preparation2fa: null,
+      methodes2fa: [],
 
       connexion: async (email, password) => {
         const reponse = await api.post<ApiReponse<ReponseJeton>>('/platform/auth/login', {
@@ -186,15 +243,17 @@ export const useAuthStore = create<AuthState>()(
         const donnees = reponse?.data
 
         // 1. Compte deja configure : il doit confirmer son secret TOTP.
+        // Un serveur plus ancien n'envoie pas `methodes` : il ne connait que le TOTP.
+        const methodes = (donnees?.methodes?.length ? donnees.methodes : ['totp']) as Methode2FA[]
         if (donnees?.jeton_challenge) {
-          set({ challenge2fa: donnees.jeton_challenge, jetonEnrolement: null })
+          set({ challenge2fa: donnees.jeton_challenge, jetonEnrolement: null, methodes2fa: methodes })
           return 'challenge'
         }
 
         // 2. Compte sans aucun secret : il doit s'enroler. Ce jeton ouvre la
         // preparation et l'activation, et ne vaut pas session.
         if (donnees?.jeton_enrolement) {
-          set({ challenge2fa: null, jetonEnrolement: donnees.jeton_enrolement })
+          set({ challenge2fa: null, jetonEnrolement: donnees.jeton_enrolement, methodes2fa: methodes })
           return 'enrolement'
         }
 
@@ -229,12 +288,44 @@ export const useAuthStore = create<AuthState>()(
           token: reponse.data.access_token,
           refreshToken: reponse.data.refresh_token,
           challenge2fa: null,
+          methodes2fa: [],
         })
         await get().chargerProfil()
       },
 
-      annuler2fa: () => set({ challenge2fa: null }),
-    annulerEnrolement: () => set({ jetonEnrolement: null, preparation2fa: null }),
+      annuler2fa: () => set({ challenge2fa: null, methodes2fa: [] }),
+      annulerEnrolement: () => set({ jetonEnrolement: null, preparation2fa: null, methodes2fa: [] }),
+
+      envoyerCodeEmail: async () => {
+        const { challenge2fa: challenge, jetonEnrolement: jeton } = get()
+        if (challenge) {
+          const reponse = await api.post<ApiReponse<EnvoiCodeEmail>>('/platform/auth/2fa/email', {
+            jeton_challenge: challenge,
+          })
+          return reponse.data
+        }
+        if (jeton) {
+          // Meme regle que l'activation : le jeton d'enrolement va en `bearer`.
+          const reponse = await api.post<ApiReponse<EnvoiCodeEmail>>(
+            '/platform/auth/2fa/activation-email/envoi',
+            {},
+            { bearer: jeton },
+          )
+          return reponse.data
+        }
+        throw new Error('Session de connexion expirée.')
+      },
+
+      activerEnrolementEmail: async (code) => {
+        const jeton = get().jetonEnrolement
+        if (!jeton) throw new Error('Session de connexion expiree.')
+        const reponse = await api.post<ApiReponse<EnrolementTermine>>(
+          '/platform/auth/2fa/activation-email',
+          { code },
+          { bearer: jeton },
+        )
+        return terminerEnrolement(reponse.data)
+      },
 
     /**
      * Demande le secret TOTP au serveur.
@@ -279,24 +370,7 @@ export const useAuthStore = create<AuthState>()(
         { code },
         { bearer: jeton },
       )
-      const { codes_secours, ...jetons } = reponse.data
-      if (!jetons.access_token || !jetons.refresh_token) {
-        // L'activation a reussi cote serveur : impossible d'ecrire un etat
-        // « connecte » sans jeton. Le dire, plutot que laisser l'ecran pretendre.
-        throw new Error("Activation effectuee, mais le serveur n a renvoye aucune session.")
-      }
-      sessionVivante()
-      set({
-        token: jetons.access_token,
-        refreshToken: jetons.refresh_token,
-        // Le jeton d'enrolement a ete consomme par le serveur : le garder
-        // permettrait de rejouer une activation, et de trailer un secret dans l'etat.
-        jetonEnrolement: null,
-        preparation2fa: null,
-        challenge2fa: null,
-      })
-      await get().chargerProfil()
-      return codes_secours
+      return terminerEnrolement(reponse.data)
     },
 
     /**
@@ -466,15 +540,19 @@ if (typeof BroadcastChannel !== 'undefined') {
   }
 }
 
-/** `true` si l'utilisateur possède la permission `"MODULE:ACTION"`. */
+/** `true` si le profil porte la permission `platform.<ressource>.<action>`. */
 export function possedePermission(
   profil: ProfilPlateforme | null,
   permission: string,
 ): boolean {
   if (!profil) return false
-  // Court-circuit des rôles de contrôle : le backend applique la même règle,
-  // et deux implémentations divergentes donneraient des boutons visibles qui
-  // répondent 403.
-  if (profil.role === 'SUPER_ADMIN') return true
-  return profil.permissions.includes(permission)
+  // **Aucun court-circuit de rôle**, comme côté serveur : même le Super Admin
+  // doit porter la permission. Deux règles divergentes donneraient des boutons
+  // visibles qui répondent 403 - ou, à l'inverse, des écrans masqués à tort.
+  return (profil.permissions ?? []).includes(permission)
+}
+
+/** Rôle principal du profil, pour l'affichage. */
+export function rolePrincipal(profil: ProfilPlateforme | null): string | undefined {
+  return profil?.roles?.[0] ?? profil?.role
 }

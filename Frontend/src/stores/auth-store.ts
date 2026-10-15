@@ -45,8 +45,51 @@ export interface ProfilUtilisateur {
   tenant_id?: string | null
   /** Nom du cabinet, pour la barre du haut — disponible meme sans `CABINETS:READ`. */
   cabinet_nom?: string | null
+  /** Logo du cabinet (chemin relatif à l'API), s'il en a un. */
+  cabinet_logo_url?: string | null
   /** Site de rattachement de l'utilisateur, s'il en a un. */
   cabinet_id?: string | null
+  /** Double authentification active sur ce compte. */
+  deux_facteurs?: boolean
+  /** Méthodes utilisables : `totp` (application), `email`. */
+  methodes_2fa?: string[]
+  /** Obligatoire pour ce rôle : « Mon compte » ne propose pas de s'en passer. */
+  deux_facteurs_obligatoire?: boolean
+}
+
+/**
+ * Issue d'une connexion ou d'une étape franchie (`LoginEtapeResponse`).
+ *
+ * `session` : connecté. Sinon, une étape reste à franchir, portée par
+ * `jeton_etape` (usage unique, 10 minutes, jamais une session).
+ */
+export type NomEtape = 'session' | 'changement_mot_de_passe' | 'deux_facteurs' | 'enrolement_2fa'
+
+export interface ReponseEtape {
+  etape: NomEtape
+  access_token?: string | null
+  refresh_token?: string | null
+  jeton_etape?: string | null
+  methodes?: string[]
+  deux_facteurs_recommande?: boolean
+  codes_secours?: string[] | null
+}
+
+/** Étape en cours, tenue en mémoire seulement (jamais persistée). */
+export interface EtapeConnexion {
+  etape: Exclude<NomEtape, 'session'>
+  jeton: string
+  methodes: string[]
+}
+
+export interface EnvoiCode {
+  destinataire: string
+  expiration_secondes: number
+}
+
+export interface PreparationTotp {
+  secret: string
+  uri: string
 }
 
 interface TokenReponse {
@@ -61,7 +104,29 @@ interface AuthState {
   token: string | null
   refreshToken: string | null
   profil: ProfilUtilisateur | null
-  connexion: (email: string, password: string) => Promise<void>
+  /** Étape de connexion en cours ; `null` hors connexion. Non persistée. */
+  etapeConnexion: EtapeConnexion | null
+  /**
+   * Codes de secours qui viennent d'être émis, à montrer UNE fois avant de
+   * quitter l'écran de connexion. Placés ici AVANT l'ouverture de la session :
+   * sinon la page voit la session, redirige, et les codes sont perdus.
+   * Mémoire seule, jamais persistés.
+   */
+  codesSecoursAAfficher: string[] | null
+  oublierCodesSecours: () => void
+  /** Renvoie l'étape suivante, ou `session` si l'utilisateur est connecté. */
+  connexion: (email: string, password: string) => Promise<NomEtape>
+  /** Remplace le mot de passe temporaire. */
+  changerMotDePasseInitial: (nouveau: string) => Promise<NomEtape>
+  /** Code à 6 chiffres envoyé à l'adresse du compte, pour l'étape en cours. */
+  envoyerCodeEtape: () => Promise<EnvoiCode>
+  /** Code de l'application, code e-mail ou code de secours. */
+  validerCodeEtape: (code: string) => Promise<NomEtape>
+  /** QR code de la configuration obligatoire. */
+  preparerTotpEtape: () => Promise<PreparationTotp>
+  /** Active la 2FA pendant la connexion ; les codes vont dans `codesSecoursAAfficher`. */
+  activer2faEtape: (methode: 'totp' | 'email', code: string) => Promise<void>
+  annulerEtape: () => void
   chargerProfil: () => Promise<void>
   deconnexion: () => void
 }
@@ -78,22 +143,62 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       refreshToken: null,
       profil: null,
+      etapeConnexion: null,
+      codesSecoursAAfficher: null,
+
+      oublierCodesSecours: () => set({ codesSecoursAAfficher: null }),
 
       connexion: async (email, password) => {
-        const reponse = await api.post<ApiReponse<TokenReponse>>('/auth/login', {
+        const reponse = await api.post<ApiReponse<ReponseEtape>>('/auth/login', {
           email,
           password,
         })
-        sessionVivante()
-        set({
-          token: reponse.data.access_token,
-          refreshToken: reponse.data.refresh_token,
-          profil: null,
-        })
-        // Profil complet (rôles, permissions) en une seconde requête : c'est
-        // lui qui alimente le RBAC côté UI.
-        await get().chargerProfil()
+        return appliquerEtape(reponse.data)
       },
+
+      changerMotDePasseInitial: async (nouveau) => {
+        const reponse = await api.post<ApiReponse<ReponseEtape>>('/auth/etape/mot-de-passe', {
+          jeton_etape: jetonEtape(),
+          nouveau,
+        })
+        return appliquerEtape(reponse.data)
+      },
+
+      envoyerCodeEtape: async () => {
+        const reponse = await api.post<ApiReponse<EnvoiCode>>('/auth/etape/code-email', {
+          jeton_etape: jetonEtape(),
+        })
+        return reponse.data
+      },
+
+      validerCodeEtape: async (code) => {
+        const reponse = await api.post<ApiReponse<ReponseEtape>>('/auth/etape/2fa', {
+          jeton_etape: jetonEtape(),
+          code,
+        })
+        return appliquerEtape(reponse.data)
+      },
+
+      preparerTotpEtape: async () => {
+        const reponse = await api.post<ApiReponse<PreparationTotp>>('/auth/etape/2fa/preparation', {
+          jeton_etape: jetonEtape(),
+        })
+        return reponse.data
+      },
+
+      activer2faEtape: async (methode, code) => {
+        const reponse = await api.post<ApiReponse<ReponseEtape>>('/auth/etape/2fa/activation', {
+          jeton_etape: jetonEtape(),
+          methode,
+          code,
+        })
+        // Codes d'abord, session ensuite : voir `codesSecoursAAfficher`. Ils
+        // ne sont pas persistés et l'écran les efface dès leur confirmation.
+        set({ codesSecoursAAfficher: reponse.data.codes_secours ?? [] })
+        await appliquerEtape({ ...reponse.data, codes_secours: null })
+      },
+
+      annulerEtape: () => set({ etapeConnexion: null }),
 
       chargerProfil: async () => {
         const reponse = await api.get<ApiReponse<ProfilUtilisateur>>('/auth/me')
@@ -114,6 +219,8 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'sysdent-auth',
+      // `etapeConnexion` n'est volontairement PAS persistée : un jeton d'étape
+      // dans le stockage du navigateur survivrait à la fermeture de l'onglet.
       partialize: (etat) => ({
         token: etat.token,
         refreshToken: etat.refreshToken,
@@ -124,6 +231,41 @@ export const useAuthStore = create<AuthState>()(
 )
 
 /** Purgeur enregistre par l'application : vide le cache et renvoie a la connexion. */
+function jetonEtape(): string {
+  const etape = useAuthStore.getState().etapeConnexion
+  if (!etape) throw new Error('Session de connexion expirée. Reprenez depuis le début.')
+  return etape.jeton
+}
+
+/**
+ * Applique l'issue d'une étape : session ouverte, ou étape suivante.
+ *
+ * C'est le seul endroit qui écrit un jeton de session dans le store : une
+ * réponse sans `access_token` ne connecte jamais.
+ */
+async function appliquerEtape(donnees: ReponseEtape): Promise<NomEtape> {
+  if (donnees.etape === 'session') {
+    if (!donnees.access_token || !donnees.refresh_token) {
+      throw new Error('Réponse du serveur inattendue : aucune session. Rechargez la page.')
+    }
+    sessionVivante()
+    useAuthStore.setState({
+      token: donnees.access_token,
+      refreshToken: donnees.refresh_token,
+      profil: null,
+      etapeConnexion: null,
+    })
+    // Profil complet (rôles, permissions) : c'est lui qui alimente le RBAC.
+    await useAuthStore.getState().chargerProfil()
+    return 'session'
+  }
+  if (!donnees.jeton_etape) throw new Error('Réponse du serveur inattendue. Rechargez la page.')
+  useAuthStore.setState({
+    etapeConnexion: { etape: donnees.etape, jeton: donnees.jeton_etape, methodes: donnees.methodes ?? [] },
+  })
+  return donnees.etape
+}
+
 type PurgeurSession = () => void
 let purgeurSession: PurgeurSession | null = null
 

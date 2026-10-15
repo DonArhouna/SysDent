@@ -7,7 +7,6 @@ import {
   Menu,
   LogOut,
   Search,
-  Settings,
   ShieldCheck,
   UserRound,
   type LucideIcon,
@@ -17,22 +16,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/layout/theme-toggle'
 import { CommandPalette } from '@/components/layout/command-palette'
-import { useAuthStore } from '@/stores/auth-store'
+import { useAuthStore, rolePrincipal } from '@/stores/auth-store'
+import { libelleRole } from '@/lib/libelles'
 import { cn } from '@/lib/utils'
-
-/** Libellé du rôle plateforme — copie dédiée, voir `sidebar.tsx`. */
-function libelleRole(role: string | undefined): string {
-  switch (role) {
-    case 'SUPER_ADMIN':
-      return 'Super Admin'
-    case 'SUPPORT':
-      return 'Support'
-    case 'LECTURE':
-      return 'Lecture seule'
-    default:
-      return role ?? '—'
-  }
-}
 
 /**
  * Navbar flottante.
@@ -41,7 +27,7 @@ function libelleRole(role: string | undefined): string {
  *   (demande explicite). Le clic dehors ou `Échap` ferme les panneaux ouverts ;
  * - - **`Ctrl/⌘ + K`** ouvre une palette qui cherche dans toute l'application
  *   (pages + actions), pas seulement parmi les patients ;
- * - - le bloc utilisateur ouvre un menu (Mon compte, Paramètres, Déconnexion).
+ * - - le bloc utilisateur ouvre un menu (Mon compte, Déconnexion).
  */
 
 interface EntreeMenu {
@@ -65,7 +51,7 @@ export function Topbar({
   const naviguer = useNavigate()
 
   const nomComplet = profil ? `${profil.prenom} ${profil.nom}`.trim() : '—'
-  const roleLibelle = libelleRole(profil?.role)
+  const roleLibelle = libelleRole(rolePrincipal(profil))
 
   const [paletteOuverte, setPaletteOuverte] = useState(false)
   const [menuOuvert, setMenuOuvert] = useState(false)
@@ -128,7 +114,6 @@ export function Topbar({
 
   const entreesMenu: EntreeMenu[] = [
     { libelle: 'Mon compte', icone: UserRound, action: () => naviguer('/compte') },
-    { libelle: 'Paramètres', icone: Settings, action: () => naviguer('/parametres') },
     {
       libelle: 'Se déconnecter',
       icone: LogOut,

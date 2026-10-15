@@ -4,13 +4,14 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 import structlog
-from sqlalchemy import func, select, text
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from src.core.config import settings
 from src.core.database import tenant_db_manager
 from src.core.exceptions import AppException, BusinessRuleViolationException, EntityNotFoundException
 from src.core.migrations import upgrade_tenant_to_head
+from src.core.tenant_roles import creer_base_dediee, generer_identifiants, url_tenant
 from src.core.security import (
     create_access_token,
     create_refresh_token,
@@ -36,31 +37,9 @@ def sanitize_db_name(name: str) -> str:
     return f"sysdent_tenant_{clean[:30]}_{uuid.uuid4().hex[:6]}"
 
 
-async def _create_physical_database(db_name: str) -> None:
-    """
-    Exécute un CREATE DATABASE réel sur le serveur PostgreSQL des tenants.
-    CREATE DATABASE ne peut pas tourner dans une transaction : on utilise une connexion
-    autocommit, courte durée de vie, vers la base de maintenance `postgres`.
-    """
-    maintenance_url = (
-        f"postgresql+asyncpg://{settings.TENANT_DB_USER}:{settings.TENANT_DB_PASSWORD}"
-        f"@{settings.TENANT_DB_HOST}:{settings.TENANT_DB_PORT}/postgres"
-    )
-    admin_engine: AsyncEngine = create_async_engine(maintenance_url, isolation_level="AUTOCOMMIT")
-    try:
-        async with admin_engine.connect() as conn:
-            exists = await conn.execute(
-                text("SELECT 1 FROM pg_database WHERE datname = :name"), {"name": db_name}
-            )
-            if not exists.scalar_one_or_none():
-                # db_name provient uniquement de sanitize_db_name() ([a-z0-9_] + uuid) : pas d'injection possible.
-                await conn.execute(text(f'CREATE DATABASE "{db_name}"'))
-                logger.info("tenant_database_created", db_name=db_name)
-    finally:
-        await admin_engine.dispose()
-
-
-async def _bootstrap_tenant_schema_and_admin(societe_id: uuid.UUID, db_name: str, data: SocieteCreate) -> None:
+async def _bootstrap_tenant_schema_and_admin(
+    societe_id: uuid.UUID, db_name: str, data: SocieteCreate, role_db: str, mdp_db: str
+) -> None:
     """
     Crée le schéma applicatif sur la nouvelle base tenant (via Alembic), le RBAC
     (permissions + rôles + matrice), le cabinet, le compte admin et son profil
@@ -74,10 +53,8 @@ async def _bootstrap_tenant_schema_and_admin(societe_id: uuid.UUID, db_name: str
     # Référentiel médicamenteux : sans lui, aucune ordonnance ne peut être émise
     # et le contrôle de contre-indication n'a aucune règle à appliquer.
     from src.modules.ordonnances.services import MedicamentService
-    tenant_url_migration = (
-        f"postgresql+asyncpg://{settings.TENANT_DB_USER}:{settings.TENANT_DB_PASSWORD}"
-        f"@{settings.TENANT_DB_HOST}:{settings.TENANT_DB_PORT}/{db_name}"
-    )
+    # Sous le compte DU CABINET : il devient propriétaire de ses tables.
+    tenant_url_migration = url_tenant(db_name, role_db, mdp_db)
     # # Alembic reste synchrone cote appel : `src/core/alembic_async.py` ouvre un
         # moteur `asyncpg` et fait tourner les migrations dans son thread interne.
         # On l'appelle donc dans un thread, comme avant, sans boucle en cours.
@@ -88,8 +65,8 @@ async def _bootstrap_tenant_schema_and_admin(societe_id: uuid.UUID, db_name: str
         db_name=db_name,
         host=settings.TENANT_DB_HOST,
         port=settings.TENANT_DB_PORT,
-        user=settings.TENANT_DB_USER,
-        password=settings.TENANT_DB_PASSWORD,
+        user=role_db,
+        password=mdp_db,
     )
     session_factory = await tenant_db_manager.get_session_factory(str(societe_id))
     async with session_factory() as tenant_session:
@@ -387,13 +364,16 @@ class MasterTenantService:
 
         # 2. Définition du nom et paramètres de la base de données dédiée
         db_name = sanitize_db_name(data.nom)
+        # Compte PostgreSQL DÉDIÉ au cabinet, comme le provisionnement de la
+        # console plateforme (cf. `src/core/tenant_roles.py`).
+        role_db, mdp_db = generer_identifiants(db_name)
         tenant_db = TenantDB(
             societe_id=societe.id,
             db_name=db_name,
             db_host=settings.TENANT_DB_HOST,
             db_port=settings.TENANT_DB_PORT,
-            db_user=settings.TENANT_DB_USER,
-            db_password=encrypt_secret(settings.TENANT_DB_PASSWORD),
+            db_user=role_db,
+            db_password=encrypt_secret(mdp_db),
             statut="PROVISIONING",
             schema_version="1.0.0",
         )
@@ -416,8 +396,10 @@ class MasterTenantService:
         # étape échoue (statut reste "PROVISIONING", visible et reprenable manuellement).
         admin_user = None
         try:
-            await _create_physical_database(db_name)
-            admin_user = await _bootstrap_tenant_schema_and_admin(societe.id, db_name, data)
+            await creer_base_dediee(db_name, role_db, mdp_db)
+            admin_user = await _bootstrap_tenant_schema_and_admin(
+                societe.id, db_name, data, role_db, mdp_db
+            )
         except Exception as e:
             logger.exception("tenant_provisioning_failed", societe_id=str(societe.id), db_name=db_name, error=str(e))
             raise AppException(

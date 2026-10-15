@@ -27,6 +27,197 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/2fa/activation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activation 2Fa Session */
+        post: operations["activation_2fa_session_api_v1_auth_2fa_activation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/2fa/code-email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Code Email Session */
+        post: operations["code_email_session_api_v1_auth_2fa_code_email_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/2fa/preparation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preparation Totp */
+        post: operations["preparation_totp_api_v1_auth_2fa_preparation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/activation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Activer Compte
+         * @description Le titulaire choisit son mot de passe ; le lien ne sert plus ensuite.
+         */
+        post: operations["activer_compte_api_v1_auth_activation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/activation/verification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verifier Activation
+         * @description Dit à qui appartient le lien, avant de choisir le mot de passe. Ne consomme rien.
+         */
+        post: operations["verifier_activation_api_v1_auth_activation_verification_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/etape/2fa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Etape 2Fa
+         * @description Code de l'application, code e-mail de cette étape, ou code de secours.
+         */
+        post: operations["etape_2fa_api_v1_auth_etape_2fa_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/etape/2fa/activation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Etape Activation 2Fa
+         * @description Active la 2FA (application ou e-mail), rend les codes de secours une fois, ouvre la session.
+         */
+        post: operations["etape_activation_2fa_api_v1_auth_etape_2fa_activation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/etape/2fa/preparation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Etape Preparation Totp
+         * @description Secret à scanner (QR code), pendant la configuration obligatoire.
+         */
+        post: operations["etape_preparation_totp_api_v1_auth_etape_2fa_preparation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/etape/code-email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Etape Code Email
+         * @description Envoie un code à l'adresse du compte. Il ne vaut que pour cette étape.
+         */
+        post: operations["etape_code_email_api_v1_auth_etape_code_email_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/etape/mot-de-passe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Etape Mot De Passe
+         * @description Remplace le mot de passe temporaire, puis enchaîne sur l'étape suivante.
+         */
+        post: operations["etape_mot_de_passe_api_v1_auth_etape_mot_de_passe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -38,11 +229,12 @@ export interface paths {
         put?: never;
         /**
          * Login
-         * @description Connexion utilisateur.
+         * @description Connexion utilisateur, **en étapes**.
          *
-         *     Le cabinet est résolu via l'index Master `utilisateur_index`, le mot de passe
-         *     est vérifié en base argon2, et une session persistée est créée pour rendre
-         *     le token révocable. Le cookie HttpOnly est déposé pour les navigateurs.
+         *     Le cabinet est résolu via l'index Master, le mot de passe vérifié en argon2.
+         *     Ensuite, selon le compte : session directe, changement du mot de passe
+         *     temporaire, code de double authentification, ou configuration de la 2FA
+         *     (obligatoire pour l'administrateur du cabinet). Voir `LoginEtapeResponse`.
          */
         post: operations["login_api_v1_auth_login_post"];
         delete?: never;
@@ -882,6 +1074,23 @@ export interface paths {
          * @description Remet en service un fauteuil désactivé.
          */
         post: operations["reactiver_fauteuil_api_v1_fauteuils__fauteuil_id__reactiver_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/logos/{societe_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Logo d'un cabinet (public) */
+        get: operations["lire_logo_api_v1_logos__societe_id__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1927,6 +2136,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/auth/2fa/activation-email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enrôlement par e-mail : activer et ouvrir la session
+         * @description Pendant de `/2fa/activation` pour l'e-mail : le code recu active le second
+         *     facteur, les codes de secours sont rendus **une fois**, la session s'ouvre.
+         */
+        post: operations["activer_2fa_email_api_v1_platform_auth_2fa_activation_email_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/auth/2fa/activation-email/envoi": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enrôlement par e-mail : recevoir le code
+         * @description Alternative au QR code : un code part a l'adresse du compte (jeton d'enrolement).
+         */
+        post: operations["envoyer_code_email_enrolement_api_v1_platform_auth_2fa_activation_email_envoi_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/auth/2fa/codes-secours/regenerer": {
         parameters: {
             query?: never;
@@ -1948,6 +2198,29 @@ export interface paths {
          *     journal ne contient que leur nombre.
          */
         post: operations["regenerer_codes_secours_api_v1_platform_auth_2fa_codes_secours_regenerer_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/auth/2fa/email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recevoir le code de connexion par e-mail
+         * @description Alternative au TOTP : un code a 6 chiffres part a l'adresse du compte.
+         *
+         *     Le code se saisit ensuite sur `/2fa`, avec le meme defi. Il ne vaut que pour
+         *     ce defi, 5 minutes, une fois ; un nouvel envoi annule le precedent.
+         */
+        post: operations["envoyer_code_email_defi_api_v1_platform_auth_2fa_email_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2232,6 +2505,68 @@ export interface paths {
         get: operations["historique_plan_api_v1_platform_plans__plan_id__revisions_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/rendez-vous": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Rendez-vous de l'équipe */
+        get: operations["lister_api_v1_platform_rendez_vous_get"];
+        put?: never;
+        /**
+         * Planifier un rendez-vous
+         * @description Refusé si l'agent a déjà un rendez-vous actif sur ce créneau (`RDV_CONFLIT_AGENT`).
+         */
+        post: operations["creer_api_v1_platform_rendez_vous_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/rendez-vous/{rdv_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Détail d'un rendez-vous */
+        get: operations["obtenir_api_v1_platform_rendez_vous__rdv_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Modifier un rendez-vous
+         * @description Le contact est prévenu si l'horaire, la durée ou le lieu changent.
+         */
+        patch: operations["modifier_api_v1_platform_rendez_vous__rdv_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/platform/rendez-vous/{rdv_id}/statut": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirmer, marquer effectué ou annuler
+         * @description L'annulation exige un motif ; le contact en est prévenu.
+         */
+        post: operations["changer_statut_api_v1_platform_rendez_vous__rdv_id__statut_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2533,6 +2868,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/tenants/{tenant_id}/administrateurs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Administrateurs d'un cabinet
+         * @description Comptes administrateurs du cabinet : état d'activation, de la 2FA, dernière connexion.
+         */
+        get: operations["lister_administrateurs_api_v1_platform_tenants__tenant_id__administrateurs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/tenants/{tenant_id}/administrateurs/{utilisateur_id}/acces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Réinitialiser l'accès d'un administrateur du cabinet
+         * @description `lien` (recommandé), `temporaire` (rendu une fois, changement imposé) ou
+         *     `deux_facteurs` (téléphone perdu). Sessions coupées, motif journalisé dans
+         *     la console et dans le cabinet. Aucun mot de passe choisi par un agent.
+         */
+        post: operations["reinitialiser_acces_admin_api_v1_platform_tenants__tenant_id__administrateurs__utilisateur_id__acces_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/tenants/{tenant_id}/administrateurs/{utilisateur_id}/email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Changer l'e-mail de connexion d'un administrateur du cabinet
+         * @description Change l'adresse de connexion (base du cabinet + index master, ensemble) et
+         *     envoie un lien d'activation à la nouvelle adresse. Sessions coupées.
+         */
+        post: operations["changer_email_administrateur_api_v1_platform_tenants__tenant_id__administrateurs__utilisateur_id__email_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/tenants/{tenant_id}/archivage": {
         parameters: {
             query?: never;
@@ -2574,6 +2972,24 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/tenants/{tenant_id}/logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Envoyer le logo d'un cabinet (PNG, JPEG ou WebP, 512 Ko max) */
+        post: operations["envoyer_logo_api_v1_platform_tenants__tenant_id__logo_post"];
+        /** Retirer le logo */
+        delete: operations["supprimer_logo_api_v1_platform_tenants__tenant_id__logo_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2621,6 +3037,66 @@ export interface paths {
         get: operations["simuler_quota_api_v1_platform_tenants__tenant_id__quotas_simulation_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/tenants/{tenant_id}/rbac": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Rôles et permissions d'un cabinet
+         * @description Rôles du cabinet avec leurs permissions, et le catalogue des permissions accordables.
+         */
+        get: operations["lire_matrice_api_v1_platform_tenants__tenant_id__rbac_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/tenants/{tenant_id}/rbac/roles/{role_id}/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accorder une permission à un rôle du cabinet
+         * @description Trace dans le journal de la console ET dans celui du cabinet. Motif obligatoire.
+         */
+        post: operations["accorder_api_v1_platform_tenants__tenant_id__rbac_roles__role_id__permissions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/tenants/{tenant_id}/rbac/roles/{role_id}/permissions/retrait": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retirer une permission à un rôle du cabinet
+         * @description Trace dans le journal de la console ET dans celui du cabinet. Motif obligatoire.
+         */
+        post: operations["retirer_api_v1_platform_tenants__tenant_id__rbac_roles__role_id__permissions_retrait_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3232,7 +3708,7 @@ export interface paths {
          * @description Créneaux réellement disponibles : heures déclarées **moins** ce qui est déjà
          *     pris (rendez-vous du praticien, fauteuils immobilisés).
          *
-         *     ⚠️ Complète `GET /praticiens/{id}/creneaux` du module D2A, qui ne connaît que
+         *     ATTENTION : Complète `GET /praticiens/{id}/creneaux` du module D2A, qui ne connaît que
          *     les heures déclarées. C'est cette route qu'un écran de prise de rendez-vous
          *     doit appeler.
          */
@@ -3258,7 +3734,7 @@ export interface paths {
          * Bloquer Fauteuil
          * @description Immobilise un fauteuil sans rendez-vous (panne, entretien).
          *
-         *     ⚠️ `422 CRENEAU_DEJA_OCCUPE` si un rendez-vous occupe déjà le fauteuil sur
+         *     ATTENTION : `422 CRENEAU_DEJA_OCCUPE` si un rendez-vous occupe déjà le fauteuil sur
          *     cette plage : il faut d'abord déplacer ou annuler ce rendez-vous, pas
          *     supprimer son occupation.
          */
@@ -3834,6 +4310,28 @@ export interface paths {
         patch: operations["modifier_utilisateur_api_v1_utilisateurs__utilisateur_id__patch"];
         trace?: never;
     };
+    "/api/v1/utilisateurs/{utilisateur_id}/invitation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Renvoyer Invitation
+         * @description (Re)envoie le lien d'activation : la personne choisit un nouveau mot de
+         *     passe. Le lien précédent ne vaut plus rien, les sessions sont révoquées.
+         *     Recommandé plutôt qu'un mot de passe temporaire quand l'adresse est valide.
+         */
+        post: operations["renvoyer_invitation_api_v1_utilisateurs__utilisateur_id__invitation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/utilisateurs/{utilisateur_id}/mot-de-passe": {
         parameters: {
             query?: never;
@@ -4177,6 +4675,22 @@ export interface components {
             /** Tarif Applique */
             tarif_applique?: number | string | null;
         };
+        /** ActionAccesAdminRequest */
+        ActionAccesAdminRequest: {
+            /** Action */
+            action: string;
+            /**
+             * Motif
+             * @description Motif obligatoire (journalisé)
+             */
+            motif: string;
+        };
+        /** ActionAccesAdminResponse */
+        ActionAccesAdminResponse: {
+            compte: components["schemas"]["AdminCabinetResponse"];
+            /** Mot De Passe Temporaire */
+            mot_de_passe_temporaire?: string | null;
+        };
         /** Activation2FAResponse */
         Activation2FAResponse: {
             /** Instruction */
@@ -4192,10 +4706,63 @@ export interface components {
              */
             uri: string;
         };
+        /**
+         * ActivationDeuxFacteursRequest
+         * @description `jeton_etape` pendant la connexion ; absent quand on est déjà connecté.
+         */
+        ActivationDeuxFacteursRequest: {
+            /** Code */
+            code: string;
+            /** Jeton Etape */
+            jeton_etape?: string | null;
+            /** Methode */
+            methode: string;
+        };
+        /** ActivationInfoResponse */
+        ActivationInfoResponse: {
+            /** Cabinet Logo Url */
+            cabinet_logo_url?: string | null;
+            /** Cabinet Nom */
+            cabinet_nom?: string | null;
+            /** Email */
+            email: string;
+            /** Nom */
+            nom: string;
+            /** Prenom */
+            prenom: string;
+        };
+        /** ActivationRequest */
+        ActivationRequest: {
+            /** Jeton */
+            jeton: string;
+            /** Mot De Passe */
+            mot_de_passe: string;
+        };
         /** Activer2FARequest */
         Activer2FARequest: {
             /** Code */
             code: string;
+        };
+        /** AdminCabinetResponse */
+        AdminCabinetResponse: {
+            /** Actif */
+            actif: boolean;
+            /** Activation Requise */
+            activation_requise: boolean;
+            /** Dernier Login */
+            dernier_login?: string | null;
+            /** Deux Facteurs */
+            deux_facteurs: boolean;
+            /** Doit Changer Mot De Passe */
+            doit_changer_mot_de_passe: boolean;
+            /** Email */
+            email: string;
+            /** Id */
+            id: string;
+            /** Nom */
+            nom: string;
+            /** Prenom */
+            prenom: string;
         };
         /**
          * AgendaResponse
@@ -4523,9 +5090,42 @@ export interface components {
              */
             success: boolean;
         };
+        /** APIResponse[ActionAccesAdminResponse] */
+        APIResponse_ActionAccesAdminResponse_: {
+            data?: components["schemas"]["ActionAccesAdminResponse"] | null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
         /** APIResponse[Activation2FAResponse] */
         APIResponse_Activation2FAResponse_: {
             data?: components["schemas"]["Activation2FAResponse"] | null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
+        /** APIResponse[ActivationInfoResponse] */
+        APIResponse_ActivationInfoResponse_: {
+            data?: components["schemas"]["ActivationInfoResponse"] | null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
+        /** APIResponse[AdminCabinetResponse] */
+        APIResponse_AdminCabinetResponse_: {
+            data?: components["schemas"]["AdminCabinetResponse"] | null;
             /** Message */
             message?: string | null;
             /**
@@ -4603,6 +5203,17 @@ export interface components {
         /** APIResponse[ChartingParodontalResponse] */
         APIResponse_ChartingParodontalResponse_: {
             data?: components["schemas"]["ChartingParodontalResponse"] | null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
+        /** APIResponse[CodesSecoursResponse] */
+        APIResponse_CodesSecoursResponse_: {
+            data?: components["schemas"]["CodesSecoursResponse"] | null;
             /** Message */
             message?: string | null;
             /**
@@ -4768,6 +5379,28 @@ export interface components {
              */
             success: boolean;
         };
+        /** APIResponse[EnvoiCodeEmailResponse] */
+        APIResponse_EnvoiCodeEmailResponse_: {
+            data?: components["schemas"]["EnvoiCodeEmailResponse"] | null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
+        /** APIResponse[EnvoiCodeResponse] */
+        APIResponse_EnvoiCodeResponse_: {
+            data?: components["schemas"]["EnvoiCodeResponse"] | null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
         /** APIResponse[EtatGeneralResponse] */
         APIResponse_EtatGeneralResponse_: {
             data?: components["schemas"]["EtatGeneralResponse"] | null;
@@ -4873,6 +5506,18 @@ export interface components {
         APIResponse_List_ActeRealiseResponse__: {
             /** Data */
             data?: components["schemas"]["ActeRealiseResponse"][] | null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
+        /** APIResponse[List[AdminCabinetResponse]] */
+        APIResponse_List_AdminCabinetResponse__: {
+            /** Data */
+            data?: components["schemas"]["AdminCabinetResponse"][] | null;
             /** Message */
             message?: string | null;
             /**
@@ -5123,6 +5768,17 @@ export interface components {
              */
             success: boolean;
         };
+        /** APIResponse[LoginEtapeResponse] */
+        APIResponse_LoginEtapeResponse_: {
+            data?: components["schemas"]["LoginEtapeResponse"] | null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
         /** APIResponse[LoginPlateformeResponse] */
         APIResponse_LoginPlateformeResponse_: {
             data?: components["schemas"]["LoginPlateformeResponse"] | null;
@@ -5137,6 +5793,17 @@ export interface components {
         /** APIResponse[MasterTokenResponse] */
         APIResponse_MasterTokenResponse_: {
             data?: components["schemas"]["MasterTokenResponse"] | null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
+        /** APIResponse[MatriceCabinetResponse] */
+        APIResponse_MatriceCabinetResponse_: {
+            data?: components["schemas"]["MatriceCabinetResponse"] | null;
             /** Message */
             message?: string | null;
             /**
@@ -5267,6 +5934,17 @@ export interface components {
              */
             success: boolean;
         };
+        /** APIResponse[PermissionsRoleCabinetResponse] */
+        APIResponse_PermissionsRoleCabinetResponse_: {
+            data?: components["schemas"]["PermissionsRoleCabinetResponse"] | null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
         /** APIResponse[PlanEchelonnementResponse] */
         APIResponse_PlanEchelonnementResponse_: {
             data?: components["schemas"]["PlanEchelonnementResponse"] | null;
@@ -5322,6 +6000,17 @@ export interface components {
              */
             success: boolean;
         };
+        /** APIResponse[PreparationTotpResponse] */
+        APIResponse_PreparationTotpResponse_: {
+            data?: components["schemas"]["PreparationTotpResponse"] | null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
         /** APIResponse[QuotaResumeResponse] */
         APIResponse_QuotaResumeResponse_: {
             data?: components["schemas"]["QuotaResumeResponse"] | null;
@@ -5369,6 +6058,17 @@ export interface components {
         /** APIResponse[RegenererCodesSecoursResponse] */
         APIResponse_RegenererCodesSecoursResponse_: {
             data?: components["schemas"]["RegenererCodesSecoursResponse"] | null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
+        /** APIResponse[RendezVousPlateformeResponse] */
+        APIResponse_RendezVousPlateformeResponse_: {
+            data?: components["schemas"]["RendezVousPlateformeResponse"] | null;
             /** Message */
             message?: string | null;
             /**
@@ -5821,6 +6521,14 @@ export interface components {
             /** Motif Detail */
             motif_detail?: string | null;
         };
+        /** Body_envoyer_logo_api_v1_platform_tenants__tenant_id__logo_post */
+        Body_envoyer_logo_api_v1_platform_tenants__tenant_id__logo_post: {
+            /**
+             * Fichier
+             * @description PNG, JPEG ou WebP, 512 Ko au plus
+             */
+            fichier: string;
+        };
         /** CabinetResponse */
         CabinetResponse: {
             /** Actif */
@@ -5951,6 +6659,19 @@ export interface components {
              */
             jeton_challenge: string;
         };
+        /** ChangementEmailAdminRequest */
+        ChangementEmailAdminRequest: {
+            /**
+             * Motif
+             * @description Motif obligatoire (journalisé)
+             */
+            motif: string;
+            /**
+             * Nouvel Email
+             * Format: email
+             */
+            nouvel_email: string;
+        };
         /** ChangementMotDePasseRequest */
         ChangementMotDePasseRequest: {
             /** Ancien */
@@ -6076,6 +6797,11 @@ export interface components {
             motif_ecart?: string | null;
             /** Notes */
             notes?: string | null;
+        };
+        /** CodesSecoursResponse */
+        CodesSecoursResponse: {
+            /** Codes Secours */
+            codes_secours: string[];
         };
         /** CommandeCreate */
         CommandeCreate: {
@@ -7068,6 +7794,53 @@ export interface components {
             /** Refresh Token */
             refresh_token: string;
         };
+        /**
+         * EnvoiCodeEmailRequest
+         * @description Demande d'un code par e-mail pendant le defi de connexion.
+         */
+        EnvoiCodeEmailRequest: {
+            /**
+             * Jeton Challenge
+             * @description Défi reçu au login
+             */
+            jeton_challenge: string;
+        };
+        /** EnvoiCodeEmailResponse */
+        EnvoiCodeEmailResponse: {
+            /**
+             * Destinataire
+             * @description Adresse masquée à laquelle le code est parti
+             */
+            destinataire: string;
+            /** Expiration Secondes */
+            expiration_secondes: number;
+        };
+        /** EnvoiCodeResponse */
+        EnvoiCodeResponse: {
+            /** Destinataire */
+            destinataire: string;
+            /** Expiration Secondes */
+            expiration_secondes: number;
+        };
+        /** EtapeCodeRequest */
+        EtapeCodeRequest: {
+            /** Code */
+            code: string;
+            /** Jeton Etape */
+            jeton_etape: string;
+        };
+        /** EtapeJetonRequest */
+        EtapeJetonRequest: {
+            /** Jeton Etape */
+            jeton_etape: string;
+        };
+        /** EtapeMotDePasseRequest */
+        EtapeMotDePasseRequest: {
+            /** Jeton Etape */
+            jeton_etape: string;
+            /** Nouveau */
+            nouveau: string;
+        };
         /** EtatGeneralCreate */
         EtatGeneralCreate: {
             /**
@@ -7655,6 +8428,14 @@ export interface components {
              */
             tenant_id: string;
         };
+        /** JetonActivationRequest */
+        JetonActivationRequest: {
+            /**
+             * Jeton
+             * @description Jeton reçu dans le lien d'activation
+             */
+            jeton: string;
+        };
         /** LigneCommandeCreate */
         LigneCommandeCreate: {
             /**
@@ -7877,6 +8658,49 @@ export interface components {
             quantite_recue: number;
         };
         /**
+         * LoginEtapeResponse
+         * @description Issue d'une connexion, ou d'une étape franchie.
+         *
+         *     `etape` dit quoi faire ensuite :
+         *     - `session` : connecté (jetons présents) ;
+         *     - `changement_mot_de_passe` : mot de passe temporaire à remplacer ;
+         *     - `deux_facteurs` : code de vérification à saisir ;
+         *     - `enrolement_2fa` : double authentification à configurer (rôle concerné).
+         */
+        LoginEtapeResponse: {
+            /** Access Token */
+            access_token?: string | null;
+            /** Codes Secours */
+            codes_secours?: string[] | null;
+            /**
+             * Deux Facteurs Recommande
+             * @default false
+             */
+            deux_facteurs_recommande: boolean;
+            /** Etape */
+            etape: string;
+            /** Expiration Secondes */
+            expiration_secondes?: number | null;
+            /** Expires In */
+            expires_in?: number | null;
+            /** Jeton Etape */
+            jeton_etape?: string | null;
+            /**
+             * Methodes
+             * @default []
+             */
+            methodes: string[];
+            /** Refresh Token */
+            refresh_token?: string | null;
+            /** Tenant Id */
+            tenant_id?: string | null;
+            /**
+             * Token Type
+             * @default bearer
+             */
+            token_type: string;
+        };
+        /**
          * LoginPlateformeResponse
          * @description Reponse de la premiere etape.
          *
@@ -7911,6 +8735,8 @@ export interface components {
             jeton_challenge?: string | null;
             /** Jeton Enrolement */
             jeton_enrolement?: string | null;
+            /** Methodes */
+            methodes?: string[];
             /** Refresh Expires In */
             refresh_expires_in?: number | null;
             /** Refresh Token */
@@ -7955,6 +8781,13 @@ export interface components {
              * @default bearer
              */
             token_type: string;
+        };
+        /** MatriceCabinetResponse */
+        MatriceCabinetResponse: {
+            /** Catalogue */
+            catalogue: components["schemas"]["PermissionCabinetResponse"][];
+            /** Roles */
+            roles: components["schemas"]["RoleCabinetResponse"][];
         };
         /**
          * MedicamentCreate
@@ -8020,6 +8853,19 @@ export interface components {
          * @enum {string}
          */
         ModePaiementEnum: "ESPECES" | "CARTE_BANCAIRE" | "CHEQUE" | "VIREMENT" | "MOBILE_MONEY" | "ASSURANCE";
+        /** ModificationPermissionCabinet */
+        ModificationPermissionCabinet: {
+            /**
+             * Motif
+             * @description Motif obligatoire (journalisé)
+             */
+            motif: string;
+            /**
+             * Permission
+             * @description MODULE:ACTION, issue du catalogue
+             */
+            permission: string;
+        };
         /**
          * MotDePasseTemporaireResponse
          * @description Mot de passe temporaire, renvoyé **une seule fois**.
@@ -8534,6 +9380,17 @@ export interface components {
              */
             success: boolean;
         };
+        /** PaginatedResponse[RendezVousPlateformeResponse] */
+        PaginatedResponse_RendezVousPlateformeResponse_: {
+            /** Items */
+            items: components["schemas"]["RendezVousPlateformeResponse"][];
+            meta: components["schemas"]["PaginationMeta"];
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+        };
         /** PaginatedResponse[RendezVousResponse] */
         PaginatedResponse_RendezVousResponse_: {
             /** Items */
@@ -8950,6 +9807,25 @@ export interface components {
             /** Ville */
             ville?: string | null;
         };
+        /** PermissionCabinetResponse */
+        PermissionCabinetResponse: {
+            /** Action */
+            action: string;
+            /**
+             * Code
+             * @description MODULE:ACTION
+             */
+            code: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Disponible
+             * @description Présente dans la base de ce cabinet
+             */
+            disponible: boolean;
+            /** Module */
+            module: string;
+        };
         /** PermissionGrant */
         PermissionGrant: {
             /**
@@ -8975,6 +9851,13 @@ export interface components {
             ressource: string;
             /** Sensible */
             sensible: boolean;
+        };
+        /** PermissionsRoleCabinetResponse */
+        PermissionsRoleCabinetResponse: {
+            /** Permissions */
+            permissions: string[];
+            /** Role Id */
+            role_id: string;
         };
         /** PlanCreate */
         PlanCreate: {
@@ -9199,6 +10082,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Methodes 2Fa */
+            methodes_2fa?: string[];
             /** Nom */
             nom: string;
             /** Permissions */
@@ -9338,6 +10223,13 @@ export interface components {
             specialite?: string | null;
             /** Titre */
             titre?: string | null;
+        };
+        /** PreparationTotpResponse */
+        PreparationTotpResponse: {
+            /** Secret */
+            secret: string;
+            /** Uri */
+            uri: string;
         };
         /** QuotaResumeResponse */
         QuotaResumeResponse: {
@@ -9565,6 +10457,152 @@ export interface components {
              */
             type_motif: string;
         };
+        /** RendezVousPlateformeCreate */
+        RendezVousPlateformeCreate: {
+            /** Agent Id */
+            agent_id?: string | null;
+            /** Contact Email */
+            contact_email?: string | null;
+            /** Contact Nom */
+            contact_nom?: string | null;
+            /** Contact Telephone */
+            contact_telephone?: string | null;
+            /**
+             * Debut
+             * Format: date-time
+             */
+            debut: string;
+            /**
+             * Duree Minutes
+             * @default 60
+             */
+            duree_minutes: number;
+            /** Lien Visio */
+            lien_visio?: string | null;
+            /** Lieu */
+            lieu?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Notifier Contact
+             * @default true
+             */
+            notifier_contact: boolean;
+            /** Prospect Nom */
+            prospect_nom?: string | null;
+            /**
+             * Tenant Id
+             * @description Cabinet client ; sinon `prospect_nom`
+             */
+            tenant_id?: string | null;
+            /** Titre */
+            titre: string;
+            /**
+             * Type Rdv
+             * @description DEMO | INSTALLATION | FORMATION | SUPPORT | COMMERCIAL | AUTRE
+             */
+            type_rdv: string;
+        };
+        /** RendezVousPlateformeResponse */
+        RendezVousPlateformeResponse: {
+            /** Agent Id */
+            agent_id?: string | null;
+            /** Agent Nom */
+            agent_nom?: string | null;
+            /** Contact Email */
+            contact_email?: string | null;
+            /** Contact Nom */
+            contact_nom?: string | null;
+            /**
+             * Contact Prevenu
+             * @default false
+             */
+            contact_prevenu: boolean;
+            /** Contact Telephone */
+            contact_telephone?: string | null;
+            /** Cree Par */
+            cree_par?: string | null;
+            /**
+             * Debut
+             * Format: date-time
+             */
+            debut: string;
+            /**
+             * Duree Minutes
+             * @default 60
+             */
+            duree_minutes: number;
+            /**
+             * Fin
+             * Format: date-time
+             */
+            fin: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Lien Visio */
+            lien_visio?: string | null;
+            /** Lieu */
+            lieu?: string | null;
+            /** Motif Annulation */
+            motif_annulation?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Prospect Nom */
+            prospect_nom?: string | null;
+            /** Statut */
+            statut: string;
+            /**
+             * Tenant Id
+             * @description Cabinet client ; sinon `prospect_nom`
+             */
+            tenant_id?: string | null;
+            /** Tenant Nom */
+            tenant_nom?: string | null;
+            /** Titre */
+            titre: string;
+            /**
+             * Type Rdv
+             * @description DEMO | INSTALLATION | FORMATION | SUPPORT | COMMERCIAL | AUTRE
+             */
+            type_rdv: string;
+        };
+        /** RendezVousPlateformeUpdate */
+        RendezVousPlateformeUpdate: {
+            /** Agent Id */
+            agent_id?: string | null;
+            /** Contact Email */
+            contact_email?: string | null;
+            /** Contact Nom */
+            contact_nom?: string | null;
+            /** Contact Telephone */
+            contact_telephone?: string | null;
+            /** Debut */
+            debut?: string | null;
+            /** Duree Minutes */
+            duree_minutes?: number | null;
+            /** Lien Visio */
+            lien_visio?: string | null;
+            /** Lieu */
+            lieu?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /**
+             * Notifier Contact
+             * @default true
+             */
+            notifier_contact: boolean;
+            /** Prospect Nom */
+            prospect_nom?: string | null;
+            /** Tenant Id */
+            tenant_id?: string | null;
+            /** Titre */
+            titre?: string | null;
+            /** Type Rdv */
+            type_rdv?: string | null;
+        };
         /** RendezVousResponse */
         RendezVousResponse: {
             /**
@@ -9662,6 +10700,23 @@ export interface components {
             notes?: string | null;
             /** Type Motif */
             type_motif?: string | null;
+        };
+        /** RoleCabinetResponse */
+        RoleCabinetResponse: {
+            /** Description */
+            description?: string | null;
+            /** Id */
+            id: string;
+            /** Modifiable */
+            modifiable: boolean;
+            /** Nb Utilisateurs */
+            nb_utilisateurs: number;
+            /** Niveau Hierarchie */
+            niveau_hierarchie: number;
+            /** Nom */
+            nom: string;
+            /** Permissions */
+            permissions: string[];
         };
         /** RoleCreate */
         RoleCreate: {
@@ -10080,6 +11135,21 @@ export interface components {
          * @enum {string}
          */
         StatutFactureEnum: "BROUILLON" | "EMISE" | "PARTIELLEMENT_PAYEE" | "PAYEE" | "ANNULEE";
+        /** StatutRendezVousPlateformeRequest */
+        StatutRendezVousPlateformeRequest: {
+            /**
+             * Motif
+             * @description Obligatoire pour une annulation
+             */
+            motif?: string | null;
+            /**
+             * Notifier Contact
+             * @default true
+             */
+            notifier_contact: boolean;
+            /** Statut */
+            statut: string;
+        };
         /**
          * StatutRendezVousResponse
          * @description Rappel du cycle de vie, pour l'UI (évite de le redéfinir côté client).
@@ -10417,6 +11487,8 @@ export interface components {
              * @default fr
              */
             langue: string;
+            /** Logo Url */
+            logo_url?: string | null;
             /** Nom */
             nom: string;
             /** Pays */
@@ -10510,8 +11582,20 @@ export interface components {
         UserProfileResponse: {
             /** Cabinet Id */
             cabinet_id?: string | null;
+            /** Cabinet Logo Url */
+            cabinet_logo_url?: string | null;
             /** Cabinet Nom */
             cabinet_nom?: string | null;
+            /**
+             * Deux Facteurs
+             * @default false
+             */
+            deux_facteurs: boolean;
+            /**
+             * Deux Facteurs Obligatoire
+             * @default false
+             */
+            deux_facteurs_obligatoire: boolean;
             /**
              * Email
              * Format: email
@@ -10529,6 +11613,11 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Methodes 2Fa
+             * @default []
+             */
+            methodes_2fa: string[];
             /** Nom */
             nom: string;
             /**
@@ -10563,7 +11652,7 @@ export interface components {
             /** Email */
             email: string;
             /** Mot De Passe */
-            mot_de_passe: string;
+            mot_de_passe?: string | null;
             /** Nom */
             nom: string;
             /** Prenom */
@@ -10582,6 +11671,11 @@ export interface components {
             a_profil_professionnel: boolean;
             /** Actif */
             actif: boolean;
+            /**
+             * Activation Requise
+             * @default false
+             */
+            activation_requise: boolean;
             /** Cabinet Id */
             cabinet_id?: string | null;
             /** Cabinet Nom */
@@ -10595,6 +11689,11 @@ export interface components {
              * @default false
              */
             deux_facteurs: boolean;
+            /**
+             * Doit Changer Mot De Passe
+             * @default false
+             */
+            doit_changer_mot_de_passe: boolean;
             /** Email */
             email: string;
             /**
@@ -10719,6 +11818,11 @@ export interface components {
             a_profil_professionnel: boolean;
             /** Actif */
             actif: boolean;
+            /**
+             * Activation Requise
+             * @default false
+             */
+            activation_requise: boolean;
             /** Cabinet Id */
             cabinet_id?: string | null;
             /** Cabinet Nom */
@@ -10732,6 +11836,11 @@ export interface components {
              * @default false
              */
             deux_facteurs: boolean;
+            /**
+             * Doit Changer Mot De Passe
+             * @default false
+             */
+            doit_changer_mot_de_passe: boolean;
             /** Email */
             email: string;
             /**
@@ -10831,6 +11940,310 @@ export interface operations {
             };
         };
     };
+    activation_2fa_session_api_v1_auth_2fa_activation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivationDeuxFacteursRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_CodesSecoursResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    code_email_session_api_v1_auth_2fa_code_email_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_EnvoiCodeResponse_"];
+                };
+            };
+        };
+    };
+    preparation_totp_api_v1_auth_2fa_preparation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_PreparationTotpResponse_"];
+                };
+            };
+        };
+    };
+    activer_compte_api_v1_auth_activation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_NoneType_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verifier_activation_api_v1_auth_activation_verification_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JetonActivationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_ActivationInfoResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    etape_2fa_api_v1_auth_etape_2fa_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EtapeCodeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_LoginEtapeResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    etape_activation_2fa_api_v1_auth_etape_2fa_activation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivationDeuxFacteursRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_LoginEtapeResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    etape_preparation_totp_api_v1_auth_etape_2fa_preparation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EtapeJetonRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_PreparationTotpResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    etape_code_email_api_v1_auth_etape_code_email_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EtapeJetonRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_EnvoiCodeResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    etape_mot_de_passe_api_v1_auth_etape_mot_de_passe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EtapeMotDePasseRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_LoginEtapeResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     login_api_v1_auth_login_post: {
         parameters: {
             query?: never;
@@ -10850,7 +12263,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["APIResponse_TokenResponse_"];
+                    "application/json": components["schemas"]["APIResponse_LoginEtapeResponse_"];
                 };
             };
             /** @description Validation Error */
@@ -12513,6 +13926,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["APIResponse_FauteuilResponse_"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lire_logo_api_v1_logos__societe_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                societe_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -14476,6 +15918,87 @@ export interface operations {
             };
         };
     };
+    activer_2fa_email_api_v1_platform_auth_2fa_activation_email_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Activer2FARequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_Enrolement2FAResponse_"];
+                };
+            };
+            /** @description Jeton d'enrolement invalide, ou code invalide */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Trop de tentatives */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    envoyer_code_email_enrolement_api_v1_platform_auth_2fa_activation_email_envoi_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_EnvoiCodeEmailResponse_"];
+                };
+            };
+            /** @description Jeton d'enrolement invalide ou expire */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Trop d'envois */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     regenerer_codes_secours_api_v1_platform_auth_2fa_codes_secours_regenerer_post: {
         parameters: {
             query?: never;
@@ -14515,6 +16038,53 @@ export interface operations {
                 };
             };
             /** @description Trop de tentatives (limitation de débit) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    envoyer_code_email_defi_api_v1_platform_auth_2fa_email_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnvoiCodeEmailRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_EnvoiCodeEmailResponse_"];
+                };
+            };
+            /** @description Défi invalide ou expiré */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Trop d'envois */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -14982,6 +16552,180 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["APIResponse_List_PlanRevisionResponse__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lister_api_v1_platform_rendez_vous_get: {
+        parameters: {
+            query?: {
+                agent_id?: string | null;
+                /** @description Fin de période (exclue) */
+                au?: string | null;
+                /** @description Début de période (inclus) */
+                du?: string | null;
+                limit?: number;
+                page?: number;
+                statut?: string | null;
+                tenant_id?: string | null;
+                type_rdv?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedResponse_RendezVousPlateformeResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    creer_api_v1_platform_rendez_vous_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RendezVousPlateformeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_RendezVousPlateformeResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    obtenir_api_v1_platform_rendez_vous__rdv_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rdv_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_RendezVousPlateformeResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    modifier_api_v1_platform_rendez_vous__rdv_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rdv_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RendezVousPlateformeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_RendezVousPlateformeResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    changer_statut_api_v1_platform_rendez_vous__rdv_id__statut_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rdv_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatutRendezVousPlateformeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_RendezVousPlateformeResponse_"];
                 };
             };
             /** @description Validation Error */
@@ -15521,6 +17265,105 @@ export interface operations {
             };
         };
     };
+    lister_administrateurs_api_v1_platform_tenants__tenant_id__administrateurs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_List_AdminCabinetResponse__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reinitialiser_acces_admin_api_v1_platform_tenants__tenant_id__administrateurs__utilisateur_id__acces_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+                utilisateur_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActionAccesAdminRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_ActionAccesAdminResponse_"];
+                };
+            };
+            /** @description Compte hors périmètre, ou e-mail non envoyé */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    changer_email_administrateur_api_v1_platform_tenants__tenant_id__administrateurs__utilisateur_id__email_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+                utilisateur_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangementEmailAdminRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_AdminCabinetResponse_"];
+                };
+            };
+            /** @description Adresse déjà utilisée, identique, ou compte hors périmètre */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     archiver_tenant_api_v1_platform_tenants__tenant_id__archivage_post: {
         parameters: {
             query?: never;
@@ -15576,6 +17419,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["APIResponse_List_HistoriqueStatutEntry__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    envoyer_logo_api_v1_platform_tenants__tenant_id__logo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_envoyer_logo_api_v1_platform_tenants__tenant_id__logo_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_dict_"];
+                };
+            };
+            /** @description Format non accepté, fichier vide ou trop lourd */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    supprimer_logo_api_v1_platform_tenants__tenant_id__logo_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_NoneType_"];
                 };
             };
             /** @description Validation Error */
@@ -15659,6 +17566,105 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    lire_matrice_api_v1_platform_tenants__tenant_id__rbac_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_MatriceCabinetResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accorder_api_v1_platform_tenants__tenant_id__rbac_roles__role_id__permissions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModificationPermissionCabinet"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_PermissionsRoleCabinetResponse_"];
+                };
+            };
+            /** @description Rôle protégé ou permission hors catalogue */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    retirer_api_v1_platform_tenants__tenant_id__rbac_roles__role_id__permissions_retrait_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role_id: string;
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModificationPermissionCabinet"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_PermissionsRoleCabinetResponse_"];
+                };
+            };
+            /** @description Rôle protégé ou permission hors catalogue */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -18205,6 +20211,37 @@ export interface operations {
                 "application/json": components["schemas"]["UtilisateurUpdate"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIResponse_UtilisateurResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    renvoyer_invitation_api_v1_utilisateurs__utilisateur_id__invitation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                utilisateur_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

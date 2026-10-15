@@ -66,10 +66,19 @@ DUREE_CHALLENGE_2FA_MINUTES = 5
 # suffisent largement, et un jeton plus durable serait une surface d'attaque
 # inutile.
 DUREE_ENROLEMENT_2FA_MINUTES = 10
+# Code e-mail : aussi court que le defi qu'il accompagne.
+DUREE_CODE_EMAIL_MINUTES = 5
 
 
 def _maintenant() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def masquer_email(email: str) -> str:
+    """`famillegueye50@gmail.com` -> `fa************@gmail.com` : dire ou chercher, sans tout reveler."""
+    local, _, domaine = email.partition("@")
+    visible = local[:2]
+    return f"{visible}{'*' * max(len(local) - len(visible), 1)}@{domaine}"
 
 
 class PlatformAuthService:
@@ -223,6 +232,7 @@ class PlatformAuthService:
                 "activation_requise": True,
                 "jeton_enrolement": jeton_enrolement,
                 "expiration_secondes": DUREE_ENROLEMENT_2FA_MINUTES * 60,
+                "methodes": ["totp", "email"],
             }
 
         # Compte actif : le defi TOTP (ou un code de secours) ouvre la session.
@@ -247,6 +257,7 @@ class PlatformAuthService:
             "activation_requise": False,
             "jeton_challenge": jeton_challenge,
             "expiration_secondes": DUREE_CHALLENGE_2FA_MINUTES * 60,
+            "methodes": PlatformAuthService.methodes_disponibles(user),
         }
 
     @staticmethod
@@ -302,6 +313,12 @@ class PlatformAuthService:
         # Usage unique : la consommation est un effet de bord, retire de la liste,
         # et le commit qui ouvre la session la rend definitive.
         code_valide = secret is not None and verifier_code_totp(secret, code)
+        if not code_valide:
+            # Code recu par e-mail : il ne vaut que pour CE defi (HMAC sur son
+            # empreinte), donc un code intercepte ne sert pas a une autre connexion.
+            code_valide = await PlatformAuthService._consommer_code_email(
+                db, user, hash_challenge, code
+            )
         if not code_valide:
             code_valide = await PlatformAuthService.consommer_code_de_secours(
                 db, user, code
@@ -466,6 +483,172 @@ class PlatformAuthService:
 
         # Dix codes, hachés Argon2, émis UNE fois — ici. `False` au lieu de
         # l'invariant : l'activation vient de garantir la présence des codes.
+        codes = generer_codes_secours()
+        user.codes_secours_haches = hacher_codes_secours(codes)
+        user.codes_secours_a_regenerer = False
+        await db.flush()
+        return codes
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Second facteur par e-mail (alternative au TOTP)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def methodes_disponibles(user: UtilisateurPlateforme) -> List[str]:
+        """
+        Methodes proposees a l'ecran du defi.
+
+        Le TOTP n'est propose que si un secret actif existe : un compte enrole par
+        e-mail n'a pas d'application configuree, lui proposer serait une impasse.
+        """
+        methodes = ["totp"] if user.secret_2fa_chiffre else []
+        return methodes + ["email"]
+
+    @staticmethod
+    async def resoudre_defi(
+        db: AsyncSession, jeton_challenge: str
+    ) -> tuple[UtilisateurPlateforme, str]:
+        """Utilisateur d'un defi encore valable, et l'empreinte du defi."""
+        hash_challenge = hacher_jeton(jeton_challenge)
+        jeton = (
+            await db.execute(
+                select(JetonUsageUnique).where(
+                    JetonUsageUnique.hash_jeton == hash_challenge,
+                    JetonUsageUnique.usage == UsageJeton.CHALLENGE_2FA,
+                )
+            )
+        ).scalar_one_or_none()
+        if jeton is None or jeton.utilise or jeton.expire_le <= _maintenant():
+            raise InvalidTokenException("Session de connexion expirée, reprenez l'identification.")
+        user = await db.get(UtilisateurPlateforme, uuid.UUID(str(jeton.cible_id)))
+        if user is None or user.statut != StatutUtilisateurPlateforme.ACTIF:
+            raise AuthenticationException("Compte indisponible.", code="COMPTE_NON_ACTIF")
+        return user, hash_challenge
+
+    @staticmethod
+    async def envoyer_code_email(
+        db: AsyncSession,
+        user: UtilisateurPlateforme,
+        contexte: str,
+        client_ip: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Envoie un code a 6 chiffres a l'adresse du compte.
+
+        `contexte` est l'empreinte du defi ou du jeton d'enrolement : le code
+        n'est valable que pour lui. Un nouvel envoi **annule** les codes encore
+        valables du meme compte - un seul code vit a la fois, le dernier recu.
+
+        Ni le code ni son empreinte ne sont journalises.
+        """
+        from src.modules.platform.security import generer_code_email, hacher_code_email
+        from src.modules.platform.services.notifications import EmailService
+
+        precedents = (
+            await db.execute(
+                select(JetonUsageUnique).where(
+                    JetonUsageUnique.usage == UsageJeton.CODE_2FA_EMAIL,
+                    JetonUsageUnique.cible_id == str(user.id),
+                    JetonUsageUnique.utilise.is_(False),
+                )
+            )
+        ).scalars().all()
+        for precedent in precedents:
+            precedent.utilise = True
+            precedent.utilise_at = _maintenant()
+
+        code = generer_code_email()
+        db.add(
+            JetonUsageUnique(
+                usage=UsageJeton.CODE_2FA_EMAIL,
+                hash_jeton=hacher_code_email(contexte, code),
+                cible_type="UTILISATEUR",
+                cible_id=str(user.id),
+                expire_le=_maintenant() + timedelta(minutes=DUREE_CODE_EMAIL_MINUTES),
+                ip_address=client_ip,
+            )
+        )
+        await JournalService.journaliser(
+            db,
+            action="PLATFORM_2FA_CODE_EMAIL_ENVOYE",
+            type_cible="AUTH",
+            acteur_email=user.email,
+            acteur_id=user.id,
+            ip_address=client_ip,
+            user_agent=user_agent,
+        )
+        # Commit AVANT l'envoi : un code recu doit exister en base quand
+        # l'utilisateur le saisit, meme si l'envoi met du temps.
+        await db.commit()
+
+        envoye = await EmailService.code_connexion_2fa(user.email, code, DUREE_CODE_EMAIL_MINUTES)
+        if not envoye:
+            raise InvalidStateException(
+                "L'e-mail n'a pas pu être envoyé. Réessayez ou utilisez une autre méthode.",
+                code="ENVOI_EMAIL_ECHOUE",
+            )
+        return {
+            "destinataire": masquer_email(user.email),
+            "expiration_secondes": DUREE_CODE_EMAIL_MINUTES * 60,
+        }
+
+    @staticmethod
+    async def _consommer_code_email(
+        db: AsyncSession, user: UtilisateurPlateforme, contexte: str, code: str
+    ) -> bool:
+        """Consomme le code e-mail de ce contexte : `True` s'il etait valable."""
+        from src.modules.platform.security import hacher_code_email
+
+        code = (code or "").strip()
+        if len(code) != 6 or not code.isdigit():
+            return False
+        ligne = (
+            await db.execute(
+                select(JetonUsageUnique).where(
+                    JetonUsageUnique.hash_jeton == hacher_code_email(contexte, code),
+                    JetonUsageUnique.usage == UsageJeton.CODE_2FA_EMAIL,
+                    JetonUsageUnique.cible_id == str(user.id),
+                    JetonUsageUnique.utilise.is_(False),
+                    JetonUsageUnique.expire_le > _maintenant(),
+                )
+            )
+        ).scalar_one_or_none()
+        if ligne is None:
+            return False
+        ligne.utilise = True
+        ligne.utilise_at = _maintenant()
+        return True
+
+    @staticmethod
+    async def activer_second_facteur_par_email(
+        db: AsyncSession, user: UtilisateurPlateforme, contexte: str, code: str
+    ) -> List[str]:
+        """
+        Active le second facteur **par e-mail** et rend les codes de secours, une fois.
+
+        Pendant de `activer_second_facteur` pour qui ne veut pas d'application :
+        le code recu prouve la possession de la boite mail. Aucun secret TOTP
+        n'est promu ; un secret prepare mais jamais scanne est efface, pour qu'il
+        ne puisse pas etre active plus tard par une autre voie.
+        """
+        from src.modules.platform.security import (
+            generer_codes_secours,
+            hacher_codes_secours,
+        )
+
+        if user.deux_facteurs_actif:
+            raise InvalidStateException(
+                "Le second facteur est déjà actif.", code="DEUX_FACTEURS_DEJA_ACTIF"
+            )
+        if not await PlatformAuthService._consommer_code_email(db, user, contexte, code):
+            raise AuthenticationException(
+                "Code de vérification invalide.", code="CODE_2FA_INVALIDE"
+            )
+
+        user.secret_2fa_en_attente = None
+        user.deux_facteurs_actif = True
+        user.deux_facteurs_confirme_at = _maintenant()
         codes = generer_codes_secours()
         user.codes_secours_haches = hacher_codes_secours(codes)
         user.codes_secours_a_regenerer = False

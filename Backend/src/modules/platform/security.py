@@ -41,6 +41,26 @@ def hacher_jeton(jeton: str) -> str:
     return hashlib.sha256(jeton.encode("utf-8")).hexdigest()
 
 
+def generer_code_email() -> str:
+    """Code a 6 chiffres pour la 2FA par e-mail (tirage cryptographique)."""
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
+def hacher_code_email(contexte: str, code: str) -> str:
+    """
+    Empreinte d'un code e-mail, **liee a son contexte** et cle par le serveur.
+
+    Un SHA-256 nu d'un code a 6 chiffres se retrouve en un million d'essais : une
+    lecture de la base suffirait. Le HMAC avec la cle plateforme l'empeche, et le
+    contexte (empreinte du defi ou du jeton d'enrolement) fait qu'un code ne vaut
+    que pour la connexion qui l'a demande.
+    """
+    from src.core.config import resoudre_cle_platform
+
+    message = f"{contexte}:{code.strip()}".encode("utf-8")
+    return hmac.new(resoudre_cle_platform().encode("utf-8"), message, hashlib.sha256).hexdigest()
+
+
 def comparer_jeton(jeton_en_clair: str, hash_stocke: str) -> bool:
     """Comparaison à temps constant, pour ne pas fuir le préfixe correct."""
     return hmac.compare_digest(hacher_jeton(jeton_en_clair), hash_stocke)

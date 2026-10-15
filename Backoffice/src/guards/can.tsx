@@ -34,10 +34,8 @@ export function Can({ permission, role, fallback = null, children }: CanProps) {
   // Vérification de rôle
   if (role) {
     const rolesAcceptes = Array.isArray(role) ? role : [role]
-    const roleAutorise =
-      profil.role === 'ADMIN_CABINET' ||
-      profil.role === 'SUPER_ADMIN' ||
-      rolesAcceptes.includes(profil.role)
+    const roles = profil.roles ?? (profil.role ? [profil.role] : [])
+    const roleAutorise = roles.some((r) => rolesAcceptes.includes(r))
     if (!roleAutorise) return <>{fallback}</>
   }
 
@@ -68,10 +66,8 @@ export function ProtectedRoute({
 
   if (role) {
     const rolesAcceptes = Array.isArray(role) ? role : [role]
-    const roleAutorise =
-      profil.role === 'ADMIN_CABINET' ||
-      profil.role === 'SUPER_ADMIN' ||
-      rolesAcceptes.includes(profil.role)
+    const roles = profil.roles ?? (profil.role ? [profil.role] : [])
+    const roleAutorise = roles.some((r) => rolesAcceptes.includes(r))
     if (!roleAutorise) return <Navigate to="/403" replace />
   }
 

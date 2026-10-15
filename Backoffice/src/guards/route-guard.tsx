@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 
 import { usePermission } from './can'
@@ -29,6 +29,22 @@ export function PermissionGuard({
   children: ReactNode
 }) {
   const autorise = usePermission(permission)
+  const profil = useAuthStore((etat) => etat.profil)
+  const chargerProfil = useAuthStore((etat) => etat.chargerProfil)
+
+  // Juste apres la connexion, le jeton arrive AVANT le profil : sans cette
+  // attente, toute page protegee renvoyait sur 403 le temps que `/me` reponde.
+  useEffect(() => {
+    if (!profil) void chargerProfil().catch(() => undefined)
+  }, [profil, chargerProfil])
+
+  if (!profil) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground" role="status">
+        Chargement du profil…
+      </div>
+    )
+  }
   if (!autorise) return <Navigate to="/403" replace />
   return <>{children}</>
 }

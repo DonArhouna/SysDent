@@ -31,7 +31,8 @@ export interface UtilisateurCreate {
   email: string
   prenom: string
   nom: string
-  mot_de_passe: string
+  /** Absent : lien d'activation envoyé par e-mail (recommandé). Présent : temporaire. */
+  mot_de_passe?: string | null
   role: string
   telephone?: string | null
   cabinet_id?: string | null

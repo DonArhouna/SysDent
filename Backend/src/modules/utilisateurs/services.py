@@ -166,7 +166,7 @@ class UtilisateurService:
         master_db: AsyncSession,
         societe_id: uuid.UUID,
         email: str,
-        mot_de_passe: str,
+        mot_de_passe: Optional[str],
         prenom: str,
         nom: str,
         role: str,
@@ -200,7 +200,11 @@ class UtilisateurService:
 
         u = Utilisateur(
             email=email,
-            mot_de_passe=get_password_hash(mot_de_passe),
+            # Sans mot de passe : un aléa que personne ne connaît, remplacé par
+            # celui que la personne choisira via son lien d'activation.
+            mot_de_passe=get_password_hash(mot_de_passe or _mot_de_passe_temporaire(32)),
+            # Fixé par un tiers : temporaire par nature, à changer à la connexion.
+            doit_changer_mot_de_passe=mot_de_passe is not None,
             role_id=entete_role.id,
             prenom=prenom.strip(),
             nom=nom.strip(),
@@ -222,7 +226,26 @@ class UtilisateurService:
         # La ligne d'index master est ce qui rend le compte **connectable**.
         # Sans elle, il existe mais ne peut jamais se connecter.
         await UtilisateurService._indexer(master_db, societe_id, u)
+        if mot_de_passe is None:
+            return await UtilisateurService.envoyer_invitation(db, u.id, str(societe_id))
         return await UtilisateurService._charger(db, u.id)
+
+    @staticmethod
+    async def envoyer_invitation(
+        db: AsyncSession, utilisateur_id: uuid.UUID, tenant_id: str
+    ) -> Utilisateur:
+        """Envoie (ou renvoie) le lien d'activation et coupe les sessions ouvertes."""
+        from src.modules.auth.securite import SecuriteCompte
+
+        u = await UtilisateurService._charger(db, utilisateur_id)
+        nom_cabinet = None
+        if u.cabinet_id is not None:
+            nom_cabinet = (
+                await db.execute(select(Cabinet.nom).where(Cabinet.id == u.cabinet_id))
+            ).scalar_one_or_none()
+        await SecuriteCompte.envoyer_activation(db, u, tenant_id, nom_cabinet)
+        await UtilisateurService.revoquer_sessions(db, utilisateur_id)
+        return await UtilisateurService._charger(db, utilisateur_id)
 
     @staticmethod
     async def modifier(
@@ -308,6 +331,8 @@ class UtilisateurService:
         u = await UtilisateurService._charger(db, utilisateur_id)
         temporaire = _mot_de_passe_temporaire()
         u.mot_de_passe = get_password_hash(temporaire)
+        # Temporaire : la prochaine connexion passe par son changement.
+        u.doit_changer_mot_de_passe = True
         await db.commit()
         # Un mot de passe réinitialisé doit invalider les sessions ouvertes :
         # quelqu'un pourrait être connecté avec l'ancien.

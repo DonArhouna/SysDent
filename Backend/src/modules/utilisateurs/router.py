@@ -42,6 +42,8 @@ def _serialiser(u: Utilisateur, noms_cabinet: dict | None = None) -> Utilisateur
         cabinet_id=u.cabinet_id,
         cabinet_nom=(noms_cabinet or {}).get(str(u.cabinet_id)) if u.cabinet_id else None,
         deux_facteurs=bool(u.deux_facteurs),
+        activation_requise=bool(u.activation_requise),
+        doit_changer_mot_de_passe=bool(u.doit_changer_mot_de_passe),
         dernier_login=u.dernier_login,
         a_profil_professionnel=profil is not None,
         numero_ordre=profil.numero_ordre if profil else None,
@@ -216,6 +218,22 @@ async def reinitialiser_mot_de_passe(
     """
     temporaire = await UtilisateurService.reinitialiser_mot_de_passe(db, utilisateur_id)
     return APIResponse(data=MotDePasseTemporaireResponse(temporaire=temporaire))
+
+
+@router.post("/{utilisateur_id}/invitation", response_model=APIResponse[UtilisateurResponse])
+async def renvoyer_invitation(
+    utilisateur_id: uuid.UUID,
+    db: AsyncSession = Depends(get_tenant_db),
+    tenant_id: str = Depends(get_current_tenant_id),
+    _: bool = Depends(require_permissions("ADMIN:UPDATE")),
+):
+    """
+    (Re)envoie le lien d'activation : la personne choisit un nouveau mot de
+    passe. Le lien précédent ne vaut plus rien, les sessions sont révoquées.
+    Recommandé plutôt qu'un mot de passe temporaire quand l'adresse est valide.
+    """
+    u = await UtilisateurService.envoyer_invitation(db, utilisateur_id, str(tenant_id))
+    return APIResponse(message="Lien d'activation envoyé.", data=_serialiser(u))
 
 
 @router.delete(

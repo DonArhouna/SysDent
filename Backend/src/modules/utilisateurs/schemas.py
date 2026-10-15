@@ -13,7 +13,10 @@ class UtilisateurCreate(BaseSchema):
     model_config = ConfigDict(extra="forbid")
 
     email: str = Field(..., max_length=150)
-    mot_de_passe: str = Field(..., min_length=10, max_length=128)
+    # Absent (recommandé) : la personne reçoit un lien d'activation et choisit
+    # elle-même son mot de passe. Présent : mot de passe TEMPORAIRE, à changer
+    # obligatoirement à la première connexion.
+    mot_de_passe: Optional[str] = Field(None, min_length=10, max_length=128)
     prenom: str = Field(..., min_length=1, max_length=100)
     nom: str = Field(..., min_length=1, max_length=100)
     role: str = Field(..., min_length=2, max_length=50)
@@ -77,6 +80,10 @@ class UtilisateurResponse(BaseSchema):
     cabinet_id: Optional[uuid.UUID] = None
     cabinet_nom: Optional[str] = None
     deux_facteurs: bool = False
+    # Compte en attente : lien d'activation pas encore utilisé.
+    activation_requise: bool = False
+    # Mot de passe temporaire pas encore changé.
+    doit_changer_mot_de_passe: bool = False
     dernier_login: Optional[datetime] = None
     #: Vrai si le compte porte un profil professionnel (Chantier 5).
     a_profil_professionnel: bool = False

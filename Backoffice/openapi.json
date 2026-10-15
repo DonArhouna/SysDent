@@ -129,6 +129,38 @@
         "title": "APIResponse[ActeRealiseResponse]",
         "type": "object"
       },
+      "APIResponse_ActionAccesAdminResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActionAccesAdminResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "title": "APIResponse[ActionAccesAdminResponse]",
+        "type": "object"
+      },
       "APIResponse_Activation2FAResponse_": {
         "properties": {
           "data": {
@@ -159,6 +191,70 @@
           }
         },
         "title": "APIResponse[Activation2FAResponse]",
+        "type": "object"
+      },
+      "APIResponse_ActivationInfoResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActivationInfoResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "title": "APIResponse[ActivationInfoResponse]",
+        "type": "object"
+      },
+      "APIResponse_AdminCabinetResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdminCabinetResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "title": "APIResponse[AdminCabinetResponse]",
         "type": "object"
       },
       "APIResponse_AgendaResponse_": {
@@ -383,6 +479,38 @@
           }
         },
         "title": "APIResponse[ChartingParodontalResponse]",
+        "type": "object"
+      },
+      "APIResponse_CodesSecoursResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CodesSecoursResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "title": "APIResponse[CodesSecoursResponse]",
         "type": "object"
       },
       "APIResponse_CommandeResponse_": {
@@ -801,6 +929,70 @@
         "title": "APIResponse[Enrolement2FAResponse]",
         "type": "object"
       },
+      "APIResponse_EnvoiCodeEmailResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EnvoiCodeEmailResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "title": "APIResponse[EnvoiCodeEmailResponse]",
+        "type": "object"
+      },
+      "APIResponse_EnvoiCodeResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EnvoiCodeResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "title": "APIResponse[EnvoiCodeResponse]",
+        "type": "object"
+      },
       "APIResponse_EtatGeneralResponse_": {
         "properties": {
           "data": {
@@ -1131,6 +1323,42 @@
           }
         },
         "title": "APIResponse[List[ActeRealiseResponse]]",
+        "type": "object"
+      },
+      "APIResponse_List_AdminCabinetResponse__": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AdminCabinetResponse"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "title": "APIResponse[List[AdminCabinetResponse]]",
         "type": "object"
       },
       "APIResponse_List_AlerteStockResponse__": {
@@ -1854,6 +2082,38 @@
         "title": "APIResponse[List[dict]]",
         "type": "object"
       },
+      "APIResponse_LoginEtapeResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoginEtapeResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "title": "APIResponse[LoginEtapeResponse]",
+        "type": "object"
+      },
       "APIResponse_LoginPlateformeResponse_": {
         "properties": {
           "data": {
@@ -1916,6 +2176,38 @@
           }
         },
         "title": "APIResponse[MasterTokenResponse]",
+        "type": "object"
+      },
+      "APIResponse_MatriceCabinetResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MatriceCabinetResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "title": "APIResponse[MatriceCabinetResponse]",
         "type": "object"
       },
       "APIResponse_MedicamentResponse_": {
@@ -2264,6 +2556,38 @@
         "title": "APIResponse[PatientResponse]",
         "type": "object"
       },
+      "APIResponse_PermissionsRoleCabinetResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PermissionsRoleCabinetResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "title": "APIResponse[PermissionsRoleCabinetResponse]",
+        "type": "object"
+      },
       "APIResponse_PlanEchelonnementResponse_": {
         "properties": {
           "data": {
@@ -2424,6 +2748,38 @@
         "title": "APIResponse[PraticienResponse]",
         "type": "object"
       },
+      "APIResponse_PreparationTotpResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PreparationTotpResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "title": "APIResponse[PreparationTotpResponse]",
+        "type": "object"
+      },
       "APIResponse_QuotaResumeResponse_": {
         "properties": {
           "data": {
@@ -2582,6 +2938,38 @@
           }
         },
         "title": "APIResponse[RegenererCodesSecoursResponse]",
+        "type": "object"
+      },
+      "APIResponse_RendezVousPlateformeResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RendezVousPlateformeResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "title": "APIResponse[RendezVousPlateformeResponse]",
         "type": "object"
       },
       "APIResponse_RendezVousResponse_": {
@@ -3980,6 +4368,51 @@
         "title": "ActeRealiseUpdate",
         "type": "object"
       },
+      "ActionAccesAdminRequest": {
+        "properties": {
+          "action": {
+            "pattern": "^(lien|temporaire|deux_facteurs)$",
+            "title": "Action",
+            "type": "string"
+          },
+          "motif": {
+            "description": "Motif obligatoire (journalisé)",
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Motif",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "motif"
+        ],
+        "title": "ActionAccesAdminRequest",
+        "type": "object"
+      },
+      "ActionAccesAdminResponse": {
+        "properties": {
+          "compte": {
+            "$ref": "#/components/schemas/AdminCabinetResponse"
+          },
+          "mot_de_passe_temporaire": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mot De Passe Temporaire"
+          }
+        },
+        "required": [
+          "compte"
+        ],
+        "title": "ActionAccesAdminResponse",
+        "type": "object"
+      },
       "Activation2FAResponse": {
         "properties": {
           "instruction": {
@@ -4005,6 +4438,104 @@
         "title": "Activation2FAResponse",
         "type": "object"
       },
+      "ActivationDeuxFacteursRequest": {
+        "description": "`jeton_etape` pendant la connexion ; absent quand on est déjà connecté.",
+        "properties": {
+          "code": {
+            "maxLength": 12,
+            "minLength": 6,
+            "title": "Code",
+            "type": "string"
+          },
+          "jeton_etape": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jeton Etape"
+          },
+          "methode": {
+            "pattern": "^(totp|email)$",
+            "title": "Methode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "methode",
+          "code"
+        ],
+        "title": "ActivationDeuxFacteursRequest",
+        "type": "object"
+      },
+      "ActivationInfoResponse": {
+        "properties": {
+          "cabinet_logo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cabinet Logo Url"
+          },
+          "cabinet_nom": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cabinet Nom"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "nom": {
+            "title": "Nom",
+            "type": "string"
+          },
+          "prenom": {
+            "title": "Prenom",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "prenom",
+          "nom"
+        ],
+        "title": "ActivationInfoResponse",
+        "type": "object"
+      },
+      "ActivationRequest": {
+        "properties": {
+          "jeton": {
+            "title": "Jeton",
+            "type": "string"
+          },
+          "mot_de_passe": {
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "Mot De Passe",
+            "type": "string"
+          }
+        },
+        "required": [
+          "jeton",
+          "mot_de_passe"
+        ],
+        "title": "ActivationRequest",
+        "type": "object"
+      },
       "Activer2FARequest": {
         "properties": {
           "code": {
@@ -4018,6 +4549,66 @@
           "code"
         ],
         "title": "Activer2FARequest",
+        "type": "object"
+      },
+      "AdminCabinetResponse": {
+        "properties": {
+          "actif": {
+            "title": "Actif",
+            "type": "boolean"
+          },
+          "activation_requise": {
+            "title": "Activation Requise",
+            "type": "boolean"
+          },
+          "dernier_login": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dernier Login"
+          },
+          "deux_facteurs": {
+            "title": "Deux Facteurs",
+            "type": "boolean"
+          },
+          "doit_changer_mot_de_passe": {
+            "title": "Doit Changer Mot De Passe",
+            "type": "boolean"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "nom": {
+            "title": "Nom",
+            "type": "string"
+          },
+          "prenom": {
+            "title": "Prenom",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "prenom",
+          "nom",
+          "actif",
+          "activation_requise",
+          "doit_changer_mot_de_passe",
+          "deux_facteurs"
+        ],
+        "title": "AdminCabinetResponse",
         "type": "object"
       },
       "AgendaResponse": {
@@ -5268,6 +5859,21 @@
         "title": "BlocageFauteuilCreate",
         "type": "object"
       },
+      "Body_envoyer_logo_api_v1_platform_tenants__tenant_id__logo_post": {
+        "properties": {
+          "fichier": {
+            "contentMediaType": "application/octet-stream",
+            "description": "PNG, JPEG ou WebP, 512 Ko au plus",
+            "title": "Fichier",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fichier"
+        ],
+        "title": "Body_envoyer_logo_api_v1_platform_tenants__tenant_id__logo_post",
+        "type": "object"
+      },
       "CabinetResponse": {
         "properties": {
           "actif": {
@@ -5630,6 +6236,28 @@
         "title": "Challenge2FARequest",
         "type": "object"
       },
+      "ChangementEmailAdminRequest": {
+        "properties": {
+          "motif": {
+            "description": "Motif obligatoire (journalisé)",
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Motif",
+            "type": "string"
+          },
+          "nouvel_email": {
+            "format": "email",
+            "title": "Nouvel Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nouvel_email",
+          "motif"
+        ],
+        "title": "ChangementEmailAdminRequest",
+        "type": "object"
+      },
       "ChangementMotDePasseRequest": {
         "properties": {
           "ancien": {
@@ -5984,6 +6612,22 @@
           "especes_comptees"
         ],
         "title": "ClotureCaisseCreate",
+        "type": "object"
+      },
+      "CodesSecoursResponse": {
+        "properties": {
+          "codes_secours": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Codes Secours",
+            "type": "array"
+          }
+        },
+        "required": [
+          "codes_secours"
+        ],
+        "title": "CodesSecoursResponse",
         "type": "object"
       },
       "CommandeCreate": {
@@ -8310,6 +8954,111 @@
         "title": "Enrolement2FAResponse",
         "type": "object"
       },
+      "EnvoiCodeEmailRequest": {
+        "description": "Demande d'un code par e-mail pendant le defi de connexion.",
+        "properties": {
+          "jeton_challenge": {
+            "description": "Défi reçu au login",
+            "title": "Jeton Challenge",
+            "type": "string"
+          }
+        },
+        "required": [
+          "jeton_challenge"
+        ],
+        "title": "EnvoiCodeEmailRequest",
+        "type": "object"
+      },
+      "EnvoiCodeEmailResponse": {
+        "properties": {
+          "destinataire": {
+            "description": "Adresse masquée à laquelle le code est parti",
+            "title": "Destinataire",
+            "type": "string"
+          },
+          "expiration_secondes": {
+            "title": "Expiration Secondes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "destinataire",
+          "expiration_secondes"
+        ],
+        "title": "EnvoiCodeEmailResponse",
+        "type": "object"
+      },
+      "EnvoiCodeResponse": {
+        "properties": {
+          "destinataire": {
+            "title": "Destinataire",
+            "type": "string"
+          },
+          "expiration_secondes": {
+            "title": "Expiration Secondes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "destinataire",
+          "expiration_secondes"
+        ],
+        "title": "EnvoiCodeResponse",
+        "type": "object"
+      },
+      "EtapeCodeRequest": {
+        "properties": {
+          "code": {
+            "maxLength": 12,
+            "minLength": 6,
+            "title": "Code",
+            "type": "string"
+          },
+          "jeton_etape": {
+            "title": "Jeton Etape",
+            "type": "string"
+          }
+        },
+        "required": [
+          "jeton_etape",
+          "code"
+        ],
+        "title": "EtapeCodeRequest",
+        "type": "object"
+      },
+      "EtapeJetonRequest": {
+        "properties": {
+          "jeton_etape": {
+            "title": "Jeton Etape",
+            "type": "string"
+          }
+        },
+        "required": [
+          "jeton_etape"
+        ],
+        "title": "EtapeJetonRequest",
+        "type": "object"
+      },
+      "EtapeMotDePasseRequest": {
+        "properties": {
+          "jeton_etape": {
+            "title": "Jeton Etape",
+            "type": "string"
+          },
+          "nouveau": {
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "Nouveau",
+            "type": "string"
+          }
+        },
+        "required": [
+          "jeton_etape",
+          "nouveau"
+        ],
+        "title": "EtapeMotDePasseRequest",
+        "type": "object"
+      },
       "EtatGeneralCreate": {
         "additionalProperties": false,
         "properties": {
@@ -10092,6 +10841,20 @@
         "title": "InscriptionResponse",
         "type": "object"
       },
+      "JetonActivationRequest": {
+        "properties": {
+          "jeton": {
+            "description": "Jeton reçu dans le lien d'activation",
+            "title": "Jeton",
+            "type": "string"
+          }
+        },
+        "required": [
+          "jeton"
+        ],
+        "title": "JetonActivationRequest",
+        "type": "object"
+      },
       "LigneCommandeCreate": {
         "additionalProperties": false,
         "properties": {
@@ -10675,6 +11438,118 @@
         "title": "LigneReceptionResponse",
         "type": "object"
       },
+      "LoginEtapeResponse": {
+        "description": "Issue d'une connexion, ou d'une étape franchie.\n\n`etape` dit quoi faire ensuite :\n- `session` : connecté (jetons présents) ;\n- `changement_mot_de_passe` : mot de passe temporaire à remplacer ;\n- `deux_facteurs` : code de vérification à saisir ;\n- `enrolement_2fa` : double authentification à configurer (rôle concerné).",
+        "properties": {
+          "access_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Access Token"
+          },
+          "codes_secours": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codes Secours"
+          },
+          "deux_facteurs_recommande": {
+            "default": false,
+            "title": "Deux Facteurs Recommande",
+            "type": "boolean"
+          },
+          "etape": {
+            "title": "Etape",
+            "type": "string"
+          },
+          "expiration_secondes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiration Secondes"
+          },
+          "expires_in": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires In"
+          },
+          "jeton_etape": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jeton Etape"
+          },
+          "methodes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Methodes",
+            "type": "array"
+          },
+          "refresh_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refresh Token"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id"
+          },
+          "token_type": {
+            "default": "bearer",
+            "title": "Token Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "etape"
+        ],
+        "title": "LoginEtapeResponse",
+        "type": "object"
+      },
       "LoginPlateformeResponse": {
         "description": "Reponse de la premiere etape.\n\nTrois cas distincts, et **jamais** les deux a la fois :\n\n- session ouverte : `access_token` present ;\n- defi 2FA         : `jeton_challenge` present ;\n- enrolement       : `jeton_enrolement` present.\n\n`access_token` n'est present que si le second facteur est actif. Le garantir\nici evite qu'un evolution du service emette une session a un compte qui n'a\npas de 2FA.",
         "properties": {
@@ -10742,6 +11617,13 @@
               }
             ],
             "title": "Jeton Enrolement"
+          },
+          "methodes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Methodes",
+            "type": "array"
           },
           "refresh_expires_in": {
             "anyOf": [
@@ -10851,6 +11733,30 @@
           "expires_in"
         ],
         "title": "MasterTokenResponse",
+        "type": "object"
+      },
+      "MatriceCabinetResponse": {
+        "properties": {
+          "catalogue": {
+            "items": {
+              "$ref": "#/components/schemas/PermissionCabinetResponse"
+            },
+            "title": "Catalogue",
+            "type": "array"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/RoleCabinetResponse"
+            },
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "roles",
+          "catalogue"
+        ],
+        "title": "MatriceCabinetResponse",
         "type": "object"
       },
       "MedicamentCreate": {
@@ -11043,6 +11949,28 @@
         ],
         "title": "ModePaiementEnum",
         "type": "string"
+      },
+      "ModificationPermissionCabinet": {
+        "properties": {
+          "motif": {
+            "description": "Motif obligatoire (journalisé)",
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Motif",
+            "type": "string"
+          },
+          "permission": {
+            "description": "MODULE:ACTION, issue du catalogue",
+            "title": "Permission",
+            "type": "string"
+          }
+        },
+        "required": [
+          "permission",
+          "motif"
+        ],
+        "title": "ModificationPermissionCabinet",
+        "type": "object"
       },
       "MotDePasseTemporaireResponse": {
         "description": "Mot de passe temporaire, renvoyé **une seule fois**.\n\nLe serveur n'en conserve que l'empreinte : il ne peut donc pas le\nredonner. L'interface doit le dire explicitement, sinon l'utilisateur\ncroira avoir saisir un mot de passe définitif.",
@@ -12127,6 +13055,31 @@
           "meta"
         ],
         "title": "PaginatedResponse[PatientResponse]",
+        "type": "object"
+      },
+      "PaginatedResponse_RendezVousPlateformeResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RendezVousPlateformeResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          },
+          "success": {
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ],
+        "title": "PaginatedResponse[RendezVousPlateformeResponse]",
         "type": "object"
       },
       "PaginatedResponse_RendezVousResponse_": {
@@ -13405,6 +14358,47 @@
         "title": "PatientUpdate",
         "type": "object"
       },
+      "PermissionCabinetResponse": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "code": {
+            "description": "MODULE:ACTION",
+            "title": "Code",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "disponible": {
+            "description": "Présente dans la base de ce cabinet",
+            "title": "Disponible",
+            "type": "boolean"
+          },
+          "module": {
+            "title": "Module",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "module",
+          "action",
+          "disponible"
+        ],
+        "title": "PermissionCabinetResponse",
+        "type": "object"
+      },
       "PermissionGrant": {
         "properties": {
           "action": {
@@ -13460,6 +14454,27 @@
           "sensible"
         ],
         "title": "PermissionPlateformeResponse",
+        "type": "object"
+      },
+      "PermissionsRoleCabinetResponse": {
+        "properties": {
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Permissions",
+            "type": "array"
+          },
+          "role_id": {
+            "title": "Role Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role_id",
+          "permissions"
+        ],
+        "title": "PermissionsRoleCabinetResponse",
         "type": "object"
       },
       "PlanCreate": {
@@ -13950,6 +14965,13 @@
             "title": "Id",
             "type": "string"
           },
+          "methodes_2fa": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Methodes 2Fa",
+            "type": "array"
+          },
           "nom": {
             "title": "Nom",
             "type": "string"
@@ -14305,6 +15327,24 @@
           }
         },
         "title": "PraticienUpdate",
+        "type": "object"
+      },
+      "PreparationTotpResponse": {
+        "properties": {
+          "secret": {
+            "title": "Secret",
+            "type": "string"
+          },
+          "uri": {
+            "title": "Uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "secret",
+          "uri"
+        ],
+        "title": "PreparationTotpResponse",
         "type": "object"
       },
       "QuotaResumeResponse": {
@@ -14764,6 +15804,528 @@
         "title": "RendezVousCreate",
         "type": "object"
       },
+      "RendezVousPlateformeCreate": {
+        "properties": {
+          "agent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
+          "contact_email": {
+            "anyOf": [
+              {
+                "format": "email",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Email"
+          },
+          "contact_nom": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Nom"
+          },
+          "contact_telephone": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Telephone"
+          },
+          "debut": {
+            "format": "date-time",
+            "title": "Debut",
+            "type": "string"
+          },
+          "duree_minutes": {
+            "default": 60,
+            "maximum": 600.0,
+            "minimum": 5.0,
+            "title": "Duree Minutes",
+            "type": "integer"
+          },
+          "lien_visio": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lien Visio"
+          },
+          "lieu": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lieu"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "notifier_contact": {
+            "default": true,
+            "title": "Notifier Contact",
+            "type": "boolean"
+          },
+          "prospect_nom": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prospect Nom"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cabinet client ; sinon `prospect_nom`",
+            "title": "Tenant Id"
+          },
+          "titre": {
+            "maxLength": 150,
+            "minLength": 2,
+            "title": "Titre",
+            "type": "string"
+          },
+          "type_rdv": {
+            "description": "DEMO | INSTALLATION | FORMATION | SUPPORT | COMMERCIAL | AUTRE",
+            "title": "Type Rdv",
+            "type": "string"
+          }
+        },
+        "required": [
+          "titre",
+          "type_rdv",
+          "debut"
+        ],
+        "title": "RendezVousPlateformeCreate",
+        "type": "object"
+      },
+      "RendezVousPlateformeResponse": {
+        "properties": {
+          "agent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
+          "agent_nom": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Nom"
+          },
+          "contact_email": {
+            "anyOf": [
+              {
+                "format": "email",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Email"
+          },
+          "contact_nom": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Nom"
+          },
+          "contact_prevenu": {
+            "default": false,
+            "title": "Contact Prevenu",
+            "type": "boolean"
+          },
+          "contact_telephone": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Telephone"
+          },
+          "cree_par": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cree Par"
+          },
+          "debut": {
+            "format": "date-time",
+            "title": "Debut",
+            "type": "string"
+          },
+          "duree_minutes": {
+            "default": 60,
+            "maximum": 600.0,
+            "minimum": 5.0,
+            "title": "Duree Minutes",
+            "type": "integer"
+          },
+          "fin": {
+            "format": "date-time",
+            "title": "Fin",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lien_visio": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lien Visio"
+          },
+          "lieu": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lieu"
+          },
+          "motif_annulation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motif Annulation"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "prospect_nom": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prospect Nom"
+          },
+          "statut": {
+            "title": "Statut",
+            "type": "string"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cabinet client ; sinon `prospect_nom`",
+            "title": "Tenant Id"
+          },
+          "tenant_nom": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Nom"
+          },
+          "titre": {
+            "maxLength": 150,
+            "minLength": 2,
+            "title": "Titre",
+            "type": "string"
+          },
+          "type_rdv": {
+            "description": "DEMO | INSTALLATION | FORMATION | SUPPORT | COMMERCIAL | AUTRE",
+            "title": "Type Rdv",
+            "type": "string"
+          }
+        },
+        "required": [
+          "titre",
+          "type_rdv",
+          "debut",
+          "id",
+          "statut",
+          "fin"
+        ],
+        "title": "RendezVousPlateformeResponse",
+        "type": "object"
+      },
+      "RendezVousPlateformeUpdate": {
+        "properties": {
+          "agent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
+          "contact_email": {
+            "anyOf": [
+              {
+                "format": "email",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Email"
+          },
+          "contact_nom": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Nom"
+          },
+          "contact_telephone": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Telephone"
+          },
+          "debut": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Debut"
+          },
+          "duree_minutes": {
+            "anyOf": [
+              {
+                "maximum": 600.0,
+                "minimum": 5.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duree Minutes"
+          },
+          "lien_visio": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lien Visio"
+          },
+          "lieu": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lieu"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "notifier_contact": {
+            "default": true,
+            "title": "Notifier Contact",
+            "type": "boolean"
+          },
+          "prospect_nom": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prospect Nom"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id"
+          },
+          "titre": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Titre"
+          },
+          "type_rdv": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Rdv"
+          }
+        },
+        "title": "RendezVousPlateformeUpdate",
+        "type": "object"
+      },
       "RendezVousResponse": {
         "properties": {
           "cabinet_id": {
@@ -15051,6 +16613,58 @@
           }
         },
         "title": "RendezVousUpdate",
+        "type": "object"
+      },
+      "RoleCabinetResponse": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "modifiable": {
+            "title": "Modifiable",
+            "type": "boolean"
+          },
+          "nb_utilisateurs": {
+            "title": "Nb Utilisateurs",
+            "type": "integer"
+          },
+          "niveau_hierarchie": {
+            "title": "Niveau Hierarchie",
+            "type": "integer"
+          },
+          "nom": {
+            "title": "Nom",
+            "type": "string"
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Permissions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "nom",
+          "niveau_hierarchie",
+          "permissions",
+          "nb_utilisateurs",
+          "modifiable"
+        ],
+        "title": "RoleCabinetResponse",
         "type": "object"
       },
       "RoleCreate": {
@@ -16112,6 +17726,38 @@
         "title": "StatutFactureEnum",
         "type": "string"
       },
+      "StatutRendezVousPlateformeRequest": {
+        "properties": {
+          "motif": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Obligatoire pour une annulation",
+            "title": "Motif"
+          },
+          "notifier_contact": {
+            "default": true,
+            "title": "Notifier Contact",
+            "type": "boolean"
+          },
+          "statut": {
+            "pattern": "^(PLANIFIE|CONFIRME|EFFECTUE|ANNULE)$",
+            "title": "Statut",
+            "type": "string"
+          }
+        },
+        "required": [
+          "statut"
+        ],
+        "title": "StatutRendezVousPlateformeRequest",
+        "type": "object"
+      },
       "StatutRendezVousResponse": {
         "description": "Rappel du cycle de vie, pour l'UI (évite de le redéfinir côté client).",
         "properties": {
@@ -16888,6 +18534,17 @@
             "title": "Langue",
             "type": "string"
           },
+          "logo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo Url"
+          },
           "nom": {
             "title": "Nom",
             "type": "string"
@@ -17208,6 +18865,17 @@
             ],
             "title": "Cabinet Id"
           },
+          "cabinet_logo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cabinet Logo Url"
+          },
           "cabinet_nom": {
             "anyOf": [
               {
@@ -17218,6 +18886,16 @@
               }
             ],
             "title": "Cabinet Nom"
+          },
+          "deux_facteurs": {
+            "default": false,
+            "title": "Deux Facteurs",
+            "type": "boolean"
+          },
+          "deux_facteurs_obligatoire": {
+            "default": false,
+            "title": "Deux Facteurs Obligatoire",
+            "type": "boolean"
           },
           "email": {
             "format": "email",
@@ -17236,6 +18914,14 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "methodes_2fa": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Methodes 2Fa",
+            "type": "array"
           },
           "nom": {
             "title": "Nom",
@@ -17339,10 +19025,17 @@
             "type": "string"
           },
           "mot_de_passe": {
-            "maxLength": 128,
-            "minLength": 10,
-            "title": "Mot De Passe",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mot De Passe"
           },
           "nom": {
             "maxLength": 100,
@@ -17377,7 +19070,6 @@
         },
         "required": [
           "email",
-          "mot_de_passe",
           "prenom",
           "nom",
           "role"
@@ -17394,6 +19086,11 @@
           },
           "actif": {
             "title": "Actif",
+            "type": "boolean"
+          },
+          "activation_requise": {
+            "default": false,
+            "title": "Activation Requise",
             "type": "boolean"
           },
           "cabinet_id": {
@@ -17446,6 +19143,11 @@
           "deux_facteurs": {
             "default": false,
             "title": "Deux Facteurs",
+            "type": "boolean"
+          },
+          "doit_changer_mot_de_passe": {
+            "default": false,
+            "title": "Doit Changer Mot De Passe",
             "type": "boolean"
           },
           "email": {
@@ -17764,6 +19466,11 @@
             "title": "Actif",
             "type": "boolean"
           },
+          "activation_requise": {
+            "default": false,
+            "title": "Activation Requise",
+            "type": "boolean"
+          },
           "cabinet_id": {
             "anyOf": [
               {
@@ -17814,6 +19521,11 @@
           "deux_facteurs": {
             "default": false,
             "title": "Deux Facteurs",
+            "type": "boolean"
+          },
+          "doit_changer_mot_de_passe": {
+            "default": false,
+            "title": "Doit Changer Mot De Passe",
             "type": "boolean"
           },
           "email": {
@@ -18121,9 +19833,401 @@
         ]
       }
     },
+    "/api/v1/auth/2fa/activation": {
+      "post": {
+        "operationId": "activation_2fa_session_api_v1_auth_2fa_activation_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationDeuxFacteursRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_CodesSecoursResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Activation 2Fa Session",
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
+    "/api/v1/auth/2fa/code-email": {
+      "post": {
+        "operationId": "code_email_session_api_v1_auth_2fa_code_email_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_EnvoiCodeResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Code Email Session",
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
+    "/api/v1/auth/2fa/preparation": {
+      "post": {
+        "operationId": "preparation_totp_api_v1_auth_2fa_preparation_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_PreparationTotpResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Preparation Totp",
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
+    "/api/v1/auth/activation": {
+      "post": {
+        "description": "Le titulaire choisit son mot de passe ; le lien ne sert plus ensuite.",
+        "operationId": "activer_compte_api_v1_auth_activation_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_NoneType_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activer Compte",
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
+    "/api/v1/auth/activation/verification": {
+      "post": {
+        "description": "Dit à qui appartient le lien, avant de choisir le mot de passe. Ne consomme rien.",
+        "operationId": "verifier_activation_api_v1_auth_activation_verification_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JetonActivationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_ActivationInfoResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Verifier Activation",
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
+    "/api/v1/auth/etape/2fa": {
+      "post": {
+        "description": "Code de l'application, code e-mail de cette étape, ou code de secours.",
+        "operationId": "etape_2fa_api_v1_auth_etape_2fa_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EtapeCodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_LoginEtapeResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Etape 2Fa",
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
+    "/api/v1/auth/etape/2fa/activation": {
+      "post": {
+        "description": "Active la 2FA (application ou e-mail), rend les codes de secours une fois, ouvre la session.",
+        "operationId": "etape_activation_2fa_api_v1_auth_etape_2fa_activation_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationDeuxFacteursRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_LoginEtapeResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Etape Activation 2Fa",
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
+    "/api/v1/auth/etape/2fa/preparation": {
+      "post": {
+        "description": "Secret à scanner (QR code), pendant la configuration obligatoire.",
+        "operationId": "etape_preparation_totp_api_v1_auth_etape_2fa_preparation_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EtapeJetonRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_PreparationTotpResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Etape Preparation Totp",
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
+    "/api/v1/auth/etape/code-email": {
+      "post": {
+        "description": "Envoie un code à l'adresse du compte. Il ne vaut que pour cette étape.",
+        "operationId": "etape_code_email_api_v1_auth_etape_code_email_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EtapeJetonRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_EnvoiCodeResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Etape Code Email",
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
+    "/api/v1/auth/etape/mot-de-passe": {
+      "post": {
+        "description": "Remplace le mot de passe temporaire, puis enchaîne sur l'étape suivante.",
+        "operationId": "etape_mot_de_passe_api_v1_auth_etape_mot_de_passe_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EtapeMotDePasseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_LoginEtapeResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Etape Mot De Passe",
+        "tags": [
+          "Authentification"
+        ]
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
-        "description": "Connexion utilisateur.\n\nLe cabinet est résolu via l'index Master `utilisateur_index`, le mot de passe\nest vérifié en base argon2, et une session persistée est créée pour rendre\nle token révocable. Le cookie HttpOnly est déposé pour les navigateurs.",
+        "description": "Connexion utilisateur, **en étapes**.\n\nLe cabinet est résolu via l'index Master, le mot de passe vérifié en argon2.\nEnsuite, selon le compte : session directe, changement du mot de passe\ntemporaire, code de double authentification, ou configuration de la 2FA\n(obligatoire pour l'administrateur du cabinet). Voir `LoginEtapeResponse`.",
         "operationId": "login_api_v1_auth_login_post",
         "requestBody": {
           "content": {
@@ -18140,7 +20244,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/APIResponse_TokenResponse_"
+                  "$ref": "#/components/schemas/APIResponse_LoginEtapeResponse_"
                 }
               }
             },
@@ -21203,6 +23307,42 @@
         "summary": "Reactiver Fauteuil",
         "tags": [
           "Cabinets & Ressources"
+        ]
+      }
+    },
+    "/api/v1/logos/{societe_id}": {
+      "get": {
+        "operationId": "lire_logo_api_v1_logos__societe_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "societe_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Societe Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Logo d'un cabinet (public)",
+        "tags": [
+          "Logos"
         ]
       }
     },
@@ -24581,6 +26721,82 @@
         ]
       }
     },
+    "/api/v1/platform/auth/2fa/activation-email": {
+      "post": {
+        "description": "Pendant de `/2fa/activation` pour l'e-mail : le code recu active le second\nfacteur, les codes de secours sont rendus **une fois**, la session s'ouvre.",
+        "operationId": "activer_2fa_email_api_v1_platform_auth_2fa_activation_email_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Activer2FARequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_Enrolement2FAResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Jeton d'enrolement invalide, ou code invalide"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Trop de tentatives"
+          }
+        },
+        "summary": "Enrôlement par e-mail : activer et ouvrir la session",
+        "tags": [
+          "Platform · Authentification"
+        ]
+      }
+    },
+    "/api/v1/platform/auth/2fa/activation-email/envoi": {
+      "post": {
+        "description": "Alternative au QR code : un code part a l'adresse du compte (jeton d'enrolement).",
+        "operationId": "envoyer_code_email_enrolement_api_v1_platform_auth_2fa_activation_email_envoi_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_EnvoiCodeEmailResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Jeton d'enrolement invalide ou expire"
+          },
+          "429": {
+            "description": "Trop d'envois"
+          }
+        },
+        "summary": "Enrôlement par e-mail : recevoir le code",
+        "tags": [
+          "Platform · Authentification"
+        ]
+      }
+    },
     "/api/v1/platform/auth/2fa/codes-secours/regenerer": {
       "post": {
         "description": "Remplace les codes de secours d'un compte déjà enrôlé par dix nouveaux.\n\n**Seule voie de recours après la perte des codes.** Garde-fous identiques au\nlogin : limitation de débit sur (e-mail, IP), message générique en cas\nd'échec, et une session ouverte ne suffit pas — un **TOTP valide sur le\nsecret actif** et un **motif** sont exigés. Les anciens codes sont invalidés\ndans la même transaction, les dix nouveaux ne sont renvoyés qu'ici, et le\njournal ne contient que leur nombre.",
@@ -24624,6 +26840,54 @@
           }
         },
         "summary": "Régénérer les codes de secours",
+        "tags": [
+          "Platform · Authentification"
+        ]
+      }
+    },
+    "/api/v1/platform/auth/2fa/email": {
+      "post": {
+        "description": "Alternative au TOTP : un code a 6 chiffres part a l'adresse du compte.\n\nLe code se saisit ensuite sur `/2fa`, avec le meme defi. Il ne vaut que pour\nce defi, 5 minutes, une fois ; un nouvel envoi annule le precedent.",
+        "operationId": "envoyer_code_email_defi_api_v1_platform_auth_2fa_email_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnvoiCodeEmailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_EnvoiCodeEmailResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Défi invalide ou expiré"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Trop d'envois"
+          }
+        },
+        "summary": "Recevoir le code de connexion par e-mail",
         "tags": [
           "Platform · Authentification"
         ]
@@ -25259,6 +27523,355 @@
         "summary": "Historique des versions d'un plan",
         "tags": [
           "Platform · Plans, abonnements & facturation"
+        ]
+      }
+    },
+    "/api/v1/platform/rendez-vous": {
+      "get": {
+        "operationId": "lister_api_v1_platform_rendez_vous_get",
+        "parameters": [
+          {
+            "description": "Début de période (inclus)",
+            "in": "query",
+            "name": "du",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Début de période (inclus)",
+              "title": "Du"
+            }
+          },
+          {
+            "description": "Fin de période (exclue)",
+            "in": "query",
+            "name": "au",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Fin de période (exclue)",
+              "title": "Au"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tenant_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tenant Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "statut",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Statut"
+            }
+          },
+          {
+            "in": "query",
+            "name": "type_rdv",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type Rdv"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_RendezVousPlateformeResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rendez-vous de l'équipe",
+        "tags": [
+          "Platform · Agenda"
+        ]
+      },
+      "post": {
+        "description": "Refusé si l'agent a déjà un rendez-vous actif sur ce créneau (`RDV_CONFLIT_AGENT`).",
+        "operationId": "creer_api_v1_platform_rendez_vous_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RendezVousPlateformeCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_RendezVousPlateformeResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Planifier un rendez-vous",
+        "tags": [
+          "Platform · Agenda"
+        ]
+      }
+    },
+    "/api/v1/platform/rendez-vous/{rdv_id}": {
+      "get": {
+        "operationId": "obtenir_api_v1_platform_rendez_vous__rdv_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rdv_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Rdv Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_RendezVousPlateformeResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Détail d'un rendez-vous",
+        "tags": [
+          "Platform · Agenda"
+        ]
+      },
+      "patch": {
+        "description": "Le contact est prévenu si l'horaire, la durée ou le lieu changent.",
+        "operationId": "modifier_api_v1_platform_rendez_vous__rdv_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rdv_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Rdv Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RendezVousPlateformeUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_RendezVousPlateformeResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Modifier un rendez-vous",
+        "tags": [
+          "Platform · Agenda"
+        ]
+      }
+    },
+    "/api/v1/platform/rendez-vous/{rdv_id}/statut": {
+      "post": {
+        "description": "L'annulation exige un motif ; le contact en est prévenu.",
+        "operationId": "changer_statut_api_v1_platform_rendez_vous__rdv_id__statut_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rdv_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Rdv Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatutRendezVousPlateformeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_RendezVousPlateformeResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirmer, marquer effectué ou annuler",
+        "tags": [
+          "Platform · Agenda"
         ]
       }
     },
@@ -26039,6 +28652,164 @@
         ]
       }
     },
+    "/api/v1/platform/tenants/{tenant_id}/administrateurs": {
+      "get": {
+        "description": "Comptes administrateurs du cabinet : état d'activation, de la 2FA, dernière connexion.",
+        "operationId": "lister_administrateurs_api_v1_platform_tenants__tenant_id__administrateurs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_List_AdminCabinetResponse__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Administrateurs d'un cabinet",
+        "tags": [
+          "Platform · Tenants (cycle de vie)"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{tenant_id}/administrateurs/{utilisateur_id}/acces": {
+      "post": {
+        "description": "`lien` (recommandé), `temporaire` (rendu une fois, changement imposé) ou\n`deux_facteurs` (téléphone perdu). Sessions coupées, motif journalisé dans\nla console et dans le cabinet. Aucun mot de passe choisi par un agent.",
+        "operationId": "reinitialiser_acces_admin_api_v1_platform_tenants__tenant_id__administrateurs__utilisateur_id__acces_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "utilisateur_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Utilisateur Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionAccesAdminRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_ActionAccesAdminResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Compte hors périmètre, ou e-mail non envoyé"
+          }
+        },
+        "summary": "Réinitialiser l'accès d'un administrateur du cabinet",
+        "tags": [
+          "Platform · Tenants (cycle de vie)"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{tenant_id}/administrateurs/{utilisateur_id}/email": {
+      "post": {
+        "description": "Change l'adresse de connexion (base du cabinet + index master, ensemble) et\nenvoie un lien d'activation à la nouvelle adresse. Sessions coupées.",
+        "operationId": "changer_email_administrateur_api_v1_platform_tenants__tenant_id__administrateurs__utilisateur_id__email_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "utilisateur_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Utilisateur Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangementEmailAdminRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_AdminCabinetResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Adresse déjà utilisée, identique, ou compte hors périmètre"
+          }
+        },
+        "summary": "Changer l'e-mail de connexion d'un administrateur du cabinet",
+        "tags": [
+          "Platform · Tenants (cycle de vie)"
+        ]
+      }
+    },
     "/api/v1/platform/tenants/{tenant_id}/archivage": {
       "post": {
         "description": "Retire le cabinet du registre actif sans rien supprimer.\n\nL'archivage est RÉVERSIBLE ; c'est ce qui en fait l'outil du quotidien. La\nsuppression définitive, elle, est irréversible et exige trois verrous.",
@@ -26144,6 +28915,93 @@
           }
         },
         "summary": "Historique horodaté des transitions",
+        "tags": [
+          "Platform · Tenants (cycle de vie)"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{tenant_id}/logo": {
+      "delete": {
+        "operationId": "supprimer_logo_api_v1_platform_tenants__tenant_id__logo_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_NoneType_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retirer le logo",
+        "tags": [
+          "Platform · Tenants (cycle de vie)"
+        ]
+      },
+      "post": {
+        "operationId": "envoyer_logo_api_v1_platform_tenants__tenant_id__logo_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_envoyer_logo_api_v1_platform_tenants__tenant_id__logo_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_dict_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Format non accepté, fichier vide ou trop lourd"
+          }
+        },
+        "summary": "Envoyer le logo d'un cabinet (PNG, JPEG ou WebP, 512 Ko max)",
         "tags": [
           "Platform · Tenants (cycle de vie)"
         ]
@@ -26258,6 +29116,162 @@
         "summary": "Simuler l'effet d'un quota",
         "tags": [
           "Platform · Plans, abonnements & facturation"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{tenant_id}/rbac": {
+      "get": {
+        "description": "Rôles du cabinet avec leurs permissions, et le catalogue des permissions accordables.",
+        "operationId": "lire_matrice_api_v1_platform_tenants__tenant_id__rbac_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_MatriceCabinetResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rôles et permissions d'un cabinet",
+        "tags": [
+          "Platform · Tenants (cycle de vie)"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{tenant_id}/rbac/roles/{role_id}/permissions": {
+      "post": {
+        "description": "Trace dans le journal de la console ET dans celui du cabinet. Motif obligatoire.",
+        "operationId": "accorder_api_v1_platform_tenants__tenant_id__rbac_roles__role_id__permissions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "role_id",
+            "required": true,
+            "schema": {
+              "title": "Role Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModificationPermissionCabinet"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_PermissionsRoleCabinetResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Rôle protégé ou permission hors catalogue"
+          }
+        },
+        "summary": "Accorder une permission à un rôle du cabinet",
+        "tags": [
+          "Platform · Tenants (cycle de vie)"
+        ]
+      }
+    },
+    "/api/v1/platform/tenants/{tenant_id}/rbac/roles/{role_id}/permissions/retrait": {
+      "post": {
+        "description": "Trace dans le journal de la console ET dans celui du cabinet. Motif obligatoire.",
+        "operationId": "retirer_api_v1_platform_tenants__tenant_id__rbac_roles__role_id__permissions_retrait_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "role_id",
+            "required": true,
+            "schema": {
+              "title": "Role Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModificationPermissionCabinet"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_PermissionsRoleCabinetResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Rôle protégé ou permission hors catalogue"
+          }
+        },
+        "summary": "Retirer une permission à un rôle du cabinet",
+        "tags": [
+          "Platform · Tenants (cycle de vie)"
         ]
       }
     },
@@ -27821,7 +30835,7 @@
     },
     "/api/v1/rendez-vous/creneaux-libres": {
       "get": {
-        "description": "Créneaux réellement disponibles : heures déclarées **moins** ce qui est déjà\npris (rendez-vous du praticien, fauteuils immobilisés).\n\n⚠️ Complète `GET /praticiens/{id}/creneaux` du module D2A, qui ne connaît que\nles heures déclarées. C'est cette route qu'un écran de prise de rendez-vous\ndoit appeler.",
+        "description": "Créneaux réellement disponibles : heures déclarées **moins** ce qui est déjà\npris (rendez-vous du praticien, fauteuils immobilisés).\n\nATTENTION : Complète `GET /praticiens/{id}/creneaux` du module D2A, qui ne connaît que\nles heures déclarées. C'est cette route qu'un écran de prise de rendez-vous\ndoit appeler.",
         "operationId": "lister_creneaux_libres_api_v1_rendez_vous_creneaux_libres_get",
         "parameters": [
           {
@@ -27932,7 +30946,7 @@
     },
     "/api/v1/rendez-vous/fauteuils/blocage": {
       "post": {
-        "description": "Immobilise un fauteuil sans rendez-vous (panne, entretien).\n\n⚠️ `422 CRENEAU_DEJA_OCCUPE` si un rendez-vous occupe déjà le fauteuil sur\ncette plage : il faut d'abord déplacer ou annuler ce rendez-vous, pas\nsupprimer son occupation.",
+        "description": "Immobilise un fauteuil sans rendez-vous (panne, entretien).\n\nATTENTION : `422 CRENEAU_DEJA_OCCUPE` si un rendez-vous occupe déjà le fauteuil sur\ncette plage : il faut d'abord déplacer ou annuler ce rendez-vous, pas\nsupprimer son occupation.",
         "operationId": "bloquer_fauteuil_api_v1_rendez_vous_fauteuils_blocage_post",
         "requestBody": {
           "content": {
@@ -30842,6 +33856,55 @@
           }
         ],
         "summary": "Modifier Utilisateur",
+        "tags": [
+          "Utilisateurs & rôles"
+        ]
+      }
+    },
+    "/api/v1/utilisateurs/{utilisateur_id}/invitation": {
+      "post": {
+        "description": "(Re)envoie le lien d'activation : la personne choisit un nouveau mot de\npasse. Le lien précédent ne vaut plus rien, les sessions sont révoquées.\nRecommandé plutôt qu'un mot de passe temporaire quand l'adresse est valide.",
+        "operationId": "renvoyer_invitation_api_v1_utilisateurs__utilisateur_id__invitation_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "utilisateur_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Utilisateur Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_UtilisateurResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Renvoyer Invitation",
         "tags": [
           "Utilisateurs & rôles"
         ]

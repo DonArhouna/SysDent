@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Avatar, initiales } from '@/components/ui/avatar'
 import { formatDateFr } from '@/lib/format'
+import { CarteSecurite } from '../components/carte-securite'
 
 /**
  * « Mon compte » — profil de l'utilisateur connecté.
@@ -29,6 +30,9 @@ interface Profil {
   /** Nom du cabinet et site de rattachement : exposes par `/auth/me`. */
   cabinet_nom?: string | null
   cabinet_id?: string | null
+  deux_facteurs?: boolean
+  methodes_2fa?: string[]
+  deux_facteurs_obligatoire?: boolean
 }
 
 interface Cabinet {
@@ -126,6 +130,8 @@ export function MonComptePage() {
           </CardContent>
         </Card>
       </div>
+
+      <CarteSecurite profil={p} />
 
       <Card>
         <CardHeader>

@@ -40,6 +40,9 @@ R_TEMPLATES = "templates"
 R_ONBOARDING = "onboarding"
 R_MIGRATIONS = "migrations"
 R_EXPORTS = "exports"
+# Agenda de l'équipe éditrice : rendez-vous avec les cabinets et les prospects.
+# Aucune donnée patient : les rendez-vous des patients restent dans le cabinet.
+R_AGENDA = "agenda"
 
 # ---------------------------------------------------------------------------
 # Actions
@@ -86,6 +89,13 @@ CATALOGUE_PERMISSIONS: List[Permission] = [
     # Suppression DÉFINITIVE : irrécversible, droit à part entière.
     p(R_TENANTS, A_DELETE),
     p(R_TENANTS, A_EXPORT),
+    # Rôles et permissions À L'INTÉRIEUR d'un cabinet : la seule écriture de la
+    # console dans une base cliente hors provisionnement. Droit à part entière,
+    # sensible, accordé au seul Super Admin.
+    p(R_TENANTS, "rbac"),
+    # Accès des ADMINISTRATEURS d'un cabinet : lien de réinitialisation, mot de
+    # passe temporaire, remise à zéro de la 2FA. Écrit dans la base du cabinet.
+    p(R_TENANTS, "reset_access"),
     # ── Utilisateurs plateforme ──────────────────────────────────────────────
     p(R_USERS, A_READ),
     p(R_USERS, A_CREATE),
@@ -123,6 +133,9 @@ CATALOGUE_PERMISSIONS: List[Permission] = [
     p(R_EXPORTS, A_READ),
     p(R_EXPORTS, A_CREATE),
     p(R_ONBOARDING, A_READ),
+    # ── Agenda de l'éditeur ──────────────────────────────────────────────────
+    p(R_AGENDA, A_READ),
+    p(R_AGENDA, A_WRITE),
 ]
 
 #: Permissions « sensibles » : elles sont journalisées avec le détail avant/après
@@ -139,6 +152,8 @@ PERMISSIONS_SENSIBLES: FrozenSet[str] = frozenset(
         format_permission(R_TENANTS, A_TERMINATE),
         format_permission(R_TENANTS, A_SUSPEND),
         format_permission(R_TENANTS, A_CREATE),
+        format_permission(R_TENANTS, "rbac"),
+        format_permission(R_TENANTS, "reset_access"),
         format_permission(R_SUPPORT, A_GRANT),
         format_permission(R_SUPPORT, "grant_elevated"),
         format_permission(R_SUPPORT, A_REVOKE),
@@ -158,6 +173,10 @@ DESCRIPTIONS_PERMISSIONS: Dict[Permission, str] = {
     p(R_TENANTS, A_ACTIVATE): "Réactiver un cabinet suspendu ou en essai",
     p(R_TENANTS, A_TERMINATE): "Résilier un cabinet (irréversible côté métier)",
     p(R_TENANTS, A_DELETE): "Supprimer DÉFINITIVEMENT le dossier d'un cabinet",
+    p(R_TENANTS, "rbac"): "Modifier les rôles et permissions à l'intérieur d'un cabinet",
+    p(R_TENANTS, "reset_access"): "Réinitialiser l'accès des administrateurs d'un cabinet (mot de passe, 2FA)",
+    p(R_AGENDA, A_READ): "Consulter l'agenda de l'équipe (rendez-vous avec les cabinets)",
+    p(R_AGENDA, A_WRITE): "Planifier, modifier et annuler des rendez-vous",
     p(R_TENANTS, A_EXPORT): "Demander l'export d'un dossier client",
     p(R_USERS, A_READ): "Consulter les comptes de la console",
     p(R_USERS, A_CREATE): "Créer un compte de la console",
@@ -236,6 +255,8 @@ MATRICE_ROLES: Dict[str, List[Permission]] = {
         p(R_ONBOARDING, A_READ),
         p(R_MIGRATIONS, A_READ),
         p(R_AUDIT, A_READ),
+        p(R_AGENDA, A_READ),
+        p(R_AGENDA, A_WRITE),
     ],
     ROLE_FACTURATION: [
         p(R_TENANTS, A_READ),
@@ -255,6 +276,8 @@ MATRICE_ROLES: Dict[str, List[Permission]] = {
         p(R_ONBOARDING, A_READ),
         p(R_STATS, A_READ),
         p(R_ANNOUNCEMENTS, A_READ),
+        p(R_AGENDA, A_READ),
+        p(R_AGENDA, A_WRITE),
     ],
     ROLE_AUDITEUR: [
         p(R_TENANTS, A_READ),
@@ -265,6 +288,7 @@ MATRICE_ROLES: Dict[str, List[Permission]] = {
         p(R_AUDIT, A_READ),
         p(R_AUDIT, A_EXPORT),
         p(R_HEALTH, A_READ),
+        p(R_AGENDA, A_READ),
     ],
 }
 

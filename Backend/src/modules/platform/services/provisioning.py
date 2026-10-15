@@ -42,13 +42,20 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
-from sqlalchemy import select, text
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import settings
+from src.core.database import tenant_db_manager
 from src.core.exceptions import BusinessRuleViolationException
 from src.modules.platform.services.journal import JournalService
 from src.core.migrations import upgrade_tenant_to_head
+from src.core.tenant_roles import (
+    creer_base_dediee,
+    generer_identifiants,
+    supprimer_base_et_role,
+    url_tenant,
+)
 from src.core.security import (
     encrypt_secret,
     get_password_hash,
@@ -170,13 +177,17 @@ class ProvisioningService:
         await master_db.flush()
 
         db_name = sanitize_db_name(nom)
+        # Compte PostgreSQL DÉDIÉ au cabinet (cf. `src/core/tenant_roles.py`) :
+        # jamais le compte d'administration du serveur. Le mot de passe n'existe
+        # en clair que le temps du provisionnement ; le registre le garde chiffré.
+        role_db, mdp_db = generer_identifiants(db_name)
         tenant_db = TenantDB(
             societe_id=societe.id,
             db_name=db_name,
             db_host=settings.TENANT_DB_HOST,
             db_port=settings.TENANT_DB_PORT,
-            db_user=settings.TENANT_DB_USER,
-            db_password=encrypt_secret(settings.TENANT_DB_PASSWORD),
+            db_user=role_db,
+            db_password=encrypt_secret(mdp_db),
             statut="PROVISIONING",
             schema_version="1.0.0",
         )
@@ -196,12 +207,13 @@ class ProvisioningService:
 
         try:
             # ── Étape 2 : base physique ────────────────────────────────────────
-            await ProvisioningService._creer_base_physique(db_name)
+            await creer_base_dediee(db_name, role_db, mdp_db)
             base_creee = True
             etapes.append("base_creee")
 
             # ── Étape 3 : schéma ──────────────────────────────────────────────
-            await ProvisioningService._appliquer_migrations(db_name)
+            # Sous le compte du cabinet : il devient propriétaire de ses tables.
+            await ProvisioningService._appliquer_migrations(db_name, role_db, mdp_db)
             etapes.append("migrations_appliquees")
 
             # ── Étape 4 : semis depuis les gabarits plateforme ────────────────
@@ -291,6 +303,7 @@ class ProvisioningService:
                 base_creee,
                 client_ip,
                 auteur,
+                role_db=role_db,
             )
             logger.exception(
                 "provisionnement_echoue",
@@ -315,8 +328,13 @@ class ProvisioningService:
             ) from exc
 
         # Le compte admin a été créé par le semis : on lui envoie son invitation.
-        invitation_envoyee = await ProvisioningService._envoyer_invitation_admin(
-            societe.id, db_name, email_normalise, nom, platform_db, auteur, client_ip
+        # Mot de passe fixé d'avance (commande de démonstration) : rien à activer.
+        invitation_envoyee = (
+            await ProvisioningService._envoyer_invitation_admin(
+                societe.id, db_name, email_normalise, nom, platform_db, auteur, client_ip
+            )
+            if admin_password is None
+            else False
         )
 
         # Journalisation : la création d'un cabinet est l'acte le plus sensible
@@ -366,35 +384,14 @@ class ProvisioningService:
     # ─────────────────────────────────────────────────────────────────────────
 
     @staticmethod
-    async def _creer_base_physique(db_name: str) -> None:
-        """`CREATE DATABASE` hors transaction, sur une connexion AUTOCOMMIT éphémère."""
-        url = (
-            f"postgresql+asyncpg://{settings.TENANT_DB_USER}:{settings.TENANT_DB_PASSWORD}"
-            f"@{settings.TENANT_DB_HOST}:{settings.TENANT_DB_PORT}/postgres"
-        )
-        engine = create_async_engine(url, isolation_level="AUTOCOMMIT")
-        try:
-            async with engine.connect() as conn:
-                existe = await conn.execute(
-                    text("SELECT 1 FROM pg_database WHERE datname = :name"), {"name": db_name}
-                )
-                if not existe.scalar_one_or_none():
-                    # `db_name` vient de `sanitize_db_name()` ([a-z0-9_] + uuid) :
-                    # aucune injection possible malgré l'identifiant dynamique.
-                    await conn.execute(text(f'CREATE DATABASE "{db_name}"'))
-        finally:
-            await engine.dispose()
-
-    @staticmethod
-    async def _appliquer_migrations(db_name: str) -> None:
-        """Alembic est synchrone : on le lance dans un thread pour ne pas bloquer la boucle."""
+    async def _appliquer_migrations(db_name: str, role: str, mot_de_passe: str) -> None:
+        """
+        Migrations sous le compte DU CABINET, jamais sous l'administrateur : les
+        tables créées lui appartiennent. Alembic est synchrone : thread dédié.
+        """
         import asyncio
 
-        url = (
-            f"postgresql+asyncpg://{settings.TENANT_DB_USER}:{settings.TENANT_DB_PASSWORD}"
-            f"@{settings.TENANT_DB_HOST}:{settings.TENANT_DB_PORT}/{db_name}"
-        )
-        await asyncio.to_thread(upgrade_tenant_to_head, url)
+        await asyncio.to_thread(upgrade_tenant_to_head, url_tenant(db_name, role, mot_de_passe))
 
     @staticmethod
     async def _enregistrer_index(
@@ -441,6 +438,7 @@ class ProvisioningService:
         base_creee: bool,
         client_ip: Optional[str],
         auteur: str,
+        role_db: Optional[str] = None,
     ) -> None:
         """
         Annule le provisionnement dans l'ordre inverse des étapes.
@@ -478,22 +476,16 @@ class ProvisioningService:
                     "compensation_plateforme_echouee", societe_id=str(societe_id)
                 )
 
-        # Étapes 2 à 4 : base physique
-        if base_creee and db_name:
+        # Étapes 2 à 4 : base physique ET compte dédié. Le compte peut exister
+        # sans la base (échec entre les deux) : on le supprime dès qu'on a un nom.
+        if db_name and (base_creee or role_db):
             try:
-                url = (
-                    f"postgresql+asyncpg://{settings.TENANT_DB_USER}:{settings.TENANT_DB_PASSWORD}"
-                    f"@{settings.TENANT_DB_HOST}:{settings.TENANT_DB_PORT}/postgres"
-                )
-                engine = create_async_engine(url, isolation_level="AUTOCOMMIT")
-                try:
-                    async with engine.connect() as conn:
-                        await conn.execute(
-                            text(f'DROP DATABASE IF EXISTS "{db_name}" WITH (FORCE)')
-                        )
-                finally:
-                    await engine.dispose()
-                logger.info("compensation_base_supprimee", db_name=db_name)
+                if societe_id is not None:
+                    # Le moteur du cabinet est en cache depuis le semis : le fermer,
+                    # sinon DROP DATABASE coupe des connexions encore référencées.
+                    await tenant_db_manager.oublier(str(societe_id))
+                await supprimer_base_et_role(db_name, role_db or "")
+                logger.info("compensation_base_supprimee", db_name=db_name, role=role_db)
             except Exception:  # noqa: BLE001
                 logger.exception("compensation_base_echouee", db_name=db_name)
 
@@ -533,28 +525,30 @@ class ProvisioningService:
         client_ip: Optional[str],
     ) -> bool:
         """
-        Crée et envoie l'invitation du premier administrateur.
+        Envoie au premier administrateur le **lien d'activation** de son compte.
 
-        L'invitation porte un jeton OPAQUE HACHÉ en base : le lien envoyé par
-        e-mail ne peut pas être rejoué depuis une fuite de la base, et le mot de
-        passe initial n'est jamais transmis.
+        Le lien vit dans la base DU CABINET (`jetons_auth`), haché, valable
+        `TENANT_ACTIVATION_HEURES`. L'administrateur y choisit lui-même son mot
+        de passe : personne d'autre ne le connaît jamais. Tant qu'il n'a pas
+        activé, son compte refuse toute connexion.
+
+        Un échec d'envoi ne défait pas le cabinet : le lien peut être renvoyé.
         """
-        from src.modules.platform.models import JetonUsageUnique, UsageJeton
-        from src.modules.platform.security import generer_jeton_opaque, hacher_jeton
-        from src.modules.platform.services.notifications import EmailService
+        from sqlalchemy.orm import selectinload
 
-        jeton = generer_jeton_opaque()
-        platform_db.add(
-            JetonUsageUnique(
-                usage=UsageJeton.INVITATION_ADMIN,
-                hash_jeton=hacher_jeton(jeton),
-                cible_type="TENANT",
-                cible_id=str(societe_id),
-                expire_le=_maintenant() + timedelta(hours=72),
-                cree_par=auteur,
-                ip_address=client_ip,
-            )
-        )
-        await platform_db.commit()
-        await EmailService.invitation_admin(email, jeton, nom_cabinet)
-        return True
+        from src.modules.auth.securite import SecuriteCompte, session_cabinet
+        from src.modules.tenants.models import Utilisateur
+
+        try:
+            async with await session_cabinet(str(societe_id)) as db:
+                admin = (
+                    await db.execute(
+                        select(Utilisateur)
+                        .options(selectinload(Utilisateur.role))
+                        .where(Utilisateur.email == email)
+                    )
+                ).scalar_one()
+                return await SecuriteCompte.envoyer_activation(db, admin, str(societe_id), nom_cabinet)
+        except Exception:  # noqa: BLE001 - le cabinet existe, seul l'envoi a échoué
+            logger.exception("activation_admin_non_envoyee", societe_id=str(societe_id))
+            return False
