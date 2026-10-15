@@ -68,10 +68,10 @@ export function AppSidebar({
   const roleLibelle = libelleRole(profil?.role)
   // Le repère est le cabinet, tel que `/auth/me` le donne. Le mot « Plateforme »
   // n'a rien à faire dans l'application d'un cabinet : un utilisateur client
-  // n'est pas sur une plateforme, il est dans le sien.
-  const structure = profil?.cabinet_nom ?? 'Cabinet'
-
-  console.log('--------------------Nom Cabinet---------------------:', profil?.cabinet_nom);
+  // n'est pas sur une plateforme, il est dans le sien. Le nom de la société
+  // (modifiable depuis la console) prime sur celui du site.
+  const nomCabinet = profil?.societe_nom ?? profil?.cabinet_nom ?? null
+  const structure = nomCabinet ?? 'Cabinet'
 
   return (
     <aside
@@ -86,7 +86,7 @@ export function AppSidebar({
       <div className="flex items-center gap-2 px-4 pt-4 pb-3">
         <Link
           to="/dashboard"
-          aria-label="SysDent Pro — aller au tableau de bord"
+          aria-label={`${nomCabinet ?? 'SysDent Pro'} — aller au tableau de bord`}
           title="Tableau de bord"
           className="focus-ring group flex min-w-0 flex-1 items-center gap-3 rounded-lg transition-opacity hover:opacity-80"
         >
@@ -94,7 +94,7 @@ export function AppSidebar({
             // Logo du cabinet, défini depuis la console ; « SD » à défaut.
             <img
               src={logo}
-              alt={`Logo de ${profil?.cabinet_nom ?? 'votre cabinet'}`}
+              alt={`Logo de ${structure}`}
               onError={() => setLogoCasse(true)}
               className="h-9 w-9 shrink-0 rounded-xl border border-border bg-white object-contain p-0.5 shadow-sm transition-transform duration-150 group-hover:scale-105"
             />
@@ -105,8 +105,9 @@ export function AppSidebar({
           )}
           {!collapsed && (
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-bold leading-tight">
-                SysDent Pro
+              {/* Le nom du cabinet ; la marque SysDent seulement à défaut. */}
+              <span className="block truncate text-[13px] font-bold leading-tight" title={nomCabinet ?? undefined}>
+                {nomCabinet ?? 'SysDent Pro'}
               </span>
               <span className="flex items-center gap-1 truncate text-[10px] text-muted-foreground">
                 <Sparkles className="h-3 w-3 shrink-0 text-accent-purple" aria-hidden />

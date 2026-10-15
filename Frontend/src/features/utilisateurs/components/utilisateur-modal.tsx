@@ -148,10 +148,10 @@ export function UtilisateurModal({
       <form className="space-y-4" onSubmit={soumettre}>
         {/* Le cabinet dans lequel le compte est créé : repère visible avant de valider. */}
         <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-3">
-          <CabinetLogo url={profil?.cabinet_logo_url} nom={profil?.cabinet_nom} taille="sm" />
+          <CabinetLogo url={profil?.cabinet_logo_url} nom={profil?.societe_nom ?? profil?.cabinet_nom} taille="sm" />
           <div className="min-w-0 text-sm">
             <p className="text-xs text-muted-foreground">{edition ? 'Compte du cabinet' : 'Nouveau compte dans'}</p>
-            <p className="truncate font-semibold">{profil?.cabinet_nom ?? 'Votre cabinet'}</p>
+            <p className="truncate font-semibold">{profil?.societe_nom ?? profil?.cabinet_nom ?? 'Votre cabinet'}</p>
           </div>
           {!profil?.cabinet_logo_url && <span className="ml-auto text-[10px] text-muted-foreground">Aucun logo</span>}
         </div>
