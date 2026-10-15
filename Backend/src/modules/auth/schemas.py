@@ -54,6 +54,9 @@ class UserProfileResponse(BaseSchema):
     deux_facteurs_obligatoire: bool = False
     #: Logo du cabinet (adresse publique relative à l'API), s'il en a un.
     cabinet_logo_url: Optional[str] = None
+    #: Nom de la société (base master), tel que la console le modifie.
+    #: `cabinet_nom` est celui du site, en base du tenant : les deux diffèrent.
+    societe_nom: Optional[str] = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────

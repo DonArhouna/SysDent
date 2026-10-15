@@ -381,6 +381,7 @@ async def get_me(
     access token (proxy, trace APM,support). La lecture en base a l'avantage
     secondaire de refléter immédiatement un changement de nom ou de rôle.
     """
+    societe_nom, logo = await _identite_cabinet(payload.get("tenant_id"))
     return APIResponse(
         data=UserProfileResponse(
             id=user.id,
@@ -395,7 +396,8 @@ async def get_me(
             deux_facteurs=user.deux_facteurs,
             methodes_2fa=methodes_2fa(user) if user.deux_facteurs else [],
             deux_facteurs_obligatoire=deux_facteurs_obligatoire(user),
-            cabinet_logo_url=await _logo_du_cabinet(payload.get("tenant_id")),
+            cabinet_logo_url=logo,
+            societe_nom=societe_nom,
             **await _repere_cabinet(db, user),
             **await _contrat_du_cabinet(payload.get("tenant_id")),
         )
@@ -421,11 +423,6 @@ async def _identite_cabinet(tenant_id: Optional[str]) -> tuple[Optional[str], Op
             return (ligne[0], ligne[1]) if ligne else (None, None)
     except (SQLAlchemyError, ValueError):
         return None, None
-
-
-async def _logo_du_cabinet(tenant_id: Optional[str]) -> Optional[str]:
-    """Adresse du logo (base master). Une panne master ne casse pas le profil."""
-    return (await _identite_cabinet(tenant_id))[1]
 
 
 async def _repere_cabinet(db: AsyncSession, user: Utilisateur) -> dict:

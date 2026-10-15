@@ -47,6 +47,8 @@ export interface ProfilUtilisateur {
   cabinet_nom?: string | null
   /** Logo du cabinet (chemin relatif à l'API), s'il en a un. */
   cabinet_logo_url?: string | null
+  /** Nom de la société (console), distinct de `cabinet_nom` qui est le site. */
+  societe_nom?: string | null
   /** Site de rattachement de l'utilisateur, s'il en a un. */
   cabinet_id?: string | null
   /** Double authentification active sur ce compte. */

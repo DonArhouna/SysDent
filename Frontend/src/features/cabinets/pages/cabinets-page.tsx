@@ -202,9 +202,9 @@ export function CabinetsPage() {
 
       {/* Identité du cabinet : le logo se définit depuis la console de l'éditeur. */}
       <div className="flex items-center gap-4 rounded-card border border-border bg-card p-4">
-        <CabinetLogo url={profilCabinet?.cabinet_logo_url} nom={profilCabinet?.cabinet_nom} taille="lg" legende />
+        <CabinetLogo url={profilCabinet?.cabinet_logo_url} nom={profilCabinet?.societe_nom ?? profilCabinet?.cabinet_nom} taille="lg" legende />
         <div className="min-w-0">
-          <p className="truncate text-lg font-semibold">{profilCabinet?.cabinet_nom ?? 'Votre cabinet'}</p>
+          <p className="truncate text-lg font-semibold">{profilCabinet?.societe_nom ?? profilCabinet?.cabinet_nom ?? 'Votre cabinet'}</p>
           <p className="text-xs text-muted-foreground">
             {profilCabinet?.cabinet_logo_url
               ? 'Logo affiché dans la barre latérale et sur les pages d’activation de compte.'
