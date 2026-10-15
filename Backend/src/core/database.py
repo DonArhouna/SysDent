@@ -168,6 +168,19 @@ class TenantDatabaseManager:
             )
         return self._session_factories[tenant_id]
 
+    async def oublier(self, tenant_id: str) -> None:
+        """
+        Ferme et retire du cache le moteur d'un cabinet.
+
+        Utile quand ses identifiants changent ou que sa base disparaît
+        (compensation d'un provisionnement) : un moteur en cache garderait des
+        connexions ouvertes avec les anciens identifiants.
+        """
+        engine = self._engines.pop(tenant_id, None)
+        self._session_factories.pop(tenant_id, None)
+        if engine is not None:
+            await engine.dispose()
+
     async def close_all(self) -> None:
         """Ferme proprement tous les pools lors de l'arrêt de l'application."""
         logger.info("closing_all_tenant_engines", count=len(self._engines))

@@ -1,18 +1,21 @@
 import { useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useNavigate } from 'react-router-dom'
+import { Mail, QrCode } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useAuthStore } from '@/stores/auth-store'
 
+import { EnvoiCodeEmailBouton } from './envoi-code-email'
+
 /**
  * Enrôlement du second facteur — le premier écran de tout compte plateforme.
  *
- * **Aucun code n'est envoyé par e-mail.** Le second facteur est un TOTP : un code
- * à six chiffres affiché par une application d'authentification. Le serveur
- * renvoie un secret base32 et une URI `otpauth://`, à scanner.
+ * **Deux méthodes, au choix.** Un TOTP (code à six chiffres affiché par une
+ * application d'authentification ; le serveur renvoie un secret base32 et une URI
+ * `otpauth://`, à scanner), ou un code à six chiffres reçu par e-mail.
  *
  * **Les codes de secours s'affichent une seule fois.** Ni la base ni le journal
  * ne les conservent en clair : perdus, ils imposent de repasser par un
@@ -28,6 +31,8 @@ export function EnrolementPage() {
   const activer = useAuthStore((e) => e.activerEnrolement)
   const annuler = useAuthStore((e) => e.annulerEnrolement)
   const jetonEnrolement = useAuthStore((e) => e.jetonEnrolement)
+  const methodes2fa = useAuthStore((e) => e.methodes2fa)
+  const activerParEmail = useAuthStore((e) => e.activerEnrolementEmail)
 
   const navigate = useNavigate()
 
@@ -36,6 +41,8 @@ export function EnrolementPage() {
   const [soumission, setSoumission] = useState(false)
   const [codes, setCodes] = useState<string[] | null>(null)
   const [copies, setCopies] = useState(false)
+  // Alternative au QR code : le second facteur est un code recu par e-mail.
+  const [modeEmail, setModeEmail] = useState(false)
 
   // Sans jeton d'enrolement, cet écran n'a rien a faire : on ne l'atteint que
   // depuis un login reussi, et le jeton est consomme a l'activation.
@@ -117,6 +124,77 @@ export function EnrolementPage() {
     )
   }
 
+  // ── Enrolement par e-mail : envoi puis saisie du code ────────────────────────
+  if (modeEmail) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-6">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Vérification par e-mail</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Un code à 6 chiffres sera envoyé à l'adresse de ce compte. À chaque
+              connexion, vous pourrez en recevoir un nouveau.
+            </p>
+
+            <EnvoiCodeEmailBouton onEnvoye={() => setErreur('')} />
+
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault()
+                setErreur('')
+                setSoumission(true)
+                activerParEmail(code.trim())
+                  .then(setCodes)
+                  .catch((e: Error) => setErreur(e.message))
+                  .finally(() => setSoumission(false))
+              }}
+            >
+              <div className="space-y-1.5">
+                <label htmlFor="code-email">Code reçu par e-mail</label>
+                <Input
+                  id="code-email"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="000000"
+                  required
+                />
+              </div>
+
+              {erreur && (
+                <p role="alert" className="text-sm text-danger">
+                  {erreur}
+                </p>
+              )}
+
+              <div className="flex justify-between gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setModeEmail(false)
+                    setCode('')
+                    setErreur('')
+                  }}
+                >
+                  Retour
+                </Button>
+                <Button type="submit" disabled={soumission || code.trim().length < 6}>
+                  {soumission ? 'Vérification…' : 'Activer'}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   // ── Preparation : QR + secret saisi a la main ────────────────────────────────
   if (!preparation) {
     return (
@@ -127,8 +205,8 @@ export function EnrolementPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Vos identifiants sont corrects. Ce compte n'a pas encore de secret
-              TOTP.
+              Vos identifiants sont corrects. Choisissez comment vous recevrez le
+              code de vérification à chaque connexion.
             </p>
             <Button
               className="w-full"
@@ -139,8 +217,23 @@ export function EnrolementPage() {
                 preparer().catch((e: Error) => setErreur(e.message)).finally(() => setSoumission(false))
               }}
             >
-              {soumission ? 'Préparation…' : 'Afficher le QR code'}
+              <QrCode aria-hidden />
+              {soumission ? 'Préparation…' : 'Scanner un QR code (application)'}
             </Button>
+            {methodes2fa.includes('email') && (
+              <Button
+                variant="outline"
+                className="w-full"
+                disabled={soumission}
+                onClick={() => {
+                  setErreur('')
+                  setModeEmail(true)
+                }}
+              >
+                <Mail aria-hidden />
+                Recevoir un code par e-mail
+              </Button>
+            )}
             {erreur && (
               <p role="alert" className="text-sm text-danger">
                 {erreur}

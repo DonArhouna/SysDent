@@ -1,25 +1,11 @@
 import { useMemo, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
-import { ChevronDown, ChevronsLeft, Search, Sparkles } from 'lucide-react'
+import { ChevronDown, ChevronsLeft, Search, ShieldCheck, Sparkles } from 'lucide-react'
 import { NAVIGATION } from '@/lib/navigation'
-import { useAuthStore, possedePermission } from '@/stores/auth-store'
+import { libelleRole } from '@/lib/libelles'
+import { useAuthStore, possedePermission, rolePrincipal } from '@/stores/auth-store'
 import { Avatar, initiales } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
-
-/** Libellé du rôle plateforme — simplifié par rapport au client : le backoffice
- * n'a que des comptes de contrôle, chacun avec son nom defini dans le RBAC. */
-function libelleRole(role: string | undefined): string {
-  switch (role) {
-    case 'SUPER_ADMIN':
-      return 'Super Admin'
-    case 'SUPPORT':
-      return 'Support'
-    case 'LECTURE':
-      return 'Lecture seule'
-    default:
-      return role ?? '—'
-  }
-}
 
 /**
  * Sidebar flottante de l'application.
@@ -32,8 +18,9 @@ function libelleRole(role: string | undefined): string {
  * - filtrage RBAC local avec `possedePermission` (le backend reste garant) ;
  * - recherche de fonction : filtre les entrées en temps réel, les sections
  *   s'auto-déplient pendant une recherche ;
- * - repli en rail d'icônes, piloté par le chevron de cet en-tête (et non par
- *   la navbar, qui n'a plus de bouton) ;
+ * - repli en rail d'icônes, piloté par le chevron de cet en-tête ;
+ * - élément actif : fond teinté, filet d'accent et pastille d'icône pleine,
+ *   lisibles d'un coup d'œil sans saturer le panneau ;
  * - barre de défilement masquée : `.scrollbar-none` neutralise le visuel sans
  *   empêcher la molette, le tactile ni le clavier.
  *
@@ -76,11 +63,7 @@ export function AppSidebar({
   }
 
   const nomComplet = profil ? `${profil.prenom} ${profil.nom}`.trim() : '—'
-  const roleLibelle = libelleRole(profil?.role)
-  // Sur la plateforme, il n'y a pas de cabinet rattaché : le sous-titre reste
-  // générique. La différenciation est déjà faite par le badge « Plateforme »
-  // de la navbar et le titre d'onglet.
-  const structure = 'Plateforme'
+  const roleLibelle = libelleRole(rolePrincipal(profil))
 
   return (
     <aside
@@ -92,30 +75,32 @@ export function AppSidebar({
       )}
     >
       {/* En-tête : logo + libellé (un seul lien) + repli */}
-      <div className="flex items-center gap-2 px-4 pt-4 pb-3">
+      <div
+        className={cn(
+          'flex items-center gap-2 border-b border-sidebar-border/70 pb-3 pt-4',
+          collapsed ? 'flex-col px-2' : 'px-4',
+        )}
+      >
         <Link
           to="/dashboard"
           aria-label="SysDent Pro — aller au tableau de bord"
           title="Tableau de bord"
-          className="focus-ring group flex min-w-0 flex-1 items-center gap-3 rounded-lg transition-opacity hover:opacity-80"
+          className="focus-ring group flex min-w-0 flex-1 items-center gap-3 rounded-lg transition-opacity hover:opacity-90"
         >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-sm font-black text-primary-foreground shadow-sm transition-transform duration-150 group-hover:scale-105">
+          <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-plateforme text-sm font-black text-white shadow-md shadow-primary/25 transition-transform duration-150 group-hover:scale-105">
             SD
           </span>
           {!collapsed && (
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-bold leading-tight">
-                SysDent Pro – Backoffice
-              </span>
-              <span className="flex items-center gap-1 truncate text-[10px] text-muted-foreground">
-                <Sparkles className="h-3 w-3 shrink-0 text-plateforme" aria-hidden />
+              <span className="block truncate text-[14px] font-bold leading-tight">SysDent Pro</span>
+              <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-plateforme/10 px-1.5 py-0.5 text-[10px] font-medium text-plateforme">
+                <Sparkles className="h-3 w-3 shrink-0" aria-hidden />
                 Console plateforme
               </span>
             </span>
           )}
         </Link>
 
-        {/* Repliage : la navbar n'a plus de bouton (demande explicite). */}
         <button
           type="button"
           onClick={onToggle}
@@ -132,8 +117,8 @@ export function AppSidebar({
 
       {/* Recherche de fonction : filtre réel de la navigation */}
       {!collapsed && (
-        <div className="px-4 pb-3">
-          <div className="flex h-9 items-center gap-2 rounded-full border border-surface-border bg-background/60 px-3.5 transition-all duration-150 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-ring/40">
+        <div className="px-4 pb-1 pt-3">
+          <div className="flex h-9 items-center gap-2 rounded-xl border border-surface-border bg-background/60 px-3 transition-all duration-150 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-ring/30">
             <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
             <input
               type="search"
@@ -149,12 +134,17 @@ export function AppSidebar({
 
       {/* Sections de navigation repliables — seule zone qui défile. */}
       <nav
-        className="scrollbar-none min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 pb-4"
+        className={cn(
+          'scrollbar-none min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-4',
+          collapsed ? 'px-2' : 'px-3',
+        )}
         aria-label="Navigation principale"
       >
         {sections.length === 0 && !collapsed && (
           <p className="px-2 pt-3 text-xs text-muted-foreground">
-            Aucune fonction ne correspond à « {recherche} ».
+            {recherche
+              ? `Aucune fonction ne correspond à « ${recherche} ».`
+              : 'Aucun module accessible avec vos droits.'}
           </p>
         )}
         {sections.map((section) => {
@@ -162,12 +152,12 @@ export function AppSidebar({
           const repliee =
             !collapsed && recherche.trim() === '' && sectionsRepliees.has(section.titre)
           return (
-            <div key={section.titre} className="pt-3">
-              {/* En rail, le titre est masqué : tronqué à « TAB… » il n'apporte
-                  rien. Un simple filet sépare les groupes. */}
+            <div key={section.titre} className="pt-4">
+              {/* En rail, le titre est masqué : tronqué il n'apporte rien. Un
+                  simple filet sépare les groupes. */}
               {collapsed ? (
                 <div
-                  className="mx-2 my-2 border-t border-sidebar-border"
+                  className="mx-2 mb-2 border-t border-sidebar-border"
                   role="separator"
                   aria-label={section.titre}
                 />
@@ -175,7 +165,7 @@ export function AppSidebar({
                 <button
                   type="button"
                   onClick={() => basculerSection(section.titre)}
-                  className="focus-ring flex w-full items-center justify-between gap-2 rounded-lg px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
+                  className="focus-ring mb-1 flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/80 transition-colors hover:text-foreground"
                   aria-expanded={!repliee}
                 >
                   <span className="truncate">{section.titre}</span>
@@ -197,7 +187,7 @@ export function AppSidebar({
                 )}
               >
                 <div className="overflow-hidden">
-                  <ul className="relative ml-3.5 space-y-0.5 border-l border-sidebar-border pl-2">
+                  <ul className="space-y-1">
                     {section.items.map((item) => {
                       const Icone = item.icon
                       const actif = item.href ? pathname.startsWith(item.href) : false
@@ -207,11 +197,23 @@ export function AppSidebar({
                         return (
                           <li
                             key={item.label}
-                            title="Module à venir"
-                            className="flex cursor-default items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] text-muted-foreground/50"
+                            title={collapsed ? `${item.label} — à venir` : 'Module à venir'}
+                            className={cn(
+                              'flex cursor-default items-center gap-3 rounded-xl px-2 py-1.5 text-[13px] text-muted-foreground/50',
+                              collapsed && 'justify-center',
+                            )}
                           >
-                            <Icone className="h-4 w-4 shrink-0" aria-hidden />
-                            {!collapsed && <span className="truncate">{item.label}</span>}
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
+                              <Icone className="h-4 w-4" aria-hidden />
+                            </span>
+                            {!collapsed && (
+                              <>
+                                <span className="truncate">{item.label}</span>
+                                <span className="ml-auto rounded-full border border-border px-1.5 text-[9px] uppercase tracking-wide">
+                                  Bientôt
+                                </span>
+                              </>
+                            )}
                           </li>
                         )
                       }
@@ -221,22 +223,33 @@ export function AppSidebar({
                           <NavLink
                             to={item.href}
                             className={cn(
-                              'focus-ring relative flex items-center gap-2.5 rounded-full px-2.5 py-2 text-[13px] transition-all duration-150',
+                              'focus-ring group relative flex items-center gap-3 rounded-xl px-2 py-1.5 text-[13px] transition-all duration-150',
+                              collapsed && 'justify-center',
                               actif
-                                ? 'bg-primary font-medium text-primary-foreground shadow-sm'
-                                : 'text-sidebar-foreground hover:translate-x-0.5 hover:bg-surface-hover hover:text-foreground',
+                                ? 'bg-primary/10 font-semibold text-primary dark:bg-primary/15'
+                                : 'text-sidebar-foreground hover:bg-surface-hover hover:text-foreground',
                             )}
                             title={collapsed ? item.label : undefined}
                             aria-current={actif ? 'page' : undefined}
                           >
-                            <Icone className="h-4 w-4 shrink-0" aria-hidden />
-                            {!collapsed && <span className="truncate">{item.label}</span>}
+                            {/* Filet d'accent de l'élément actif. */}
                             {actif && !collapsed && (
                               <span
-                                className="ml-auto h-1.5 w-1.5 rounded-full bg-white"
+                                className="absolute -left-3 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-primary"
                                 aria-hidden
                               />
                             )}
+                            <span
+                              className={cn(
+                                'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors duration-150',
+                                actif
+                                  ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/30'
+                                  : 'bg-muted/60 text-muted-foreground group-hover:bg-background group-hover:text-foreground',
+                              )}
+                            >
+                              <Icone className="h-4 w-4" aria-hidden />
+                            </span>
+                            {!collapsed && <span className="truncate">{item.label}</span>}
                           </NavLink>
                         </li>
                       )
@@ -250,14 +263,31 @@ export function AppSidebar({
       </nav>
 
       {/* Pied : carte utilisateur (la déconnexion vit dans le menu de la navbar) */}
-      <div className="p-3">
-        <div className="flex items-center gap-3 rounded-xl2 border border-surface-border bg-background/60 px-3 py-2.5 transition-colors duration-150 hover:border-primary/30">
-          <Avatar initials={initiales(profil?.prenom, profil?.nom)} size="lg" />
+      <div className="border-t border-sidebar-border/70 p-3">
+        <div
+          className={cn(
+            'flex items-center gap-3 rounded-xl2 bg-background/60 px-2.5 py-2.5 transition-colors duration-150 hover:bg-surface-hover',
+            collapsed && 'justify-center px-0',
+          )}
+          title={collapsed ? `${nomComplet} — ${roleLibelle}` : undefined}
+        >
+          <span className="relative shrink-0">
+            <Avatar initials={initiales(profil?.prenom, profil?.nom)} size="lg" />
+            <span
+              className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card bg-success"
+              aria-label="Connecté"
+            />
+          </span>
           {!collapsed && (
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] font-semibold leading-tight">{nomComplet}</p>
-              <p className="truncate text-[10px] leading-tight text-muted-foreground">
-                {roleLibelle} • {structure}
+              <p className="mt-1 flex items-center gap-1.5">
+                <span className="truncate rounded-full bg-plateforme/10 px-1.5 py-0.5 text-[10px] font-medium leading-none text-plateforme">
+                  {roleLibelle}
+                </span>
+                {profil?.deux_facteurs_actif && (
+                  <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-success" aria-label="Double authentification active" />
+                )}
               </p>
             </div>
           )}

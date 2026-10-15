@@ -4,6 +4,8 @@ import { Input, Label } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Modal } from '@/components/ui/modal'
 import { useToastStore } from '@/stores/toast-store'
+import { useAuthStore } from '@/stores/auth-store'
+import { CabinetLogo } from '@/components/cabinet-logo'
 import { ROLES, utilisateursApi } from '../services/utilisateurs-api'
 import type { Utilisateur } from '../types'
 
@@ -32,9 +34,9 @@ const VIDE: Formulaire = {
  *
  * Deux règles viennent du serveur et non d'ici :
  *
- * - le mot de passe est **fixé à la création**. Le changer passe par la
- *   réinitialisation, qui coupe les sessions ouvertes — sinon quelqu'un resterait
- *   connecté avec l'ancien ;
+ * - par défaut, **aucun mot de passe n'est fixé ici** : la personne reçoit un
+ *   lien d'activation par e-mail et choisit le sien. Un mot de passe saisi ici
+ *   est TEMPORAIRE : son changement est imposé à la première connexion ;
  * - un mot de passe tout numérique ou tout alphabétique est refusé : ce compte
  *   donne accès au dossier médical.
  *
@@ -55,6 +57,7 @@ export function UtilisateurModal({
   onSuccess: () => void
 }) {
   const edition = Boolean(utilisateur)
+  const profil = useAuthStore((e) => e.profil)
   const { addToast } = useToastStore()
 
   // L'etat initial est calcule une seule fois : le composant est remonte par le
@@ -74,6 +77,8 @@ export function UtilisateurModal({
   )
   const [erreur, setErreur] = useState('')
   const [soumission, setSoumission] = useState(false)
+  // Lien d'activation (recommandé) ou mot de passe temporaire (dépannage).
+  const [modeTemporaire, setModeTemporaire] = useState(false)
 
   const maj = <K extends keyof Formulaire>(cle: K, valeur: Formulaire[K]) =>
     setV((precedent) => ({ ...precedent, [cle]: valeur }))
@@ -86,7 +91,7 @@ export function UtilisateurModal({
     e.preventDefault()
     setErreur('')
 
-    if (!edition && !motDePasseSolide(v.motDePasse)) {
+    if (!edition && modeTemporaire && !motDePasseSolide(v.motDePasse)) {
       setErreur('Le mot de passe doit faire au moins 10 caractères et mélanger lettres et chiffres.')
       return
     }
@@ -106,14 +111,16 @@ export function UtilisateurModal({
           email: v.email,
           prenom: v.prenom,
           nom: v.nom,
-          mot_de_passe: v.motDePasse,
+          mot_de_passe: modeTemporaire ? v.motDePasse : null,
           role: v.role,
           telephone: v.telephone || null,
           cabinet_id: v.cabinetId || null,
         })
         addToast({
           type: 'success',
-          message: `Compte créé pour ${v.prenom} ${v.nom}.`,
+          message: modeTemporaire
+            ? `Compte créé pour ${v.prenom} ${v.nom}. Mot de passe temporaire à changer à la première connexion.`
+            : `Compte créé : ${v.prenom} ${v.nom} a reçu son lien d'activation par e-mail.`,
         })
       }
       onSuccess()
@@ -134,11 +141,20 @@ export function UtilisateurModal({
       description={
         edition
           ? 'Rôle, identité et coordonnées du compte.'
-          : 'Le compte est utilisable dès sa création.'
+          : 'La personne reçoit un lien pour activer son compte.'
       }
       maxWidth="lg"
     >
       <form className="space-y-4" onSubmit={soumettre}>
+        {/* Le cabinet dans lequel le compte est créé : repère visible avant de valider. */}
+        <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-3">
+          <CabinetLogo url={profil?.cabinet_logo_url} nom={profil?.cabinet_nom} taille="sm" />
+          <div className="min-w-0 text-sm">
+            <p className="text-xs text-muted-foreground">{edition ? 'Compte du cabinet' : 'Nouveau compte dans'}</p>
+            <p className="truncate font-semibold">{profil?.cabinet_nom ?? 'Votre cabinet'}</p>
+          </div>
+          {!profil?.cabinet_logo_url && <span className="ml-auto text-[10px] text-muted-foreground">Aucun logo</span>}
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="u-prenom" className="text-sm font-medium" required>
@@ -216,21 +232,42 @@ export function UtilisateurModal({
         </div>
 
         {!edition && (
-          <div className="space-y-1.5">
-            <Label htmlFor="u-mdp" className="text-sm font-medium" required>
-              Mot de passe initial
-            </Label>
-            <Input
-              id="u-mdp"
-              value={v.motDePasse}
-              onChange={(e) => maj('motDePasse', e.target.value)}
-              required
-              minLength={10}
-            />
-            <p className="text-xs text-muted-foreground">
-              Au moins 10 caractères, lettres et chiffres. Communicable au téléphone.
-            </p>
-          </div>
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium">Accès au compte</legend>
+            <label className="flex items-start gap-2 text-sm">
+              <input type="radio" name="u-acces" className="mt-1" checked={!modeTemporaire} onChange={() => setModeTemporaire(false)} />
+              <span>
+                <span className="font-medium">Envoyer un lien d'activation</span> (recommandé)
+                <span className="block text-xs text-muted-foreground">
+                  La personne choisit elle-même son mot de passe ; personne d'autre ne le connaît.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input type="radio" name="u-acces" className="mt-1" checked={modeTemporaire} onChange={() => setModeTemporaire(true)} />
+              <span>
+                <span className="font-medium">Fixer un mot de passe temporaire</span>
+                <span className="block text-xs text-muted-foreground">
+                  Si la personne n'a pas accès à ses e-mails. Elle devra le changer à sa première connexion.
+                </span>
+              </span>
+            </label>
+            {modeTemporaire && (
+              <div className="space-y-1.5 pl-6">
+                <Label htmlFor="u-mdp" className="text-sm font-medium" required>
+                  Mot de passe temporaire
+                </Label>
+                <Input
+                  id="u-mdp"
+                  value={v.motDePasse}
+                  onChange={(e) => maj('motDePasse', e.target.value)}
+                  required
+                  minLength={10}
+                />
+                <p className="text-xs text-muted-foreground">Au moins 10 caractères, lettres et chiffres.</p>
+              </div>
+            )}
+          </fieldset>
         )}
 
         {erreur && (

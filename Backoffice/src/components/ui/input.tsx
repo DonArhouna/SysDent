@@ -1,4 +1,4 @@
-import { forwardRef, type InputHTMLAttributes, type LabelHTMLAttributes } from 'react'
+import { forwardRef, type InputHTMLAttributes, type LabelHTMLAttributes, useId } from 'react'
 import { cn } from '@/lib/utils'
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -10,11 +10,15 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 /** Champ de saisie standard (formulaires et barres de recherche pilules). */
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, label, helperText, error, id, ...props }, ref) => {
+    // Sans `id` fourni, le libellé n'était relié à aucun champ : un lecteur
+    // d'écran annonçait un champ sans nom.
+    const idAuto = useId()
+    const champId = id ?? idAuto
     const inputElement = (
       <input
         type={type}
         ref={ref}
-        id={id}
+        id={champId}
         className={cn(
           'flex h-9 w-full rounded-lg border border-input bg-card px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-50',
           error && 'border-danger focus-visible:ring-danger',
@@ -31,7 +35,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="w-full space-y-1.5">
         {label && (
-          <label htmlFor={id} className="block text-xs font-semibold text-foreground">
+          <label htmlFor={champId} className="block text-xs font-semibold text-foreground">
             {label} {props.required && <span className="text-danger">*</span>}
           </label>
         )}

@@ -60,6 +60,10 @@ class PlatformProfilResponse(BaseSchema):
     # Vrai quand la 2FA est active mais que les codes de secours doivent être
     # régénérés : c'est lui qui pilote la bannière du backoffice.
     codes_secours_a_regenerer: bool = False
+    # Methodes du second facteur utilisables par ce compte : "totp" si une
+    # application est configuree, "email" toujours. Vide tant que la 2FA n'est
+    # pas active.
+    methodes_2fa: List[str] = Field(default_factory=list)
     dernier_login: Optional[datetime] = None
     cree_le: datetime
 
@@ -254,6 +258,8 @@ class SuppressionTenant(BaseSchema):
 class TenantResponse(BaseSchema):
     tenant_id: uuid.UUID
     nom: str
+    # Adresse publique du logo ; absent si le cabinet n'en a pas.
+    logo_url: Optional[str] = None
     ville: Optional[str] = None
     pays: Optional[str] = None
     telephone: Optional[str] = None
@@ -274,7 +280,6 @@ class TenantResponse(BaseSchema):
 class TenantDetailResponse(TenantResponse):
     adresse_siege: Optional[str] = None
     site_web: Optional[str] = None
-    logo_url: Optional[str] = None
     ninea: Optional[str] = None
     abonnement: Optional[dict] = None
 
@@ -631,10 +636,23 @@ class LoginPlateformeResponse(BaseSchema):
     jeton_challenge: Optional[str] = None
     jeton_enrolement: Optional[str] = None
     expiration_secondes: Optional[int] = None
+    # Methodes proposees a l'ecran suivant : "totp" (application), "email".
+    methodes: List[str] = Field(default_factory=list)
 
 
 class Activer2FARequest(BaseSchema):
     code: str = Field(..., min_length=6, max_length=8)
+
+
+class EnvoiCodeEmailRequest(BaseSchema):
+    """Demande d'un code par e-mail pendant le defi de connexion."""
+
+    jeton_challenge: str = Field(..., description="Défi reçu au login")
+
+
+class EnvoiCodeEmailResponse(BaseSchema):
+    destinataire: str = Field(..., description="Adresse masquée à laquelle le code est parti")
+    expiration_secondes: int
 
 
 class RegenererCodesSecoursRequest(BaseSchema):
@@ -701,3 +719,136 @@ class DashboardResponse(BaseSchema):
     sante: dict = {}
     annonces: List[AnnonceResponse] = []
     audit: List[AuditEntryResponse] = []  # Dernières actions tronquées à 5
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Rôles et permissions À L'INTÉRIEUR d'un cabinet
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class RoleCabinetResponse(BaseSchema):
+    id: str
+    nom: str
+    description: Optional[str] = None
+    niveau_hierarchie: int
+    permissions: List[str]
+    nb_utilisateurs: int
+    # Faux pour ADMIN_CABINET et SUPER_ADMIN : ils ont tous les droits par
+    # construction, leurs permissions ne se modifient pas.
+    modifiable: bool
+
+
+class PermissionCabinetResponse(BaseSchema):
+    code: str = Field(..., description="MODULE:ACTION")
+    module: str
+    action: str
+    description: Optional[str] = None
+    disponible: bool = Field(..., description="Présente dans la base de ce cabinet")
+
+
+class MatriceCabinetResponse(BaseSchema):
+    roles: List[RoleCabinetResponse]
+    catalogue: List[PermissionCabinetResponse]
+
+
+class ModificationPermissionCabinet(BaseSchema):
+    permission: str = Field(..., description="MODULE:ACTION, issue du catalogue")
+    motif: str = Field(..., min_length=5, max_length=500, description="Motif obligatoire (journalisé)")
+
+
+class PermissionsRoleCabinetResponse(BaseSchema):
+    role_id: str
+    permissions: List[str]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Accès des administrateurs d'un cabinet
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class AdminCabinetResponse(BaseSchema):
+    id: str
+    email: str
+    prenom: str
+    nom: str
+    actif: bool
+    activation_requise: bool
+    doit_changer_mot_de_passe: bool
+    deux_facteurs: bool
+    dernier_login: Optional[datetime] = None
+
+
+class ActionAccesAdminRequest(BaseSchema):
+    action: str = Field(..., pattern="^(lien|temporaire|deux_facteurs)$")
+    motif: str = Field(..., min_length=5, max_length=500, description="Motif obligatoire (journalisé)")
+
+
+class ActionAccesAdminResponse(BaseSchema):
+    compte: AdminCabinetResponse
+    # Présent pour `temporaire` uniquement, rendu UNE fois.
+    mot_de_passe_temporaire: Optional[str] = None
+
+
+class ChangementEmailAdminRequest(BaseSchema):
+    nouvel_email: EmailStr
+    motif: str = Field(..., min_length=5, max_length=500, description="Motif obligatoire (journalisé)")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Agenda de l'éditeur
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class RendezVousPlateformeBase(BaseSchema):
+    titre: str = Field(..., min_length=2, max_length=150)
+    type_rdv: str = Field(..., description="DEMO | INSTALLATION | FORMATION | SUPPORT | COMMERCIAL | AUTRE")
+    debut: datetime
+    duree_minutes: int = Field(60, ge=5, le=600)
+    tenant_id: Optional[uuid.UUID] = Field(None, description="Cabinet client ; sinon `prospect_nom`")
+    prospect_nom: Optional[str] = Field(None, max_length=150)
+    contact_nom: Optional[str] = Field(None, max_length=150)
+    contact_email: Optional[EmailStr] = None
+    contact_telephone: Optional[str] = Field(None, max_length=30)
+    lieu: Optional[str] = Field(None, max_length=255)
+    lien_visio: Optional[str] = Field(None, max_length=500)
+    agent_id: Optional[uuid.UUID] = None
+    notes: Optional[str] = None
+
+
+class RendezVousPlateformeCreate(RendezVousPlateformeBase):
+    # Prévenir le contact par e-mail (si une adresse est renseignée).
+    notifier_contact: bool = True
+
+
+class RendezVousPlateformeUpdate(BaseSchema):
+    titre: Optional[str] = Field(None, min_length=2, max_length=150)
+    type_rdv: Optional[str] = None
+    debut: Optional[datetime] = None
+    duree_minutes: Optional[int] = Field(None, ge=5, le=600)
+    tenant_id: Optional[uuid.UUID] = None
+    prospect_nom: Optional[str] = Field(None, max_length=150)
+    contact_nom: Optional[str] = Field(None, max_length=150)
+    contact_email: Optional[EmailStr] = None
+    contact_telephone: Optional[str] = Field(None, max_length=30)
+    lieu: Optional[str] = Field(None, max_length=255)
+    lien_visio: Optional[str] = Field(None, max_length=500)
+    agent_id: Optional[uuid.UUID] = None
+    notes: Optional[str] = None
+    notifier_contact: bool = True
+
+
+class StatutRendezVousPlateformeRequest(BaseSchema):
+    statut: str = Field(..., pattern="^(PLANIFIE|CONFIRME|EFFECTUE|ANNULE)$")
+    motif: Optional[str] = Field(None, max_length=500, description="Obligatoire pour une annulation")
+    notifier_contact: bool = True
+
+
+class RendezVousPlateformeResponse(RendezVousPlateformeBase):
+    id: uuid.UUID
+    statut: str
+    fin: datetime
+    tenant_nom: Optional[str] = None
+    agent_nom: Optional[str] = None
+    motif_annulation: Optional[str] = None
+    cree_par: Optional[str] = None
+    contact_prevenu: bool = False

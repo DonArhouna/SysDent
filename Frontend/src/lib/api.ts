@@ -28,6 +28,12 @@ import { toast } from '@/stores/toast-store'
 
 const BASE = import.meta.env.VITE_API_URL ?? ''
 
+/** Adresse complète d'une ressource servie par l'API (logo du cabinet…). */
+export function urlRessource(chemin: string | null | undefined): string | undefined {
+  if (!chemin) return undefined
+  return chemin.startsWith('http://') || chemin.startsWith('https://') ? chemin : `${BASE}${chemin}`
+}
+
 /** Erreur normalisée : `code` = littéral backend (ex: PAIEMENT_TROP_ELEVE). */
 export class ApiError extends Error {
   code: string

@@ -117,6 +117,9 @@ class UsageJeton(str, enum.Enum):
     # la preparation et l'activation -- sans quoi un compte sans 2FA pourrait
     # s'en servir comme d'une session.
     ENROLEMENT_2FA = "ENROLEMENT_2FA"
+    # Code a 6 chiffres envoye par e-mail, alternative au TOTP. Lie au defi ou
+    # au jeton d'enrolement qui l'a demande (HMAC), 5 minutes, usage unique.
+    CODE_2FA_EMAIL = "CODE_2FA_EMAIL"
 
 
 class StatutInscription(str, enum.Enum):
@@ -778,3 +781,45 @@ class InscriptionOnboarding(PlatformBase, UUIDMixin, TimestampMixin):
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
     verifie_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+# ==============================================================================
+# AGENDA DE L'ÉDITEUR
+# ==============================================================================
+
+
+class RendezVousPlateforme(PlatformBase, UUIDMixin, TimestampMixin):
+    """
+    Rendez-vous de l'équipe éditrice avec un cabinet ou un prospect :
+    démonstration, installation, formation, support, rendez-vous commercial.
+
+    **Aucune donnée patient.** Les rendez-vous des patients vivent dans la base
+    du cabinet et ne remontent jamais ici.
+    """
+
+    __tablename__ = "rendez_vous_plateforme"
+
+    titre: Mapped[str] = mapped_column(String(150), nullable=False)
+    # DEMO, INSTALLATION, FORMATION, SUPPORT, COMMERCIAL, AUTRE
+    type_rdv: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    # PLANIFIE, CONFIRME, EFFECTUE, ANNULE
+    statut: Mapped[str] = mapped_column(String(20), default="PLANIFIE", nullable=False, index=True)
+    debut: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    duree_minutes: Mapped[int] = mapped_column(Integer, default=60, nullable=False)
+
+    # Cabinet client, ou prospect (pas encore client) : l'un ou l'autre.
+    tenant_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
+    prospect_nom: Mapped[str | None] = mapped_column(String(150), nullable=True)
+
+    contact_nom: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    contact_email: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    contact_telephone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+
+    lieu: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    lien_visio: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+    agent_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("utilisateurs_plateforme.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    motif_annulation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cree_par: Mapped[str | None] = mapped_column(String(150), nullable=True)

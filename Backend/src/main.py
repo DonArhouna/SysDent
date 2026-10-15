@@ -11,6 +11,7 @@ from src.core.exception_handlers import register_exception_handlers
 from src.core.logging import setup_logging
 from src.core.middleware import setup_middlewares
 from src.core.platform_database import close_platform_engine, platform_engine
+from src.modules.platform.services.notifications import configurer_sender_depuis_settings
 
 # Initialiser le logging structuré
 setup_logging()
@@ -26,6 +27,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         version=settings.APP_VERSION,
         env=settings.APP_ENV,
     )
+    configurer_sender_depuis_settings(settings)
     yield
     logger.info("app_shutting_down")
     # Fermeture des connexions DB

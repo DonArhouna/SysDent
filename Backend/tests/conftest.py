@@ -127,6 +127,10 @@ def _reorienter_configuration_vers_les_tests() -> None:
 
 _reorienter_configuration_vers_les_tests()
 
+#: Les tests n'envoient jamais de vrai e-mail : sans mot de passe SMTP, l'envoi
+#: reste sur la console meme si le .env du poste en contient un.
+os.environ["SMTP_PASSWORD"] = ""
+
 from src.core.config import settings
 from src.core.database import tenant_db_manager
 from src.core.migrations import upgrade_tenant_to_head

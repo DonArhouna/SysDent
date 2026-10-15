@@ -201,6 +201,15 @@ class AuthService:
                     logger.warning("login_wrong_password", email=email_normalise, tenant_id=tenant_id)
                     raise AuthenticationException("Email ou mot de passe incorrect.", code="INVALID_CREDENTIALS")
 
+                # Compte créé par invitation et pas encore activé : son mot de
+                # passe est un aléa que personne ne connaît. Le refus est
+                # explicite ici, car seul le titulaire du lien arrive jusque-là.
+                if user.activation_requise:
+                    raise AuthenticationException(
+                        "Compte non activé : ouvrez le lien d'activation reçu par e-mail.",
+                        code="ACTIVATION_REQUISE",
+                    )
+
                 user.dernier_login = datetime.now(timezone.utc)
                 await tenant_session.flush()
 

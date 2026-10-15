@@ -36,6 +36,8 @@ from src.modules.platform.schemas import (
     Enrolement2FAResponse,
     Challenge2FARequest,
     ChangementMotDePasseRequest,
+    EnvoiCodeEmailRequest,
+    EnvoiCodeEmailResponse,
     LoginPlateformeResponse,
     PlatformLoginRequest,
     PlatformProfilResponse,
@@ -175,6 +177,40 @@ async def confirmer_2fa(
 
 
 @platform_auth_router.post(
+    "/2fa/email",
+    response_model=APIResponse[EnvoiCodeEmailResponse],
+    summary="Recevoir le code de connexion par e-mail",
+    responses={
+        401: {"description": "Défi invalide ou expiré"},
+        429: {"description": "Trop d'envois"},
+    },
+)
+async def envoyer_code_email_defi(
+    data: EnvoiCodeEmailRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_platform_db),
+):
+    """
+    Alternative au TOTP : un code a 6 chiffres part a l'adresse du compte.
+
+    Le code se saisit ensuite sur `/2fa`, avec le meme defi. Il ne vaut que pour
+    ce defi, 5 minutes, une fois ; un nouvel envoi annule le precedent.
+    """
+    refuser_acces_client(request)
+    ip = exiger_ip_autorisee(request)
+    user, contexte = await PlatformAuthService.resoudre_defi(db, data.jeton_challenge)
+
+    # Jamais de `reussite` : chaque envoi compte, pour qu'on ne puisse pas
+    # inonder une boite mail depuis l'ecran de connexion.
+    login_platform_limiter.tenter(f"platform_2fa_email|{cle_login(user.email, ip)}")
+
+    envoi = await PlatformAuthService.envoyer_code_email(
+        db, user, contexte, client_ip=ip, user_agent=request.headers.get("user-agent")
+    )
+    return APIResponse(message="Code envoyé.", data=EnvoiCodeEmailResponse(**envoi))
+
+
+@platform_auth_router.post(
     "/refresh",
     response_model=APIResponse[PlatformTokenResponse],
     summary="Renouveler la session",
@@ -243,6 +279,9 @@ async def me(user: UtilisateurPlateforme = Depends(get_current_platform_user),
             # Indicateur de la bannière : la 2FA est active mais les codes de
             # secours doivent être régénérés (compte préexistant sans codes).
             codes_secours_a_regenerer=user.codes_secours_a_regenerer,
+            methodes_2fa=(
+                PlatformAuthService.methodes_disponibles(user) if user.deux_facteurs_actif else []
+            ),
             dernier_login=user.dernier_login,
             cree_le=user.created_at,
         )
@@ -400,6 +439,93 @@ async def activer_2fa(
     )
     tokens = await PlatformAuthService._ouvrir_session(
         db, user, client_ip=client_ip(request), user_agent=request.headers.get("user-agent")
+    )
+    await db.commit()
+    _deposer_cookie(response, tokens["access_token"])
+    return APIResponse(
+        message="Second facteur activé.",
+        data=Enrolement2FAResponse(**tokens, codes_secours=codes),
+    )
+
+
+@platform_auth_router.post(
+    "/2fa/activation-email/envoi",
+    response_model=APIResponse[EnvoiCodeEmailResponse],
+    summary="Enrôlement par e-mail : recevoir le code",
+    responses={
+        401: {"description": "Jeton d'enrolement invalide ou expire"},
+        429: {"description": "Trop d'envois"},
+    },
+)
+async def envoyer_code_email_enrolement(
+    request: Request,
+    db: AsyncSession = Depends(get_platform_db),
+    user: UtilisateurPlateforme = Depends(get_current_platform_user_enrolement),
+):
+    """Alternative au QR code : un code part a l'adresse du compte (jeton d'enrolement)."""
+    from src.modules.platform.security import hacher_jeton
+
+    refuser_acces_client(request)
+    ip = exiger_ip_autorisee(request)
+    login_platform_limiter.tenter(f"platform_2fa_email|{cle_login(user.email, ip)}")
+
+    envoi = await PlatformAuthService.envoyer_code_email(
+        db,
+        user,
+        hacher_jeton(_jeton_de_l_entete(request)),
+        client_ip=ip,
+        user_agent=request.headers.get("user-agent"),
+    )
+    return APIResponse(message="Code envoyé.", data=EnvoiCodeEmailResponse(**envoi))
+
+
+@platform_auth_router.post(
+    "/2fa/activation-email",
+    response_model=APIResponse[Enrolement2FAResponse],
+    summary="Enrôlement par e-mail : activer et ouvrir la session",
+    responses={
+        401: {"description": "Jeton d'enrolement invalide, ou code invalide"},
+        429: {"description": "Trop de tentatives"},
+    },
+)
+async def activer_2fa_email(
+    data: Activer2FARequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_platform_db),
+    user: UtilisateurPlateforme = Depends(get_current_platform_user_enrolement),
+):
+    """
+    Pendant de `/2fa/activation` pour l'e-mail : le code recu active le second
+    facteur, les codes de secours sont rendus **une fois**, la session s'ouvre.
+    """
+    from src.modules.platform.security import hacher_jeton
+
+    refuser_acces_client(request)
+    ip = exiger_ip_autorisee(request)
+
+    jeton = _jeton_de_l_entete(request)
+    cle = f"platform_activation|{cle_login(jeton[:16], ip)}"
+    login_platform_limiter.tenter(cle)
+
+    codes = await PlatformAuthService.activer_second_facteur_par_email(
+        db, user, hacher_jeton(jeton), data.code
+    )
+    login_platform_limiter.reussite(cle)
+    await PlatformAuthService._marquer_enrolement_consomme(db, jeton)
+
+    await JournalService.journaliser(
+        db,
+        action="PLATFORM_2FA_ACTIVEE",
+        type_cible="AUTH",
+        acteur_email=user.email,
+        acteur_id=user.id,
+        apres={"methode": "email", "codes_secours_emus": len(codes)},
+        ip_address=ip,
+        user_agent=request.headers.get("user-agent"),
+    )
+    tokens = await PlatformAuthService._ouvrir_session(
+        db, user, client_ip=ip, user_agent=request.headers.get("user-agent")
     )
     await db.commit()
     _deposer_cookie(response, tokens["access_token"])

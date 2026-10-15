@@ -6,11 +6,11 @@ import {
   CornerDownLeft,
   LogOut,
   Search,
-  Settings,
   UserRound,
   type LucideIcon,
 } from 'lucide-react'
 import { NAVIGATION } from '@/lib/navigation'
+import { PERMISSIONS } from '@/lib/plateforme'
 import { useAuthStore, possedePermission } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
 
@@ -68,27 +68,26 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
 
     // 2. Les actions ponctuelles.
     const actions: Resultat[] = [
-      {
-        id: 'action:rdv',
-        libelle: 'Prendre un rendez-vous',
-        groupe: 'Actions',
-        icone: CalendarPlus,
-        hint: 'Agenda',
-        action: () => naviguer('/agenda'),
-      },
+      // Rendez-vous de l'ÉQUIPE avec un cabinet ou un prospect (jamais un
+      // rendez-vous de patient : ceux-là restent dans le cabinet).
+      ...(possedePermission(profil, PERMISSIONS.agendaEcrire)
+        ? [
+            {
+              id: 'action:rdv',
+              libelle: 'Planifier un rendez-vous',
+              groupe: 'Actions',
+              icone: CalendarPlus,
+              hint: 'Agenda',
+              action: () => naviguer('/agenda?nouveau=1'),
+            },
+          ]
+        : []),
       {
         id: 'action:compte',
         libelle: 'Mon compte',
         groupe: 'Compte',
         icone: UserRound,
         action: () => naviguer('/compte'),
-      },
-      {
-        id: 'action:parametres',
-        libelle: 'Paramètres',
-        groupe: 'Compte',
-        icone: Settings,
-        action: () => naviguer('/parametres'),
       },
       {
         id: 'action:deconnexion',

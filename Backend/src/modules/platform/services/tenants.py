@@ -625,6 +625,7 @@ def _vers_ligne(
     return {
         "tenant_id": str(societe.id),
         "nom": societe.nom,
+        "logo_url": societe.logo_url,
         "ville": societe.ville,
         "pays": dossier.pays if dossier else societe.pays,
         "telephone": societe.telephone,

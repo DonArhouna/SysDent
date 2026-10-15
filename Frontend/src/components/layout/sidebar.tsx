@@ -6,6 +6,7 @@ import { useAuthStore, possedePermission } from '@/stores/auth-store'
 import { libelleRole } from '@/lib/roles'
 import { Avatar, initiales } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
+import { urlRessource } from '@/lib/api'
 
 /**
  * Sidebar flottante de l'application.
@@ -39,6 +40,8 @@ export function AppSidebar({
   const { pathname } = useLocation()
   const [sectionsRepliees, setSectionsRepliees] = useState<Set<string>>(new Set())
   const [recherche, setRecherche] = useState('')
+  const logo = urlRessource(profil?.cabinet_logo_url)
+  const [logoCasse, setLogoCasse] = useState(false)
 
   const sections = useMemo(() => {
     const terme = recherche.trim().toLowerCase()
@@ -68,6 +71,8 @@ export function AppSidebar({
   // n'est pas sur une plateforme, il est dans le sien.
   const structure = profil?.cabinet_nom ?? 'Cabinet'
 
+  console.log('--------------------Nom Cabinet---------------------:', profil?.cabinet_nom);
+
   return (
     <aside
       className={cn(
@@ -85,9 +90,19 @@ export function AppSidebar({
           title="Tableau de bord"
           className="focus-ring group flex min-w-0 flex-1 items-center gap-3 rounded-lg transition-opacity hover:opacity-80"
         >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-sm font-black text-primary-foreground shadow-sm transition-transform duration-150 group-hover:scale-105">
-            SD
-          </span>
+          {logo && !logoCasse ? (
+            // Logo du cabinet, défini depuis la console ; « SD » à défaut.
+            <img
+              src={logo}
+              alt={`Logo de ${profil?.cabinet_nom ?? 'votre cabinet'}`}
+              onError={() => setLogoCasse(true)}
+              className="h-9 w-9 shrink-0 rounded-xl border border-border bg-white object-contain p-0.5 shadow-sm transition-transform duration-150 group-hover:scale-105"
+            />
+          ) : (
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-sm font-black text-primary-foreground shadow-sm transition-transform duration-150 group-hover:scale-105">
+              SD
+            </span>
+          )}
           {!collapsed && (
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[13px] font-bold leading-tight">

@@ -18,7 +18,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatusBadge, type StatusTone } from '@/components/ui/status-badge'
-import { useAuthStore } from '@/stores/auth-store'
+import { possedePermission, useAuthStore } from '@/stores/auth-store'
+import { ProchainsRendezVous } from '@/features/agenda/cartes-rendez-vous'
+import { PERMISSIONS } from '@/lib/plateforme'
 import { useDashboardStore, type VueDashboard } from './dashboard-store'
 
 /**
@@ -127,6 +129,7 @@ function ContenuDashboard() {
   const charger = useDashboardStore((s) => s.charger)
   const reessayer = useDashboardStore((s) => s.reessayer)
   const aRegenerer = useAuthStore((s) => s.profil?.codes_secours_a_regenerer)
+  const peutVoirAgenda = useAuthStore((s) => possedePermission(s.profil, PERMISSIONS.agendaLire))
 
   useEffect(() => {
     void charger()
@@ -193,6 +196,13 @@ function ContenuDashboard() {
       ) : null}
 
       <GrilleKpi vue={vue} />
+
+      {/* Garde AVANT le composant : il appelle des hooks de requête. */}
+      {peutVoirAgenda && (
+        <div className="mt-6">
+          <ProchainsRendezVous />
+        </div>
+      )}
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <ListeCabinets

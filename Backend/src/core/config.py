@@ -166,11 +166,35 @@ class Settings(BaseSettings):
     TENANT_DB_POOL_SIZE: int = 5
     TENANT_DB_MAX_OVERFLOW: int = 10
 
+    # Application des cabinets : adresse publique, pour les liens envoyés par
+    # e-mail (activation de compte). En production : https://app.<domaine>.
+    CLIENT_APP_URL: str = "http://localhost:5173"
+    # Rôles des cabinets pour lesquels la double authentification est
+    # OBLIGATOIRE. Les autres rôles peuvent l'activer depuis « Mon compte ».
+    TENANT_2FA_ROLES_OBLIGATOIRES: Union[List[str], str] = ["ADMIN_CABINET", "SUPER_ADMIN"]
+    # Durée de validité du lien d'activation d'un compte de cabinet.
+    TENANT_ACTIVATION_HEURES: int = 48
+
     # Redis
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
     REDIS_PASSWORD: str = ""
     REDIS_DB: int = 0
+
+    # E-mail sortant (SMTP). Tant que SMTP_USER ou SMTP_PASSWORD est vide, les
+    # messages restent sur la sortie standard du serveur (envoi console). Pour
+    # Gmail, SMTP_PASSWORD est un « mot de passe d'application », jamais le mot
+    # de passe du compte Google.
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = ""
+    SMTP_FROM_NAME: str = "SysDent Pro"
+    SMTP_TIMEOUT_SECONDS: int = 15
+    # Développement : chaque e-mail envoyé par SMTP est aussi affiché sur la
+    # console du serveur (codes compris). Ignoré quand APP_ENV=production.
+    EMAIL_COPIE_CONSOLE: bool = False
 
     # CORS & Domaines autorisés
     # Liste blanche explicite. `5174` est le port du BACKOFFICE : c'est une
@@ -188,7 +212,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_JSON_FORMAT: bool = False
 
-    @field_validator("CORS_ORIGINS", "ALLOWED_HOSTS", "PLATFORM_IP_WHITELIST", mode="before")
+    @field_validator("CORS_ORIGINS", "ALLOWED_HOSTS", "PLATFORM_IP_WHITELIST", "TENANT_2FA_ROLES_OBLIGATOIRES", mode="before")
     @classmethod
     def parse_cors_origins(cls, value: Union[str, List[str]]) -> List[str]:
         if isinstance(value, str):

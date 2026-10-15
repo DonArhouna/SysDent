@@ -88,6 +88,15 @@ def upgrade() -> None:
         ),
     )
 
+    # **Base neuve : rien a rattacher.** Le provisionnement applique TOUTES les
+    # migrations sur une base vide (etape 3) avant de semer roles et
+    # permissions (etape 4) depuis `MATRICE_ROLES`, qui contient deja ce lien.
+    # Exiger le role ici faisait echouer la creation de tout nouveau cabinet.
+    # Une base qui a des roles mais pas le secretariat reste, elle, refusee
+    # ci-dessous : c'est l'etat incoherent que ce controle doit attraper.
+    if op.get_bind().execute(sa.text("SELECT 1 FROM roles LIMIT 1")).first() is None:
+        return
+
     # Les deux controles qui suivent sont faits en Python, et non par un bloc
     # `DO`. Un bloc `DO` est une instruction utilitaire : PostgreSQL n'accepte
     # aucune borne sur une requete, et la premiere version de cette migration
